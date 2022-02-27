@@ -12,6 +12,8 @@ import (
 	"github.com/boynton/smithy"
 )
 
+var Version string = "development version"
+
 func main() {
 	conf := data.NewObject()
 	pVersion := flag.Bool("v", false, "Show api tool version and exit")
@@ -26,7 +28,7 @@ func main() {
 
 	flag.Parse()
 	if *pVersion {
-		fmt.Printf("API tool %s [%s]\n", smithy.ToolVersion, "https://github.com/boynton/api")
+		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
 		os.Exit(0)
 	}
 	gen := *pGen

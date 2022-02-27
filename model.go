@@ -10,8 +10,6 @@ import (
 	"github.com/boynton/smithy"
 )
 
-var ToolVersion string = "development version"
-
 var ImportFileExtensions = map[string][]string{
 	".smithy": []string{"smithy"},
 	".json":   []string{"smithy", "openapi"},

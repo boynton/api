@@ -1,9 +1,8 @@
 all:: bin/api
 
-bin/api:: go.mod
+bin/api:: go.mod *.go
 	mkdir -p bin
-#	go build -ldflags "-X github.com/boynton/api.ToolVersion=`git describe --tag`" -o bin/api github.com/boynton/api
-	go build -o bin/api github.com/boynton/api
+	go build -ldflags "-X main.Version=`git describe --tag`" -o bin/api github.com/boynton/api
 
 install:: all
 	rm -f $(HOME)/bin/api
