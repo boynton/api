@@ -1,3 +1,18 @@
+/*
+   Copyright 2022 Lee R. Boynton
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 package sadl
 
 import (
@@ -237,7 +252,11 @@ func (w *SadlWriter) EmitBlobShape(name string, shape *smithy.Shape) {
 func (w *SadlWriter) EmitCollectionShape(shapeName, name string, shape *smithy.Shape) {
 	w.EmitShapeComment(shape)
 	//	w.EmitTraits(shape.Traits, "")
-	w.Emit("type %s Array<%s> // %s\n", name, w.stripNamespace(shape.Member.Target), shapeName)
+	comment := ""
+	if shapeName != "list" {
+		comment = " // " + shapeName
+	}
+	w.Emit("type %s List<%s>%s\n", name, w.stripNamespace(shape.Member.Target), comment)
 }
 
 func (w *SadlWriter) EmitMapShape(name string, shape *smithy.Shape) {
@@ -249,7 +268,7 @@ func (w *SadlWriter) EmitMapShape(name string, shape *smithy.Shape) {
 func (w *SadlWriter) EmitStructureShape(name string, shape *smithy.Shape, opts []string) {
 	sopts := w.annotationString(opts)
 	w.EmitShapeComment(shape)
-	w.Emit("type %s Struct%s{\n", name, sopts)
+	w.Emit("type %s Struct%s {\n", name, sopts)
 	for _, k := range shape.Members.Keys() {
 		v := shape.Members.Get(k)
 		tref := w.stripNamespace(w.shapeRefToTypeRef(v.Target))

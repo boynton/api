@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package openapi
+package swagger
 
 import (
 	"fmt"
@@ -30,5 +30,5 @@ func Import(path string) (*smithy.AST, error) {
 }
 
 func ToSmithy(model *Model) (*smithy.AST, error) {
-	return nil, fmt.Errorf("openapi.ToSmithy() NYI")
+	return nil, fmt.Errorf("swagger.ToSmithy() NYI")
 }

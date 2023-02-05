@@ -1,6 +1,6 @@
 all:: bin/api
 
-bin/api:: go.mod *.go
+bin/api:: go.mod *.go */*.go
 	mkdir -p bin
 	go build -ldflags "-X main.Version=`git describe --tag`" -o bin/api github.com/boynton/api
 
