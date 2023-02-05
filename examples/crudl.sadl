@@ -1,5 +1,7 @@
 /* Generated from smithy source */
 
+namespace crudl
+version 1
 
 //
 // Create the item. The item with the updated modified time is returned.
