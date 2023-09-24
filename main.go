@@ -21,10 +21,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boynton/api/openapi"
-	"github.com/boynton/api/sadl"
+	"github.com/boynton/api/common"
+	"github.com/boynton/api/golang"
 	"github.com/boynton/data"
-	"github.com/boynton/smithy"
+	//	"github.com/boynton/api/openapi"
+	//	"github.com/boynton/api/sadl"
+	"github.com/boynton/api/smithy"
+	//	"github.com/boynton/api/swagger"
 )
 
 var Version string = "development version"
@@ -34,7 +37,8 @@ func main() {
 	pVersion := flag.Bool("v", false, "Show api tool version and exit")
 	pList := flag.Bool("l", false, "List the entities in the model")
 	pForce := flag.Bool("f", false, "Force overwrite if output file exists")
-	pGen := flag.String("g", "sadl", "The generator for output")
+	pGen := flag.String("g", "model", "The generator for output")
+	pNs := flag.String("ns", "example", "The namespace to force if none is present")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
 	var params Params
 	flag.Var(&params, "a", "Additional named arguments for a generator")
@@ -54,19 +58,28 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	ast, err := AssembleModel(files, tags)
+	model, err := AssembleModel(files, tags, *pNs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
 	}
 	if *pList {
-		for _, n := range ast.ShapeNames() {
+		for _, o := range model.Operations {
+			fmt.Println(o.Id + " (operation)")
+		}
+		for _, n := range model.ShapeNames() {
 			fmt.Println(n)
 		}
 		os.Exit(0)
 	}
+	if gen == "model" {
+		fmt.Println(data.Pretty(model))
+		os.Exit(0)
+	}
 	conf.Put("outdir", outdir)
-	conf.Put("force", *pForce)
+	if *pForce {
+		conf.Put("force", true)
+	}
 	for _, a := range params {
 		kv := strings.Split(a, "=")
 		if len(kv) > 1 {
@@ -77,7 +90,7 @@ func main() {
 	}
 	generator, err := Generator(gen)
 	if err == nil {
-		err = generator.Generate(ast, conf)
+		err = generator.Generate(model, conf)
 	}
 	if err != nil {
 		fmt.Printf("*** %v\n", err)
@@ -105,20 +118,24 @@ func (p *Tags) Set(value string) error {
 	return nil
 }
 
-func Generator(genName string) (smithy.Generator, error) {
+func Generator(genName string) (common.Generator, error) {
 	switch genName {
 	case "smithy-ast":
 		return new(smithy.AstGenerator), nil
 	case "smithy":
 		return new(smithy.IdlGenerator), nil
-	case "sadl":
-		return new(sadl.IdlGenerator), nil
-	case "openapi":
-		return new(openapi.Generator), nil
-	//case "swagger":
-	//case "grpc":
-	//case "java":
-	//case "go":
+		/*
+			case "sadl":
+					return new(sadl.SadlGenerator), nil
+				case "openapi":
+					return new(openapi.Generator), nil
+				case "swagger":
+					return new(swagger.Generator), nil
+				//case "grpc":
+				//case "java":
+		*/
+	case "go", "golang":
+		return new(golang.Generator), nil
 	//case "ts":
 	//case "http-trace":
 	//case "markdown":

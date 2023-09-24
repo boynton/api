@@ -1,0 +1,128 @@
+name api
+namespace model
+
+// BaseType - All other types are derived from these.
+type BaseType Enum {
+	Null // JSON null
+    Bool // JSON true or false
+    Int8
+    Int16
+    Int32
+    Int64
+    Float32
+    Float64
+    Decimal // JSON Number, arbitrary precision
+    Blob // an array of Int8, but is a primitive type as it is handled more as a whole than as a collection. Base64 encoded.
+    String // JSON String
+    Timestamp // a time instance, a date-time encoded as RFC 3339
+	Array // JSON Array, heterogenous sequence
+	Object // JSON Object, similar to a Struct with no predefined fields, or a Smithy Document
+    List // Abstract: value type must be defined
+    Map //Abstract: key and value types must be defined
+    Struct //Abstract: field definitions must be defined
+    Enum //Abstract: members must be defined
+    Union // Abstract: members must be defined
+}
+
+// Identifier - a simple symbolic name that most programming languages can use, i.e. "Blah"
+type Identifier String (pattern="^[a-zA-Z_][a-zA-Z_0-9]*$")
+
+// Namespace - A sequence of one or more names delimited by a '.', i.e. "foo.bar"
+type Namespace String (pattern="(^[a-zA-Z_][a-zA-Z_0-9]*\\.)*[a-zA-Z_][a-zA-Z_0-9]*$")
+
+// AbsoluteIdentifier - an Identifier in a Namespace, i.e. "foo.bar#Blah".
+type AbsoluteIdentifier String (pattern="^([a-zA-Z_][a-zA-Z_0-9]*\\.)*[a-zA-Z_][a-zA-Z_0-9]*#[a-zA-Z_][a-zA-Z_0-9]*$")
+
+// TypeDef - a structure defining a new type in this system. New types cannot be derived from these, but this new type
+// can be used to specify the type of members in aggregate types.
+// TypeDef could more properly be defined as a Union of various types, but this structure is more convenient.
+type TypeDef Struct {
+    id AbsoluteIdentifier (required)
+    base BaseType (required)
+    comment String
+    minValue Decimal
+    maxValue Decimal
+    minSize Int64
+    maxSize Int64
+    pattern String
+    items AbsoluteIdentifier
+    keys AbsoluteIdentifier
+    fields List<FieldDef>
+    elements List<EnumElement>
+    tags List<String>
+}
+
+// FieldDef - describes each field in a structure or union.
+type FieldDef Struct {
+    name String
+    type AbsoluteIdentifier
+    required Bool
+    comment String
+}
+
+// EnumElement - describes each element of an Enum type
+type EnumElement Struct {
+    symbol Identifier (required)
+    value String
+    type AbsoluteIdentifier /* defaults to "api#String", but "api#Int32" could also be used */
+    comment String
+}
+
+// OperationDef - describes an operation, including its HTTP bindings
+type OperationDef Struct {
+    id AbsoluteIdentifier (required)
+    comment String
+    httpMethod String
+    httpUri String
+    input OperationInput
+    output OperationOutput
+    exceptions List<OperationOutput>
+}
+
+// OperationInput - the description of an operation input. It is similar to a Struct definition,
+// but with HTTP bindings.
+type OperationInput Struct {
+	id AbsoluteIdentifier
+    fields List<OperationInputField>
+    comment String
+}
+
+// OperationInputField - the description of an operation input field
+type OperationInputField Struct {
+    name Identifier (required)
+    type AbsoluteIdentifier (required)
+    required Bool
+    comment String
+    httpHeader Identifier
+    httpQuery Identifier
+    httpPath Bool
+    httpPayload Bool
+}
+
+// OperationOutput - the description of an operation output. Similar to a Struct definition,
+// but with HTTP bindings. Also used for OperationExceptions.
+type OperationOutput Struct {
+	id AbsoluteIdentifier
+    httpStatus Int32
+    fields List<OperationOutputField>
+    comment String
+}
+
+// OperationOutputField
+type OperationOutputField Struct {
+    name Identifier (required)
+    type AbsoluteIdentifier (required)
+    comment String
+    httpHeader Identifier
+    httpPayload Bool
+}
+
+// ServiceDef - the definition of a service, consisting of Types and Operations
+type ServiceDef Struct {
+    id AbsoluteIdentifier (required)
+    version String
+    comment String
+    types List<TypeDef>
+    operations List<OperationDef>
+}
+

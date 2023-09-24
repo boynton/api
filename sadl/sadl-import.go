@@ -16,22 +16,30 @@ limitations under the License.
 package sadl
 
 import (
-	"path/filepath"
+	"fmt"
 
-	"github.com/boynton/sadl"
-	sadlsmithy "github.com/boynton/sadl/smithy"
-	"github.com/boynton/smithy"
+	//	"path/filepath"
+
+	//	"github.com/boynton/sadl"
+	//	sadlsmithy "github.com/boynton/sadl/smithy"
+	"github.com/boynton/api/smithy"
 )
 
-func Import(path string) (*smithy.AST, error) {
-	model, err := sadl.ParseSadlFile(path, nil)
-	if err != nil {
-		return nil, err
-	}
-	if model.Namespace == "" {
-		file := filepath.Base(path)
-		ext := filepath.Ext(path)
-		model.Namespace = file[:len(file)-len(ext)]
-	}
-	return sadlsmithy.FromSADL(model, model.Namespace)
+func Import(path string, ns string) (*smithy.AST, error) {
+	return nil, fmt.Errorf("sadl.ToSmithy() NYI")
+	/*
+		model, err := sadl.ParseSadlFile(path, nil)
+		if err != nil {
+			return nil, err
+		}
+		if model.Namespace == "" {
+			model.Namespace = ns
+			if model.Namespace == "" {
+				file := filepath.Base(path)
+				ext := filepath.Ext(path)
+				model.Namespace = file[:len(file)-len(ext)]
+			}
+		}
+		return sadlsmithy.FromSADL(model, model.Namespace)
+	*/
 }

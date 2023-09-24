@@ -20,9 +20,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/boynton/api/openapi"
-	"github.com/boynton/api/sadl"
-	"github.com/boynton/smithy"
+	//"github.com/boynton/data"
+	"github.com/boynton/api/model"
+	//	"github.com/boynton/api/openapi"
+	//	"github.com/boynton/api/sadl"
+	"github.com/boynton/api/smithy"
+	//	"github.com/boynton/api/swagger"
 )
 
 var ImportFileExtensions = map[string][]string{
@@ -59,35 +62,38 @@ func expandPaths(paths []string) ([]string, error) {
 	return result, nil
 }
 
-func AssembleModel(paths []string, tags []string) (*smithy.AST, error) {
+func AssembleModel(paths []string, tags []string, ns string) (*model.Schema, error) {
 	flatPathList, err := expandPaths(paths)
 	if err != nil {
 		return nil, err
 	}
-	assembly := &smithy.AST{
-		Smithy: "1.0",
-	}
+	assembly := &model.Schema{}
 	for _, path := range flatPathList {
-		var ast *smithy.AST
+		var model *model.Schema
 		var err error
 		ext := filepath.Ext(path)
 		switch ext {
 		case ".smithy":
-			ast, err = smithy.Parse(path)
+			model, err = smithy.Import(path)
 		case ".json":
-			ast, err = smithy.LoadAST(path)
-			if err != nil {
-				ast, err = openapi.Import(path)
-			}
-		case ".sadl":
-			ast, err = sadl.Import(path)
+			model, err = smithy.Import(path)
+			/*
+					if err != nil {
+						model, err = openapi.Import(path, ns)
+						if err != nil {
+							model, err = swagger.Import(path, ns)
+						}
+					}
+				case ".sadl":
+					model, err = sadl.Import(path, ns)
+			*/
 		default:
 			return nil, fmt.Errorf("parse for file type %q not implemented", ext)
 		}
 		if err != nil {
 			return nil, err
 		}
-		err = assembly.Merge(ast)
+		err = assembly.Merge(model)
 		if err != nil {
 			return nil, err
 		}

@@ -13,19 +13,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package openapi
+package swagger
 
 import (
 	"fmt"
 
 	"github.com/boynton/data"
-	"github.com/boynton/smithy"
+	"github.com/boynton/api/common"
+	"github.com/boynton/api/model"
 )
 
 type Generator struct {
-	smithy.BaseGenerator
+	common.BaseGenerator
 }
 
-func (gen *Generator) Generate(ast *smithy.AST, config *data.Object) error {
-	return fmt.Errorf("openapi.Generator NYI")
+func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
+	return fmt.Errorf("swagger.Generator NYI")
 }

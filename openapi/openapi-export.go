@@ -18,12 +18,12 @@ package openapi
 import (
 	"fmt"
 
+	"github.com/boynton/api/common"
 	"github.com/boynton/data"
-	"github.com/boynton/smithy"
 )
 
 type Generator struct {
-	smithy.BaseGenerator
+	common.BaseGenerator
 }
 
 func (gen *Generator) Generate(ast *smithy.AST, config *data.Object) error {

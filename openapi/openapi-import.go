@@ -18,17 +18,17 @@ package openapi
 import (
 	"fmt"
 
-	"github.com/boynton/smithy"
+	"github.com/boynton/api/smithy"
 )
 
-func Import(path string) (*smithy.AST, error) {
+func Import(path string, ns string) (*smithy.AST, error) {
 	model, err := Load(path)
 	if err != nil {
 		return nil, err
 	}
-	return ToSmithy(model)
+	return ToSmithy(model, ns)
 }
 
-func ToSmithy(model *Model) (*smithy.AST, error) {
+func ToSmithy(model *Model, ns string) (*smithy.AST, error) {
 	return nil, fmt.Errorf("openapi.ToSmithy() NYI")
 }
