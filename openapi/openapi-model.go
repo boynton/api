@@ -30,12 +30,12 @@ func IsValidFile(path string) bool {
 	return err == nil
 }
 
-func Load(path string) (*Model, error) {
+func Load(path string) (*OpenAPI, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
 	}
-	v3 := &Model{}
+	v3 := &OpenAPI{}
 	ext := filepath.Ext(path)
 	if ext == ".yaml" {
 		err = yaml.Unmarshal(data, &v3)
@@ -55,23 +55,7 @@ func missingFieldError(fld, obj string) error {
 	return OasError("Missing required field '%s' in %s object", fld, obj)
 }
 
-/*
-func Load(data []byte, format string) (*Model, error) {
-	var err error
-	v3 := &Model{}
-	if format == "yaml" {
-		err = yaml.Unmarshal(data, &v3)
-	} else {
-		err = json.Unmarshal(data, &v3)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return Validate(v3)
-}
-*/
-
-func Validate(v3 *Model) (*Model, error) {
+func Validate(v3 *OpenAPI) (*OpenAPI, error) {
 	if v3.OpenAPI == "" {
 		return nil, missingFieldError("openapi", "OpenAPI")
 	}
@@ -117,7 +101,7 @@ func ValidatePaths(paths map[string]*PathItem) error {
 	return nil
 }
 
-type Model struct {
+type OpenAPI struct {
 	Extensions   map[string]interface{} `json:"-"`
 	OpenAPI      string                 `json:"openapi"`           // Required
 	Info         *Info                  `json:"info"`              // Required
@@ -435,27 +419,27 @@ func (p Paths) MarshalJSON() ([]byte, error) {
 }
 */
 
-func (model Model) MarshalJSON() ([]byte, error) {
+func (openapi OpenAPI) MarshalJSON() ([]byte, error) {
 	tmp := make(map[string]interface{}, 0)
-	for k, v := range model.Extensions {
+	for k, v := range openapi.Extensions {
 		tmp[k] = v
 	}
-	tmp["openapi"] = model.OpenAPI
-	tmp["info"] = model.Info
-	if model.Servers != nil {
-		tmp["servers"] = model.Servers
+	tmp["openapi"] = openapi.OpenAPI
+	tmp["info"] = openapi.Info
+	if openapi.Servers != nil {
+		tmp["servers"] = openapi.Servers
 	}
-	if model.Paths != nil {
-		tmp["paths"] = model.Paths
+	if openapi.Paths != nil {
+		tmp["paths"] = openapi.Paths
 	}
-	if model.Components != nil {
-		tmp["components"] = model.Components
+	if openapi.Components != nil {
+		tmp["components"] = openapi.Components
 	}
-	if model.Security != nil {
-		tmp["security"] = model.Security
+	if openapi.Security != nil {
+		tmp["security"] = openapi.Security
 	}
-	if model.ExternalDocs != nil {
-		tmp["externalDocs"] = model.ExternalDocs
+	if openapi.ExternalDocs != nil {
+		tmp["externalDocs"] = openapi.ExternalDocs
 	}
 	return json.Marshal(tmp)
 }

@@ -98,6 +98,9 @@ func JsonKeysInOrder(data []byte) ([]string, error) {
 }
 
 func (s *Map[V]) String() string {
+	if true {
+		return "BLAH"
+	}
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -138,6 +141,21 @@ func (s *Map[V]) Put(key string, val V) {
 		s.keys = append(s.keys, key)
 	}
 	s.bindings[key] = val
+}
+
+func (s *Map[V]) Delete(key string) {
+	if s != nil {
+		if _, ok := s.bindings[key]; ok {
+			var tmp []string
+			for _, k := range s.keys {
+				if k != key {
+					tmp = append(tmp, k)
+				}
+			}
+			s.keys = tmp
+			delete(s.bindings, key)
+		}
+	}
 }
 
 func (s *Map[V]) Keys() []string {

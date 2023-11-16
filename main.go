@@ -23,11 +23,13 @@ import (
 
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/golang"
-	"github.com/boynton/data"
-	//	"github.com/boynton/api/openapi"
-	//	"github.com/boynton/api/sadl"
+	"github.com/boynton/api/markdown"
+	"github.com/boynton/api/model"
+	"github.com/boynton/api/openapi"
+	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
-	//	"github.com/boynton/api/swagger"
+	"github.com/boynton/data"
+	//"github.com/boynton/api/swagger"
 )
 
 var Version string = "development version"
@@ -36,15 +38,15 @@ func main() {
 	conf := data.NewObject()
 	pVersion := flag.Bool("v", false, "Show api tool version and exit")
 	pList := flag.Bool("l", false, "List the entities in the model")
+	pEntity := flag.String("e", "", "Show the specified entity.")
 	pForce := flag.Bool("f", false, "Force overwrite if output file exists")
-	pGen := flag.String("g", "model", "The generator for output")
+	pGen := flag.String("g", "json", "The generator for output")
 	pNs := flag.String("ns", "example", "The namespace to force if none is present")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
 	var params Params
 	flag.Var(&params, "a", "Additional named arguments for a generator")
 	var tags Tags
-	flag.Var(&tags, "t", "Tag of entities to include")
-
+	flag.Var(&tags, "t", "Tag of entities to include. Prefix tag with '-' to exclude that tag")
 	flag.Parse()
 	if *pVersion {
 		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
@@ -58,22 +60,40 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	model, err := AssembleModel(files, tags, *pNs)
+	schema, err := AssembleModel(files, tags, *pNs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
 	}
 	if *pList {
-		for _, o := range model.Operations {
+		if schema.Id != "" {
+			fmt.Println(schema.Id + " (service)")
+		}
+		for _, o := range schema.Operations {
 			fmt.Println(o.Id + " (operation)")
 		}
-		for _, n := range model.ShapeNames() {
+		for _, n := range schema.ShapeNames() {
 			fmt.Println(n)
 		}
 		os.Exit(0)
+	} else if *pEntity != "" {
+		eid := model.AbsoluteIdentifier(*pEntity)
+		td := schema.GetTypeDef(eid)
+		if td != nil {
+			fmt.Println(td)
+		} else {
+			op := schema.GetOperationDef(eid)
+			if op != nil {
+				fmt.Println(op)
+			} else {
+				fmt.Println("No such entity:", eid)
+				os.Exit(1)
+			}
+		}
+		os.Exit(0)
 	}
-	if gen == "model" {
-		fmt.Println(data.Pretty(model))
+	if gen == "json" {
+		fmt.Println(data.Pretty(schema))
 		os.Exit(0)
 	}
 	conf.Put("outdir", outdir)
@@ -90,7 +110,7 @@ func main() {
 	}
 	generator, err := Generator(gen)
 	if err == nil {
-		err = generator.Generate(model, conf)
+		err = generator.Generate(schema, conf)
 	}
 	if err != nil {
 		fmt.Printf("*** %v\n", err)
@@ -120,25 +140,27 @@ func (p *Tags) Set(value string) error {
 
 func Generator(genName string) (common.Generator, error) {
 	switch genName {
+	case "summary":
+		return new(common.SummaryGenerator), nil
+	case "api":
+		return new(common.ApiGenerator), nil
+	case "markdown":
+		return new(markdown.Generator), nil
 	case "smithy-ast":
 		return new(smithy.AstGenerator), nil
 	case "smithy":
 		return new(smithy.IdlGenerator), nil
-		/*
-			case "sadl":
-					return new(sadl.SadlGenerator), nil
-				case "openapi":
-					return new(openapi.Generator), nil
-				case "swagger":
-					return new(swagger.Generator), nil
-				//case "grpc":
-				//case "java":
-		*/
+	case "sadl":
+		return new(sadl.Generator), nil
+	case "openapi":
+		return new(openapi.Generator), nil
+	case "swagger":
+		return nil, fmt.Errorf("swagger.Generator NYI")
+		//return new(swagger.Generator), nil
 	case "go", "golang":
 		return new(golang.Generator), nil
 	//case "ts":
 	//case "http-trace":
-	//case "markdown":
 	//case "swagger-ui":
 	default:
 		return nil, fmt.Errorf("Unknown generator: %q", genName)

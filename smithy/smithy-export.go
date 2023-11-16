@@ -3,25 +3,11 @@ package smithy
 import(
 	"github.com/boynton/data"
 	"github.com/boynton/api/model"
-	"github.com/boynton/api/common"
+	//	"github.com/boynton/api/common"
 )
 
-type AstGenerator struct {
-	common.BaseGenerator
-}
-
-func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
-	if err != nil {
-		return err
-	}
-	//no longer true! the internal data.Model is not longer the same
-	text := data.Pretty(schema)
-	return gen.Emit(text, "model.json", "")
-}
-
 type IdlGenerator struct {
-	common.BaseGenerator
+	AstGenerator
 }
 
 func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) error {
@@ -45,3 +31,4 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 	panic("FIX ME: smithy.IdlGenerator.Generate")
 	return nil
 }
+

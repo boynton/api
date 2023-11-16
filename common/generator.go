@@ -38,8 +38,9 @@ type BaseGenerator struct {
 	OutDir         string
 	ForceOverwrite bool
 	buf            bytes.Buffer
-	_file           *os.File
-	_writer         *bufio.Writer
+	writer         *bufio.Writer
+	//	_file          *os.File
+	//	_writer        *bufio.Writer
 	Err            error
 	typesEmitted   map[model.AbsoluteIdentifier]bool
 }
@@ -65,6 +66,24 @@ func (gen *BaseGenerator) HasEmitted(id model.AbsoluteIdentifier) bool {
 
 func (gen *BaseGenerator) Emitted(id model.AbsoluteIdentifier) {
 	gen.typesEmitted[id] = true
+}
+
+func (gen *BaseGenerator) Begin() {
+	gen.buf.Reset()
+	gen.writer = bufio.NewWriter(&gen.buf)
+}
+
+func (gen *BaseGenerator) End() string {
+	gen.writer.Flush()
+	return gen.buf.String()
+}
+
+func (gen *BaseGenerator) Emit(s string) {
+	gen.writer.WriteString(s)
+}
+
+func (gen *BaseGenerator) Emitf(format string, args ...interface{}) {
+	gen.writer.WriteString(fmt.Sprintf(format, args...))
 }
 
 func (gen *BaseGenerator) FileExists(path string) bool {
@@ -109,7 +128,7 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 }
 */
 
-func (gen *BaseGenerator) Emit(text string, filename string, separator string) error {
+func (gen *BaseGenerator) Write(text string, filename string, separator string) error {
 	if gen.Err != nil {
 		return gen.Err
 	}

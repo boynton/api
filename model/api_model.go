@@ -25,17 +25,17 @@ const (
     Int64
     Float32
     Float64
+	Integer
     Decimal
     Blob
     String
     Timestamp
-    Array
-    Object
     List
     Map
     Struct
     Enum
     Union
+	Any
 )
 
 var namesBaseType = []string{
@@ -47,17 +47,17 @@ var namesBaseType = []string{
     Int64: "Int64",
     Float32: "Float32",
     Float64: "Float64",
+    Integer: "Integer",
     Decimal: "Decimal",
     Blob: "Blob",
     String: "String",
     Timestamp: "Timestamp",
-    Array: "Array",
-    Object: "Object",
     List: "List",
     Map: "Map",
     Struct: "Struct",
     Enum: "Enum",
     Union: "Union",
+	Any: "Any",
 }
 
 func (e BaseType) String() string {
@@ -107,8 +107,8 @@ type TypeDef struct {
     Comment string `json:"comment,omitempty"`
     MinValue *data.Decimal `json:"minValue,omitempty"`
     MaxValue *data.Decimal `json:"maxValue,omitempty"`
-    MinSize int64 `json:"minSize,omitempty"`
-    MaxSize int64 `json:"maxSize,omitempty"`
+    MinSize *int64 `json:"minSize,omitempty"`
+    MaxSize *int64 `json:"maxSize,omitempty"`
     Pattern string `json:"pattern,omitempty"`
     Items AbsoluteIdentifier `json:"items,omitempty"`
     Keys AbsoluteIdentifier `json:"keys,omitempty"`
@@ -122,7 +122,7 @@ type TypeDef struct {
 // FieldDef
 //
 type FieldDef struct {
-    Name string `json:"name,omitempty"`
+    Name Identifier `json:"name,omitempty"`
     Type AbsoluteIdentifier `json:"type,omitempty"`
     Required bool `json:"required,omitempty"`
     Comment string `json:"comment,omitempty"`
@@ -171,8 +171,9 @@ type OperationInputField struct {
     Name Identifier `json:"name"`
     Type AbsoluteIdentifier `json:"type"`
     Required bool `json:"required,omitempty"`
+    Default interface{} `json:"default,omitempty"`
     Comment string `json:"comment,omitempty"`
-    HttpHeader Identifier `json:"httpHeader,omitempty"`
+    HttpHeader string `json:"httpHeader,omitempty"`
     HttpQuery Identifier `json:"httpQuery,omitempty"`
     HttpPath bool `json:"httpPath,omitempty"`
     HttpPayload bool `json:"httpPayload,omitempty"`
@@ -197,7 +198,7 @@ type OperationOutputField struct {
     Name Identifier `json:"name"`
     Type AbsoluteIdentifier `json:"type"`
     Comment string `json:"comment,omitempty"`
-    HttpHeader Identifier `json:"httpHeader,omitempty"`
+    HttpHeader string `json:"httpHeader,omitempty"`
     HttpPayload bool `json:"httpPayload,omitempty"`
 }
 
@@ -206,9 +207,10 @@ type OperationOutputField struct {
 // ServiceDef
 //
 type ServiceDef struct {
-    Id AbsoluteIdentifier `json:"id"`
+    Id AbsoluteIdentifier `json:"id,omitempty"`
     Version string `json:"version,omitempty"`
     Comment string `json:"comment,omitempty"`
-    Types []*TypeDef `json:"types,omitempty"`
+	Base string `json:"base,omitempty"`
     Operations []*OperationDef `json:"operations,omitempty"`
+    Types []*TypeDef `json:"types,omitempty"`
 }

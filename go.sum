@@ -1,5 +1,3 @@
-github.com/boynton/data v0.0.3 h1:1sNewVRYZd18Zgv93YMrnNIi0W/sMaWZeBqgS7Mda6o=
-github.com/boynton/data v0.0.3/go.mod h1:vjCfWtPw0Nu4GRri76nD/XRZclQXMc6EP8/HbxEs3r8=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/shopspring/decimal v1.3.1 h1:2Usl1nmF/WZucqkFZhnfFYxxxu8LG21F6nPQBE5gKV8=

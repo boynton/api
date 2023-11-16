@@ -75,14 +75,14 @@ type OperationDef Struct {
     httpMethod String
     httpUri String
     input OperationInput
-    output OperationOutput
+    output OperationOutput (required) //because of HttpStatus
     exceptions List<OperationOutput>
 }
 
 // OperationInput - the description of an operation input. It is similar to a Struct definition,
 // but with HTTP bindings.
 type OperationInput Struct {
-	id AbsoluteIdentifier
+	id AbsoluteIdentifier (required)
     fields List<OperationInputField>
     comment String
 }
@@ -92,6 +92,7 @@ type OperationInputField Struct {
     name Identifier (required)
     type AbsoluteIdentifier (required)
     required Bool
+	default Any
     comment String
     httpHeader Identifier
     httpQuery Identifier
@@ -102,8 +103,8 @@ type OperationInputField Struct {
 // OperationOutput - the description of an operation output. Similar to a Struct definition,
 // but with HTTP bindings. Also used for OperationExceptions.
 type OperationOutput Struct {
-	id AbsoluteIdentifier
-    httpStatus Int32
+	id AbsoluteIdentifier (required)
+    httpStatus Int32 (required)
     fields List<OperationOutputField>
     comment String
 }

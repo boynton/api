@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/boynton/data" //for Decimal
@@ -38,8 +39,10 @@ type NodeValue struct {
 	value interface{}
 }
 func NewNodeValue() *NodeValue {
+//to do: use Map to preserve order of keys
 	return &NodeValue{value:make(map[string]interface{}, 0)}
 }
+
 func AsNodeValue(v interface{}) *NodeValue {
 	if nv, ok := v.(*NodeValue); ok {
 		return nv
@@ -60,15 +63,12 @@ func (node *NodeValue) UnmarshalJSON(b []byte) error {
     return err
 }
 
+func (node *NodeValue) RawValue() interface{} {
+	return node.value
+}
+
 func (node *NodeValue) String() string {
-	//	buf := new(bytes.Buffer)
-	//	enc := json.NewEncoder(buf)
-	//	enc.SetEscapeHTML(false)
-	//	if err := enc.Encode(node.value); err != nil {
-	//		panic("whoops")
-		return fmt.Sprint(node.value)
-	//	}
-	//	return strings.TrimRight(string(buf.String()), " \t\n\v\f\r")
+	return fmt.Sprint(node.value)
 }
 
 func (node *NodeValue) IsObject() bool {
@@ -113,7 +113,6 @@ func (node *NodeValue) Get(key string) *NodeValue {
 		}
 		return nil
 	case *NodeValue:
-		fmt.Println("Get("+key+"):", m, "->", m.Get(key))
 		return m.Get(key)
 	default:
 		fmt.Println("Whoa:", m)
@@ -166,11 +165,16 @@ func (node *NodeValue) AsInt() int {
 			return n
 		case int64:
 			return int(n)
+		case float64:
+			return int(n)
+		case *data.Integer:
+			return n.AsInt()
 		case *data.Decimal:
 			return n.AsInt()
 		case *NodeValue:
 			panic("double NodeValue wrapper, oops")
 		}
+		fmt.Println("asInt?", node)
 		panic("Whoa GetInt!")
 	}
 	return 0
@@ -185,12 +189,17 @@ func (node *NodeValue) GetInt(key string, def int) int {
 }
 
 func (node *NodeValue) AsDecimal() *data.Decimal {
+	if node == nil {
+		return nil
+	}
 	if node.value != nil {
 		switch n := node.value.(type) {
 		case *data.Decimal:
 			return n
 		case data.Decimal:
 			return &n
+		case float64:
+			return data.DecimalFromFloat64(n)
 		case *NodeValue:
 			panic("ooops, double wrapoper")
 		}
@@ -218,6 +227,7 @@ func (node *NodeValue) GetSlice(key string) []interface{} {
 }
 
 func (node *NodeValue) GetStringSlice(key string) []string {
+	fmt.Println("node:", node)
 	switch m := node.value.(type) {
 	case map[string]interface{}:
 		if tmp, ok := m[key]; ok {
@@ -303,7 +313,9 @@ func (ast *AST) ForAllShapes(visitor func(shapeId string, shape *Shape) error) e
 
 type Shape struct {
 	Type   string       `json:"type"`
-	Traits *NodeValue `json:"traits,omitempty"` //service, resource, operation, apply
+
+	//Service
+	Version string `json:"version,omitempty"`
 
 	//List and Set
 	Member *Member `json:"member,omitempty"`
@@ -336,8 +348,21 @@ type Shape struct {
 	Output *ShapeRef   `json:"output,omitempty"`
 	Errors []*ShapeRef `json:"errors,omitempty"`
 
-	//Service
-	Version string `json:"version,omitempty"`
+	Traits *NodeValue `json:"traits,omitempty"` //service, resource, operation, apply
+}
+
+func (shape *Shape) GetTrait(id string) *NodeValue {
+	if shape.Traits != nil {
+		return shape.Traits.Get(id)
+	}
+	return nil
+}
+
+func (shape *Shape) GetStringTrait(id string) string {
+	if shape.Traits != nil {
+		return shape.Traits.GetString(id)
+	}
+	return ""
 }
 
 type ShapeRef struct {
@@ -347,6 +372,13 @@ type ShapeRef struct {
 type Member struct {
 	Target string       `json:"target"`
 	Traits *NodeValue `json:"traits,omitempty"`
+}
+
+func (mem *Member) GetStringTrait(id string) string {
+	if mem.Traits != nil {
+		return mem.Traits.GetString(id)
+	}
+	return ""
 }
 
 func shapeIdNamespace(id string) string {
@@ -546,7 +578,71 @@ func LoadAST(path string) (*AST, error) {
 	return ast, nil
 }
 
+func Assemble(paths []string) (*AST, error) {
+	assembly := &AST{}
+	for _, path := range paths {
+		ext := filepath.Ext(path)
+		switch ext {
+		case ".smithy":
+			ast, err := Parse(path)
+			if err != nil {
+				return nil, err
+			}
+			assembly.Merge(ast)
+		case ".json":
+			ast, err := LoadAST(path)
+			if err != nil {
+				return nil, err
+			}
+			assembly.Merge(ast)
+		}
+	}
+	assembly.ExpandMixins()
+	for _, k := range assembly.Shapes.Keys() {
+		if tmp := assembly.GetShape(k); tmp != nil {
+			if tmp.Type == "apply" {
+				assembly.Apply(k, tmp.Traits)
+				//assembly.Shapes.Delete(k)
+			}
+		}
+	}
+	return assembly, nil
+}
+
+func (ast *AST) Apply(target string, traits *NodeValue) error {
+	lst := strings.Split(target, "$")
+	field := ""
+	if len(lst) == 2 {
+		target = lst[0]
+		field = lst[1]
+	}
+	if shape := ast.GetShape(target); shape != nil {
+		if field != "" {
+			m := shape.Members.Get(field)
+			if m == nil {
+				fmt.Println("field not found:", field, target, data.Pretty(shape))
+				panic("whoops")
+			}
+			t := ensureMemberTraits(m)
+			for _, k := range traits.Keys() {
+				t.Put(k, traits.Get(k))
+			}
+		} else {
+			t := ensureShapeTraits(shape)
+			for _, k := range traits.Keys() {
+				t.Put(k, traits.Get(k))
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("Cannot apply traits to %s: target shape not found", target)
+}
+
 func (ast *AST) Merge(src *AST) error {
+	if ast == nil || (ast.Metadata == nil && ast.Shapes == nil) {
+		*ast = *src
+		return nil
+	}
 	if ast.Smithy != src.Smithy {
 		if strings.HasPrefix(ast.Smithy, "1") && strings.HasPrefix(src.Smithy, "2") {
 			ast.Smithy = src.Smithy
@@ -588,19 +684,65 @@ func (ast *AST) mergeConflict(k string, v1 interface{}, v2 interface{}) error {
 	return fmt.Errorf("Conflict when merging metadata in models: %s\n", k)
 }
 
-func (ast *AST) Filter(tags []string) {
-	var root []string
-	for _, k := range ast.Shapes.Keys() {
-		shape := ast.Shapes.Get(k)
-		shapeTags := shape.Traits.GetStringSlice("smithy.api#tags")
-		if shapeTags != nil {
-			for _, t := range shapeTags {
-				if containsString(tags, t) {
-					root = append(root, k)
+func (ast *AST) expandMixins(shapeId string) error {
+	//destructive: every mixin is merged once
+	shape := ast.Shapes.Get(shapeId)
+	if shape == nil {
+		return fmt.Errorf("Shape not available:", shapeId)
+	}
+	//for _, mixinRef := range shape.Mixins {
+	if shape.Mixins != nil {
+		last := len(shape.Mixins) - 1
+		for i := last; i >= 0; i--  {
+			mixinRef := shape.Mixins[i]
+			mixinId := mixinRef.Target
+			ast.expandMixins(mixinId) //this causes reverse order, not what we want
+			mixin := ast.Shapes.Get(mixinId) //expanded
+			if mixin.Members != nil {
+				if shape.Type != "structure" {
+					return fmt.Errorf("Target for mixin with members not a Structure:", shapeId)
 				}
+				newMembers := NewMap[*Member]()
+				for _, memKey := range mixin.Members.Keys() {
+					mem := mixin.Members.Get(memKey)
+					newMembers.Put(memKey, mem)
+				}
+				for _, memKey := range shape.Members.Keys() {
+					if !newMembers.Has(memKey) {
+						newMembers.Put(memKey, shape.Members.Get(memKey))
+					}
+				}
+				shape.Members = newMembers
+			}
+			//note: `@private @mixin(localTraits: [private])`, which is a way to not propage a trait on a mixin, is NYI
+			if mixin.Traits != nil && mixin.Traits.Length() > 1 {
+				newTraits := NewNodeValue()
+				for _, trait := range mixin.Traits.Keys() {
+					if trait != "smithy.api#mixin" && trait != "smithy.api#trait" {
+						newTraits.Put(trait, mixin.Traits.Get(trait))
+					}
+				}
+				if shape.Traits != nil {
+					for _, trait := range shape.Traits.Keys() {
+						newTraits.Put(trait, shape.Traits.Get(trait))
+					}
+				}
+				shape.Traits = newTraits
 			}
 		}
+		shape.Mixins = nil
 	}
+	return nil
+}
+
+func (ast *AST) ExpandMixins() error {
+	for _, shapeId := range ast.Shapes.Keys() {
+		ast.expandMixins(shapeId)
+	}
+	return nil
+}
+
+func (ast *AST) FilterDependencies(root []string) {
 	included := make(map[string]bool, 0)
 	for _, k := range root {
 		if _, ok := included[k]; !ok {
@@ -614,6 +756,87 @@ func (ast *AST) Filter(tags []string) {
 		}
 	}
 	ast.Shapes = filtered
+}
+
+func (ast *AST) ServiceDependencies() (string, error) {
+	var root []string
+	ns := ""
+	for _, k := range ast.Shapes.Keys() {
+		if ns == "" {
+			ns = k[:strings.Index(k, "#")]
+		}
+		shape := ast.Shapes.Get(k)
+		if shape == nil {
+			fmt.Println("whoops, shape not defined:", k)
+			panic("here")
+		} else {
+			if shape.Type == "service" {
+				root = append(root, k)
+			}
+		}
+	}
+	switch len(root) {
+	case 0:
+		return ns, nil
+	case 1:
+		ast.FilterDependencies(root)
+		return ns, nil
+	default:
+		return "", fmt.Errorf("Cannot handle more than one service in model")
+	}
+}
+
+func (ast *AST) Filter(tags []string) {
+	var root []string
+	if len(tags) == 0 {
+		//if no tags, don't filter
+		return
+	}
+	var include []string
+	var exclude []string
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "-") {
+			exclude = append(exclude, tag[1:])
+		} else {
+			include = append(include, tag)
+		}
+	}
+	
+	for _, k := range ast.Shapes.Keys() {
+		shape := ast.Shapes.Get(k)
+		if shape == nil {
+			panic("whoops, shape is nil")
+		}
+		if shape.Traits != nil {
+			shapeTags := shape.Traits.GetStringSlice("smithy.api#tags")
+			if shapeTags != nil {
+				for _, t := range shapeTags {
+					if containsString(include, t) {
+						root = append(root, k)
+					}
+				}
+			}
+		}
+	}
+	ast.FilterDependencies(root)
+	/*
+	included := make(map[string]bool, 0)
+	for _, k := range root {
+		if _, ok := included[k]; !ok {
+			ast.noteDependencies(included, k)
+		}
+	}
+	filtered := NewMap[*Shape]()
+	for name, _ := range included {
+		if !strings.HasPrefix(name, "smithy.api#") {
+			filtered.Put(name, ast.GetShape(name))
+		}
+	}
+	*/
+	if len(exclude) > 0 {
+		fmt.Print("TBD: exclude by tag: ", exclude)
+		panic("here")
+	}
 }
 
 func containsString(ary []string, val string) bool {

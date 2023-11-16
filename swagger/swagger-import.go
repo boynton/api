@@ -22,122 +22,156 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
+	"github.com/boynton/api/model"
 )
 
-func Import(path string, ns string) (*smithy.AST, error) {
-	model, err := Load(path)
+func Import(paths []string, tags []string, ns string) (*model.Schema, error) {
+	if len(paths) != 1 {
+		return nil, fmt.Errorf("Swagger import can aonly accept a single file")
+	}
+	path := paths[0]
+	swagger, err := Load(path)
 	if err != nil {
 		return nil, err
 	}
 	file := filepath.Base(path)
 	ext := filepath.Ext(path)
 	name := file[:len(file)-len(ext)]
-	fmt.Println("model:", model)
-	return ToSmithy(model, ns, name)
+	fmt.Println("swagger:", swagger)
+	return ImportSwagger(swagger, ns, name)
 }
 
-type Model struct {
+type Swagger struct {
 	name string
 	namespace string
-	raw data.Document
+	raw data.Object
 }
 
-func (model *Model) String() string {
-	return data.Pretty(model.raw)
+func (swagger *Swagger) String() string {
+	return data.Pretty(swagger.raw)
 }
 
-func (model *Model) ImportInfo(ast *smithy.AST) error {
-	if info := model.raw.GetDocument("info"); info != nil {
-		ast.Metadata = data.NewDocument()
-		license := info.GetDocument("license")
-		if license != nil {
-			ast.Metadata.Put("x_license_name", license.GetString("name"))
-			ast.Metadata.Put("x_license_url", license.GetString("url"))
+func ImportSwagger(swagger *Swagger, ns string, name string) (*model.Schema, error) {
+	if swagger.raw.GetString("swagger") != "2.0" {
+		return nil, fmt.Errorf("Not a valid swagger document. Only version 2.0 is supported")
+	}
+	schema := model.NewSchema()
+	err := swagger.ImportInfo(schema, ns)
+	if err != nil {
+		return nil, err
+	}
+	err = swagger.ImportService(schema)
+	return schema, err
+}
+
+
+func (swagger *Swagger) ImportInfo(schema *model.Schema, ns string) error {
+	if info := swagger.raw.GetObject("info"); info != nil {
+		name := info.GetString("title")
+		if name == "" {
+			name = "Untitled"
 		}
-		v := info.GetString("version")
-		if v != "" {
-			ast.Metadata.Put("version", info.GetString("version"))
+		schema.Id = model.AbsoluteIdentifier(ns + "#" + name)
+		schema.Version = info.GetString("version")
+		schema.Comment = info.GetString("description")
+		schema.Base = swagger.raw.GetString("basePath")
+		license := info.GetObject("license")
+		if license != nil {
+			schema.Metadata = data.NewObject()
+			schema.Metadata.Put("x_license_name", license.GetString("name"))
+			schema.Metadata.Put("x_license_url", license.GetString("url"))
 		}
 		return nil
 	}
 	return nil
 }
 
-func withTrait(traits *data.Document, key string, val interface{}) *data.Document {
-	if val != nil {
-		if traits == nil {
-			traits = data.NewDocument()
-		}
-		traits.Put(key, val)
-	}
-	return traits
-}
-
-func withCommentTrait(traits *data.Document, val string) (*data.Document, string) {
-	if val != "" {
-		val = TrimSpace(val)
-		traits = withTrait(traits, "smithy.api#documentation", val)
-	}
-	return traits, ""
-}
-
-func (model *Model) ImportService(ast *smithy.AST) error {
-	doc := "service imported from swagger"
-	if info := model.raw.GetDocument("info"); info != nil {
-		s := info.GetString("title")
-		if s != "" {
-			doc = s
+func (swagger *Swagger) ImportService(schema *model.Schema) error {
+	//paths := swagger.raw.GetObject("paths")
+	defs := swagger.raw.GetObject("definitions")
+	for _, k := range defs.Keys() {
+		def := defs.GetObject(k)
+		if def.Has("properties") {
+			err := swagger.ImportStruct(k, schema, def)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	//grab other metadata
-
 	//enumerate the path/operation. Try to get an enumeration of the operationNames
-	//output a service shape
-	var traits *data.Document
-	traits, _ = withCommentTrait(traits, doc)
-	shape := &smithy.Shape{
-		Type:   "service",
-		Traits: traits,
-	}
-	ast.PutShape(model.fullName(Capitalize(model.name)), shape)
 	return nil
 }
 
-func (model *Model) fullName(name string) string {
-	return model.namespace + "#" + name
+func (swagger *Swagger) toCanonicalAbsoluteId(name string) model.AbsoluteIdentifier {
+	return model.AbsoluteIdentifier(gen.ns + "#" + name)
 }
 
-func ToSmithy(model *Model, ns string, name string) (*smithy.AST, error) {
-	ast := &smithy.AST{
-		Smithy: "2",
+func (swagger *Swagger) toCanonicalTypeName(sch *data.Object) model.AbsoluteIdentifier {
+	ref := sch.GetString("$ref")
+	if ref != "" {
+		return
 	}
-	model.namespace = ns
-	model.name = name
-	err := model.ImportInfo(ast)
-	if err != nil {
-		return nil, err
+	tname := sch.GetString("type")
+	name := "?"
+	switch name {
+	case "number":
+		name = "base.Decimal"
+		//check formats
+	case "string":
+		name = "base.String"
+		//check formats
+	case "boolean":
+		name = "base.Bool"
+	case "object":
+		//recurse, and build name
+		name
 	}
-
-	model.ImportService(ast)
-
-	//	ast.PutShape(model.fullName("foo"), &smithy.Shape{Type: "string"})
-
-	return ast, nil
+	return model.AbsoluteIdentifier(name)
 }
 
-func Load(path string) (*Model, error) {
-	model := &Model{}
+func (swagger *Swagger) ImportStruct(name string, schema *model.Schema, def *data.Object) error {
+	td := &model.TypeDef{
+		Id: swagger.toCanonicalAbsoluteId(name),
+		Base: model.Struct,
+	}
+	props := def.GetObject("properties")
+	for _, name := range props.Keys() {
+		fd := &model.FieldDef{
+			Name: name,
+		}
+		v := props.GetObject(name)
+		fd.Type = swagger.toCanonicalTypeName(v.GetString("type"))
+		if v.Traits != nil {
+					if v.Traits.Get("smithy.api#required") != nil {
+						fd.Required = true
+					}
+					comment := v.Traits.GetString("smithy.api#documentation")
+					if comment != "" {
+						fd.Comment = comment
+					}
+				}
+				td.Fields = append(td.Fields, fd)
+			}
+	
+	fmt.Println("struct: ", name, def)
+}
+
+func (swagger *Swagger) fullName(name string) string {
+	return swagger.namespace + "#" + name
+}
+
+func Load(path string) (*Swagger, error) {
+	swagger := &Swagger{}
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot read swagger file: %v\n", err)
 	}
-	err = json.Unmarshal(data, &model.raw)
+	err = json.Unmarshal(data, &swagger.raw)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot parse swagger file: %v\n", err)
 	}
-	return model, nil
+	return swagger, nil
 }
 
 

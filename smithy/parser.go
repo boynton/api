@@ -147,6 +147,7 @@ func (p *Parser) Parse() error {
 				//to do: parse straight to a "target" shape, then apply it later during assembly?
 				var ftype string
 				ftype, err = p.expectShapeId()
+				fmt.Println("apply to shapeId:", ftype)
 				//ftype, err = p.expectTarget()
 				tok := p.GetToken()
 				if tok == nil {
@@ -156,10 +157,23 @@ func (p *Parser) Parse() error {
 					return p.SyntaxError()
 				}
 				//to do: support apply on shape members
+				lst := strings.Split(ftype, "$")
+				field := ""
+				if len(lst) == 2 {
+					ftype = lst[0]
+					field = lst[1]
+				}
 				if shape := p.ast.GetShape(p.ensureNamespaced(ftype)); shape != nil {
-					t, e := p.parseTrait(shape.Traits)
-					err = e
-					shape.Traits = t
+					var e error
+					if field != "" {
+						m := shape.Members.Get(field)
+						m.Traits, e = p.parseTrait(m.Traits)
+					} else {
+						shape.Traits, e = p.parseTrait(shape.Traits)
+					}
+					if e != nil {
+						return e
+					}
 				}
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
@@ -901,15 +915,29 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 			if err != nil {
 				return nil, err
 			}
+			tok = p.GetToken()
+			if tok == nil {
+				return nil, p.EndOfFileError()
+			}
+			if tok.Type == EQUALS {
+				val, err := p.parseLiteralValue()
+				if err != nil {
+					return nil, err
+				}
+				mtraits = withTrait(mtraits, "smithy.api#default", val)
+			} else {
+				p.UngetToken()
+			}
 			err = p.ignore(COMMA)
 			if comment != "" {
 				mtraits, comment = withCommentTrait(mtraits, comment)
 				comment = ""
 			}
-			mems.Put(fname, &Member{
+			mem := &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
-			})
+			}
+			mems.Put(fname, mem)
 			mtraits = nil
 		} else if tok.Type == LINE_COMMENT {
 			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
@@ -1415,6 +1443,16 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 				}
 			} else if tok.Type == COMMA || tok.Type == NEWLINE {
 				//ignore
+			} else if tok.Type == STRING {
+				panic("STRING TOKEN!")
+			} else if tok.Type == NUMBER {
+				val, err := p.parseLiteral(tok)
+				if err != nil {
+					return nil, nil, err
+				}
+				literal = val
+				args = nil
+				//args = AsNodeValue(val)
 			} else {
 				return nil, nil, p.SyntaxError()
 			}
@@ -1431,7 +1469,7 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 		return traits, err
 	}
 	switch tname {
-	case "idempotent", "required", "httpLabel", "httpPayload", "readonly", "box", "sensitive", "input", "output", "httpResponseCode":
+	case "idempotent", "required", "httpLabel", "httpPayload", "readonly", "box", "sensitive", "input", "output", "httpResponseCode", "mixin":
 		return withTrait(traits, "smithy.api#"+tname, NewNodeValue()), nil
 	case "documentation":
 		err := p.expect(OPEN_PAREN)
@@ -1462,6 +1500,9 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 			return traits, err
 		}
 		return withTrait(traits, "smithy.api#"+tname, s), nil
+	case "default":
+		_, val, err := p.parseTraitArgs()
+		return withTrait(traits, "smithy.api#default", val), err
 	case "tags":
 		_, tags, err := p.parseTraitArgs()
 		return withTrait(traits, "smithy.api#tags", tags), err

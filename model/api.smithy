@@ -132,6 +132,8 @@ structure OperationInputField {
 
     required: Boolean
 
+	default: Document
+
     comment: String
 
     httpHeader: Identifier

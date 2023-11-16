@@ -16,42 +16,94 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	//"github.com/boynton/data"
 	"github.com/boynton/api/model"
-	//	"github.com/boynton/api/openapi"
+	"github.com/boynton/api/openapi"
 	//	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
-	//	"github.com/boynton/api/swagger"
+	//"github.com/boynton/api/swagger"
 )
 
-var ImportFileExtensions = map[string][]string{
-	".smithy": []string{"smithy"},
-	".json":   []string{"smithy", "openapi"},
-	".sadl":   []string{"sadl"},
+var ImportFileExtensions = map[string]string{
+	".api":    "api",
+	".smithy": "smithy",
+	".sadl":   "sadl",
+	".rdl":    "rdl",
 }
 
-func expandPaths(paths []string) ([]string, error) {
+func determineFormat(path string) string {
+	ext := filepath.Ext(path)
+	if f, ok := ImportFileExtensions[ext]; ok {
+		if f != "" {
+			return f
+		}
+	}
+	if ext == ".json" {
+		var raw map[string]interface{}
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return ""
+		}
+		err = json.Unmarshal(data, &raw)
+		if err != nil {
+			return ""
+		}
+		if _, ok := raw["smithy"]; ok {
+			return "smithy"
+		}
+		if _, ok := raw["openapi"]; ok {
+			return "openapi"
+		}
+		if _, ok := raw["swagger"]; ok {
+			return "swagger"
+		}
+		return "api"
+	}
+	if ext == ".yaml" {
+		//openapi/swagger in yaml
+	}
+	return ""
+}
+
+func expandPaths(paths []string) ([]string, string, error) {
+	format := ""
 	var result []string
 	for _, path := range paths {
-		ext := filepath.Ext(path)
-		if _, ok := ImportFileExtensions[ext]; ok {
+		f := determineFormat(path)
+		if f != "" {
+			if format == "" {
+				format = f
+			} else {
+				if format != f {
+					return nil, "", fmt.Errorf("Cannot combine input model formats (found both %q and %q)", format, f)
+				}
+			}
 			result = append(result, path)
 		} else {
 			fi, err := os.Stat(path)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 			if fi.IsDir() {
 				err = filepath.Walk(path, func(wpath string, info os.FileInfo, errIncoming error) error {
 					if errIncoming != nil {
 						return errIncoming
 					}
-					ext := filepath.Ext(wpath)
-					if _, ok := ImportFileExtensions[ext]; ok {
+					f := determineFormat(wpath)
+					if f != "" {
+						if format == "" {
+							format = f
+						} else {
+							if format != f {
+								return fmt.Errorf("Cannot combine input model formats (found both %q and %q)", format, f)
+							}
+						}
 						result = append(result, wpath)
 					}
 					return nil
@@ -59,51 +111,37 @@ func expandPaths(paths []string) ([]string, error) {
 			}
 		}
 	}
-	return result, nil
+	return result, format, nil
 }
 
 func AssembleModel(paths []string, tags []string, ns string) (*model.Schema, error) {
-	flatPathList, err := expandPaths(paths)
+	flatPathList, format, err := expandPaths(paths)
 	if err != nil {
 		return nil, err
 	}
-	assembly := &model.Schema{}
-	for _, path := range flatPathList {
-		var model *model.Schema
-		var err error
-		ext := filepath.Ext(path)
-		switch ext {
-		case ".smithy":
-			model, err = smithy.Import(path)
-		case ".json":
-			model, err = smithy.Import(path)
-			/*
-					if err != nil {
-						model, err = openapi.Import(path, ns)
-						if err != nil {
-							model, err = swagger.Import(path, ns)
-						}
-					}
-				case ".sadl":
-					model, err = sadl.Import(path, ns)
-			*/
-		default:
-			return nil, fmt.Errorf("parse for file type %q not implemented", ext)
-		}
-		if err != nil {
-			return nil, err
-		}
-		err = assembly.Merge(model)
-		if err != nil {
-			return nil, err
-		}
+	if format == "" {
+		return nil, fmt.Errorf("Cannot determine acceptable input file format")
 	}
-	if len(tags) > 0 {
-		assembly.Filter(tags)
+	var schema *model.Schema
+	switch format {
+	case "api":
+		schema, err = model.Load(flatPathList, tags)
+	case "smithy":
+		schema, err = smithy.Import(flatPathList, tags)
+	case "sadl":
+		//schema, err = sadl.Import(flatPathList, tags)
+		err = fmt.Errorf("sadl.Import NYI")
+	case "openapi":
+		schema, err = openapi.Import(flatPathList, tags, ns)
+		//	case "swagger":
+		//		schema, err = swagger.Import(flatPathList, tags, ns)
+	case "rdl":
+		err = fmt.Errorf("rdl.Import NYI")
+	default:
+		err = fmt.Errorf("unknown format: %q", format)
 	}
-	err = assembly.Validate()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		err = schema.Validate()
 	}
-	return assembly, nil
+	return schema, err
 }

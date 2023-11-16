@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/boynton/api/common"
+	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
@@ -26,6 +27,6 @@ type Generator struct {
 	common.BaseGenerator
 }
 
-func (gen *Generator) Generate(ast *smithy.AST, config *data.Object) error {
+func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
 	return fmt.Errorf("openapi.Generator NYI")
 }

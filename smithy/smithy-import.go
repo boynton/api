@@ -7,21 +7,53 @@ import (
 	"github.com/boynton/api/model"
 )
 
-func Import(path string) (*model.Schema, error) {
-	var ast *AST
-	var err error
-	if strings.HasSuffix(path, ".smithy") {
-		ast, err = Parse(path)
-	} else {
-		ast, err = LoadAST(path)
-	}
+func Import(paths []string, tags[]string) (*model.Schema, error) {
+	ast, err := Assemble(paths)
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println("smithy:", data.Pretty(ast))
+	return ImportAST(ast, tags)
+}
+
+func isTagged(shape *Shape, tags []string) bool {
+	if len(tags) == 0 {
+		return true
+	}
+	shapeTags := shape.Traits.GetSlice("smithy.api#tags")
+	for _, stag := range shapeTags {
+		for _, tag := range tags {
+			if stag == tag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
+	var err error
 	schema := model.NewSchema()
+	if len(tags) > 0 {
+		ast.Filter(tags)
+	} else {
+		ns, err := ast.ServiceDependencies()
+		if err != nil {
+			return nil, err
+		}
+		schema.Namespace = model.Namespace(ns)
+	}
+	if ast.Metadata != nil {
+		base := ast.Metadata.GetString("basePath")
+		if base != "" {
+			schema.Base = base
+		}
+	}
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
-		return importShape(schema, ast, shapeId, shape)
+		err = importShape(schema, ast, shapeId, shape)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
 	return schema, err
 }
@@ -84,11 +116,21 @@ func addService(schema *model.Schema, ast *AST, shapeId string, shape *Shape) er
 	schema.Id = model.AbsoluteIdentifier(shapeId)
 	schema.Version = shape.Version
 	schema.Comment = shape.Traits.GetString("smithy.api#documentation")
+	//TBD: other metadata
+	for _, opref := range shape.Operations {
+		shapeId := opref.Target
+		shape := ast.GetShape(shapeId)
+		addOperation(schema, ast, shapeId, shape)
+	}
+	//TBD: resources
 	return nil
 }
 
 func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationInput {
 	shape := ast.GetShape(shapeId)
+	if shape == nil {
+		panic("OpInput refers to undefined shape: " + shapeId)
+	}
 	//shape.Traits.GetBool("smithy.api#input") should be true
 	ti := &model.OperationInput{
 		Id: model.AbsoluteIdentifier(shapeId),
@@ -107,12 +149,16 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 		}
 		h := mem.Traits.GetString("smithy.api#httpHeader")
 		if h != "" {
-			f.HttpHeader = model.Identifier(h)
+			f.HttpHeader = h
 		}
 		f.HttpPath = mem.Traits.GetBool("smithy.api#httpLabel")
 		f.HttpPayload = mem.Traits.GetBool("smithy.api#httpPayload")
 		if f.HttpPath || f.HttpPayload {
 			f.Required = true
+		}
+		d := mem.Traits.Get("smithy.api#default")
+		if d != nil {
+			f.Default = d.RawValue()
 		}
 		ti.Fields = append(ti.Fields, f)
 	}
@@ -121,10 +167,15 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 
 func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.OperationOutput {
 	shape := ast.GetShape(shapeId)
+	if shape == nil {
+		panic("OpOutput refers to undefined shape: " + shapeId)
+	}
 	//shape.Traits.GetBool("smithy.api#output") should be true
 	to := &model.OperationOutput{
 		Id: model.AbsoluteIdentifier(shapeId),
-		Comment: shape.Traits.GetString("smithy.api#documentation"),
+	}
+	if shape.Traits != nil {
+		to.Comment = shape.Traits.GetString("smithy.api#documentation")
 	}
 	for _, k := range shape.Members.Keys() {
 		mem := shape.Members.Get(k)
@@ -134,19 +185,24 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 		}
 		h := mem.Traits.GetString("smithy.api#httpHeader")
 		if h != "" {
-			f.HttpHeader = model.Identifier(h)
+			f.HttpHeader = h
 		}
 		f.HttpPayload = mem.Traits.GetBool("smithy.api#httpPayload")
 		to.Fields = append(to.Fields, f)
 	}
+	to.HttpStatus = int32(shape.Traits.GetInt("smithy.api#httpError", 0))
 	return to
 }
 
 func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	//validate: that namespace is the same as the service we use (only one per model)
+	if shape == nil {
+		fmt.Println("shape not found!", shapeId)
+		panic("here")
+	}
 	op := model.OperationDef{
 		Id: model.AbsoluteIdentifier(shapeId),
-		Comment: shape.Traits.GetString("smithy.api#documentation"),
+		Comment: shape.GetStringTrait("smithy.api#documentation"),
 	}
 	typesConsumed := make(map[model.AbsoluteIdentifier]bool, 0)
 	if shape.Input != nil {
@@ -156,6 +212,8 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 	if shape.Output != nil {
 		op.Output = toOpOutput(schema, ast, shape.Output.Target)
 		typesConsumed[op.Output.Id] = true
+	} else {
+		op.Output = &model.OperationOutput{}
 	}
 	if shape.Errors != nil {
 		var excs []*model.OperationOutput
@@ -167,7 +225,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 		op.Exceptions = excs
 	}
 	httpTrait := shape.Traits.Get("smithy.api#http")
-	if httpTrait == nil {
+	if httpTrait != nil {
 		op.Output.HttpStatus = int32(httpTrait.GetInt("code", 0))
 		if op.Output.HttpStatus == 0 {
 			op.Output.HttpStatus = 200
@@ -181,13 +239,15 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 
 func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	panic("smithy resources NYI")
-	return nil
 }
 
 func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
+	if shape == nil {
+		panic("OpOutput refers to undefined shape: " + shapeId)
+	}
 	td := &model.TypeDef{
 		Id: toCanonicalAbsoluteId(shapeId),
-		Comment: shape.Traits.GetString("smithy.api#documentation"),
+		Comment: shape.GetStringTrait("smithy.api#documentation"),
 	}
 	number := false
 	switch shape.Type {
@@ -210,8 +270,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		td.Base = model.Float64
 		number = true
 	case "bigInteger":
-		td.Base = model.Decimal
-		//td.@integral = true?
+		td.Base = model.Integer
 		number = true
 	case "bigDecimal":
 		td.Base = model.Decimal
@@ -230,12 +289,12 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		td.Base = model.Union
 		for _, name := range shape.Members.Keys() {
 			fd := &model.FieldDef{
-				Name: name,
+				Name: model.Identifier(name),
 			}
 			v := shape.Members.Get(name)
 			fd.Type = toCanonicalTypeName(v.Target)
 			if v.Traits != nil {
-				comment := v.Traits.GetString("smithy.api#documentation")
+				comment := v.GetStringTrait("smithy.api#documentation")
 				if comment != "" {
 					fd.Comment = comment
 				}
@@ -256,7 +315,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			td.Base = model.Struct
 			for _, name := range shape.Members.Keys() {
 				fd := &model.FieldDef{
-					Name: name,
+					Name: model.Identifier(name),
 				}
 				v := shape.Members.Get(name)
 				fd.Type = toCanonicalTypeName(v.Target)
@@ -293,12 +352,37 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			}
 			td.Elements = append(td.Elements, el)
 		}
-	case "operation":
-		return addOperation(schema, ast, shapeId, shape)
+	case "timestamp":
+		td.Base = model.Timestamp
+	case "operation": //done by service
+		return nil
+		//return addOperation(schema, ast, shapeId, shape)
 	case "service":
 		return addService(schema, ast, shapeId, shape)
-	case "resource":
-		return addResource(schema, ast, shapeId, shape)
+	case "resource": //done by service
+		return nil
+		//return addResource(schema, ast, shapeId, shape)
+	case "apply":
+		/*
+		//apply to another shape. Do I handle forward references? The model keeps separate. Hmm.
+		shapeMember := strings.Split(shapeId, "$")
+		if len(shapeMember) != 2 {
+			panic("apply id has no member component")
+		} else {
+			targetId := model.AbsoluteIdentifier(shapeMember[0])
+			targetTd := schema.GetTypeDef(targetId)
+			fmt.Printf("targetId: %q, targetTd: %v\n", targetId, targetTd)
+			if targetTd == nil {
+				fmt.Print("Cannot find target shape for apply: " + shapeMember[0])
+				panic("whoa")
+			} else {
+				fmt.Println("apply to", shapeMember, ", targetTd:", targetTd, ", these traits:", model.Pretty(shape))
+				panic("here")
+			}
+		}
+		//		panic("implement 'apply': '" + shapeId + "' -> " + model.Pretty(shape))
+		*/
+		return nil
 	default:
 		panic("implement me:" + shape.Type)
 	}

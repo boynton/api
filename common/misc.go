@@ -35,7 +35,11 @@ func Uncapitalize(s string) string {
 }
 
 func FormatComment(indent, prefix, comment string, maxcol int, extraPad bool) string {
-	return FormatBlock(comment, prefix, indent, 0, maxcol)
+	s := FormatBlock(comment, prefix, indent, 0, maxcol)
+	if extraPad {
+		s = indent + prefix + "\n" + s + indent + prefix + "\n"
+	}
+	return s
 }
 
 func FormatBlock(src, prefix, indent string, leadcol, maxcol int) string {

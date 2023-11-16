@@ -8,6 +8,10 @@ import(
 	"strings"
 )
 
+func Equivalent(obj1 interface{}, obj2 interface{}) bool {
+	return JsonEncode(obj1) == JsonEncode(obj2)
+}
+
 func Pretty(obj interface{}) string {
 	indentSize := "  "
 	buf := new(bytes.Buffer)

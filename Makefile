@@ -1,4 +1,16 @@
 all:: bin/api
+#	./bin/api -g json _examples/simple-api.json
+#	./bin/api -g api _examples/simple-api.json
+	./bin/api -g json /tmp/simple.api
+#	./bin/api -g markdown /tmp/test.smithy > /tmp/test.md
+#	./bin/api -g markdown /tmp/test.json > /tmp/test.md
+#	./bin/api -g markdown _examples/crudl.smithy > /tmp/test.md
+#	./bin/api -g model _examples/crudl-openapi.json
+#	./bin/api -g model _examples/bufferapp-swagger.json
+#	mkdir -p _crudl
+#	./bin/api -f -o _crudl -g golang -a golang.inlineSlicesAndMaps=true -a golang.timestampPackage=github.com/boynton/data _examples/crudl.smithy
+#	./bin/api -f -o _crudl -g golang -a golang.inlinePrimitives=true -a golang.inlineSlicesAndMaps=true -a golang.timestampPackage=github.com/boynton/data _examples/crudl.smithy
+#	(cd _crudl/server; go build; ./server)
 
 bin/api:: go.mod *.go */*.go
 	mkdir -p bin

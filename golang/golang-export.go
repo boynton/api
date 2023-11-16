@@ -32,10 +32,11 @@ const IndentAmount = "    "
 type Generator struct {
 	common.BaseGenerator
 	ns model.Namespace
-	inlineSlicesAndMaps bool //List/Map TypeDefs are inlined to be slices. This prevents validating constraints (i.e. list.maxLength)
-	inlinePrimitives bool //primitive TypeDefs are inlined as the native types. This prevents validating constraints (i.e. string.Pattern)
+	pkg string
+	inlineSlicesAndMaps bool //more idiomatic, but prevents validating constraints (i.e. list.maxLength)
+	inlinePrimitives bool //more idomatic, but prevents validating constraints (i.e. string.Pattern)
 	decimalPackage string //use this package for the Decimal implementation. If "", then generate one in this package
-	decimalPrefix string
+	decimalPrefix string //derived from the decimalPackage
 	timestampPackage string //use this package for the Timestamp implementation. If "", then generate one in this package
 	timestampPrefix string
 }
@@ -64,7 +65,11 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 			gen.ns = "main"
 		}
 	}
-	fbase := string(gen.ns)
+	//go doesn't like compound package names, take only the last component of namespace
+	el := strings.Split(string(gen.ns), ".")
+	gen.pkg = el[len(el)-1]
+
+	fbase := string(gen.pkg)
 	if fbase == "" {
 		fbase = "model"
 	}
@@ -73,32 +78,36 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 		return err
 	}
 
-	s := gen.GenerateOperations()
-	fname := gen.FileName(fbase + "_operations", ".go")	
-	err = gen.Emit(s, fname, "\n\n------------------" + fname + "\n")
+	fname := gen.FileName(fbase + "_types", ".go")
+	s := gen.GenerateTypes()
+	err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
 	if err != nil {
 		return err
 	}
-	fname = gen.FileName(fbase + "_types", ".go")
-	s = gen.GenerateTypes()
-	err = gen.Emit(s, fname, "\n\n------------------" + fname + "\n")
-	if err != nil {
-		return err
+	if len(gen.Schema.Operations) > 0 {
+		s = gen.GenerateOperations()
+		fname = gen.FileName(fbase + "_operations", ".go")	
+		err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+		if err != nil {
+			return err
+		}
 	}
-	fname = gen.FileName(fbase + "_server", ".go")
-	s = gen.GenerateServer()
-	err = gen.Emit(s, fname, "\n\n------------------" + fname + "\n")
-	if err != nil {
-		return err
-	}
-	/*
+	if len(gen.Schema.Operations) > 0 {
+		fname = gen.FileName(fbase + "_server", ".go")
+		s = gen.GenerateServer()
+		err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+		if err != nil {
+			return err
+		}
+		/*
 	fname = gen.FileName(fbase + "_client", ".go")
 	s = gen.GenerateClient(ns, model)
-	err = gen.Emit(s, fname, "\n\n------------------" + fname + "\n")
+	err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
 	if err != nil {
 		return err
 	}
-	*/
+		*/
+	}
 	return nil
 }
 
@@ -110,46 +119,7 @@ func (gen *Generator) Validate() error {
 type GolangWriter struct {
 	buf       bytes.Buffer
 	writer    *bufio.Writer
-	//	namespace model.Namespace
-	//	name      model.Identifier
-	//	config    *data.Struct
-	//	model     *model.Model
 	gen       *Generator
-}
-
-func (gen *Generator) golangTypeDef(td *model.TypeDef) string {
-	gname := golangTypeName(td.Id)
-	comment := ""
-	if td.Comment != "" {
-		comment = common.FormatComment("", "// ", td.Comment, 80, true)
-	}
-	switch td.Base {
-	default:
-		return comment + "type " + gname + " " + golangBaseTypeName(td.Base) + "\n"
-    case model.Decimal:
-		//if @integral {
-		//    return comment + "type " + gname + " big.Int\n"
-		//}
-		return comment + "type " + gname + "*" + gen.decimalPrefix + "Decimal\n"
-    case model.Blob:
-		return comment + "type " + gname + " []byte\n"
-	case model.String:
-		if gen.inlinePrimitives {
-			return comment + "type " + gname + " string\n"
-		}
-    case model.Timestamp:
-		return comment + "type " + gname + "*" + gen.timestampPrefix + "Timestamp\n"
-    case model.List:
-		return comment + "type " + gname + " []" + golangTypeRef(td.Items, false) + "\n"
-    case model.Map:
-		//		return "map[" + golangTypeRef(td.Keys) + "]" + golangTypeRef(td.Items)
-		return comment + "type " + gname + " map[" + golangTypeRef(td.Keys, false) + "]" + golangTypeRef(td.Items, false) + "\n"
-    //case model.BaseTypeStruct:
-    //case model.BaseTypeEnum:
-	//case model.BaseTypeUnion:
-		//case model.BaseTypeNull:
-	}
-	return "//? " + string(td.Id)
 }
 
 func golangBaseTypeName(bt model.BaseType) string {
@@ -193,42 +163,6 @@ func golangBaseTypeName(bt model.BaseType) string {
 	}
 }
 
-//for now, assume a single package, so we strip the namespace of non-language types
-func golangTypeRef(typeRef model.AbsoluteIdentifier, required bool) string {
-	optional := ""
-	//	if !required {
-	//		optional = "*"
-	//	}
-	switch typeRef {
-	case "base#Bytes":
-		return "[]byte"
-	case "base#Bool":
-		return optional + "bool"
-	case "base#String":
-		return optional + "string"
-	case "base#Int8":
-		return optional + "int8"
-	case "base#Int16":
-		return optional + "int16"
-	case "base#Int32":
-		return optional + "int32"
-	case "base#Int64":
-		return optional + "int64"
-	case "base#Float32":
-		return optional + "float32"
-	case "base#Float64":
-		return optional + "float64"
-	case "base#Decimal":
-		return "*data.Decimal"
-	case "base#Timestamp":
-		return "*data.Timestamp"
-	default:
-		//BUG: if the type is a primitive type like int or string, we do not correctly handle the "optional" thing here.
-		//the only way would be to look up the type
-		return "*" + stripNamespace(typeRef)
-	}
-}
-
 func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
     switch typeRef {
     case "base#Bytes":
@@ -254,107 +188,129 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
     case "base#Timestamp":
         return "*" + gen.timestampPrefix + "Timestamp"
 	default:
-		panic("not a base type: " + typeRef)
+		//not a base type, but an operation input or output (looks like a Struct, but not declared as a type)
+		return "*" + stripLocalNamespace(typeRef, gen.Schema.ServiceNamespace())
 	}
 }
 
 func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 	td := gen.Schema.GetTypeDef(typeRef)
-	if td == nil || gen.inlinePrimitives {
+	if td == nil {
 		return gen.baseTypeRef(typeRef)
 	}
+	indirect := ""
 	switch td.Base {
 	case model.Bool:
-		return "bool"
+		if gen.inlinePrimitives {
+			return "bool"
+		}
 	case model.Int8:
-		return "int8"
+		if gen.inlinePrimitives {
+			return "int8"
+		}
 	case model.Int16:
-		return "int16"
+		if gen.inlinePrimitives {
+			return "int16"
+		}
 	case model.Int32:
-		return "int32"
+		if gen.inlinePrimitives {
+			return "int32"
+		}
 	case model.Int64:
-		return "int64"
+		if gen.inlinePrimitives {
+			return "int64"
+		}
 	case model.Float32:
-		return "float32"
+		if gen.inlinePrimitives {
+			return "float32"
+		}
 	case model.Float64:
-		return "float64"
+		if gen.inlinePrimitives {
+			return "float64"
+		}
 	case model.String:
-		return "string"
+		if gen.inlinePrimitives {
+			return "string"
+		}
 	case model.Blob:
-		return "[]byte"
+		if gen.inlinePrimitives {
+			return "[]byte"
+		}
 	case model.Decimal:
-		return "*data.Decimal"
+		if gen.inlinePrimitives {
+			return "*data.Decimal"
+		}
+		indirect = "*"
 	case model.Timestamp:
-		return "*data.Timestamp"
+		if gen.inlinePrimitives {
+			return "*data.Timestamp"
+		}
+		indirect = "*"
 	case model.List:
 		if gen.inlineSlicesAndMaps {
 			return "[]" + gen.golangTypeRef(td.Items)
 		}
+		indirect = "*"	
 	case model.Map:
 		if gen.inlineSlicesAndMaps {
 			return "map[" + gen.golangTypeRef(td.Keys) + "]" + gen.golangTypeRef(td.Items)
 		}
+		indirect = "*"
+	default:
+		indirect = "*"
 	}
-	return "*" + stripLocalNamespace(typeRef, gen.Schema.ServiceNamespace())
+	return indirect + stripLocalNamespace(typeRef, gen.Schema.ServiceNamespace())
 }
 
 //for now, assume a single package, so we strip the namespace of non-language types
-func golangTypeName(typeRef model.AbsoluteIdentifier) string {
+func (gen *Generator) golangTypeName(typeRef model.AbsoluteIdentifier) string {
 	switch typeRef {
-	case "api.Bytes":
+	case "base#Bytes":
 		return "[]byte"
-	case "api.Bool":
+	case "base#Bool":
 		return "bool"
-	case "api.String":
+	case "base@String":
 		return "string"
-	case "api.Int8":
+	case "base#Int8":
 		return "int8"
-	case "api.Int16":
+	case "base#Int16":
 		return "int16"
-	case "api.Int32":
+	case "base#Int32":
 		return "int32"
-	case "api.Int64":
+	case "base#Int64":
 		return "int64"
-	case "api.Float32":
+	case "base#Float32":
 		return "float32"
-	case "api.Float64":
+	case "base#Float64":
 		return "float64"
-	case "api.Decimal":
+	case "base#Decimal":
 		return "*data.Decimal"
-	case "api.Timestamp":
+	case "base#Timestamp":
 		return "*data.Timestamp"
 	default:
 		return stripNamespace(typeRef)
 	}
 }
 
-/*
-func golangifyTypesAndNames(d *data.Struct) {
-	d.PutStringIfNotEmpty("golang-type", golangTypeName(d.GetString("type")))
-	d.PutStringIfNotEmpty("golang-items", golangTypeName(d.GetString("items")))
-	d.PutStringIfNotEmpty("golang-keys", golangTypeName(d.GetString("keys")))
-	for _, f := range d.GetStructSlice("fields") {
-		// f.GetBool("Required")
-		f.PutStringIfNotEmpty("golang-type", golangTypeName(f.GetString("type")))
-	}
-}
-*/
-func (gen *Generator)goImports() map[string]bool {
+func (gen *Generator)goImports(forDef bool) map[string]bool {
 	includes := make(map[string]bool, 0)
 	deps := gen.AllTypeDependencies()
 	for _, dep := range deps {
-		switch dep {
-		case "base#Decimal": //if expanded, then ["fmt", "math/big"]
+		bt := gen.Schema.BaseType(dep)
+		switch bt {
+		case model.Decimal: //if expanded, then ["fmt", "math/big"]
 			if gen.decimalPackage != "" {
 				includes[gen.decimalPackage] = true
 			} else {
 				includes["fmt"] = true
-				includes["math.big"] = true
+				includes["math/big"] = true
 			}
-		case "base#Enum":
-			includes["encoding/json"] = true
-			includes["fmt"] = true
-		case "base#Timestamp":
+		case model.Enum:
+			if forDef {
+				includes["encoding/json"] = true
+				includes["fmt"] = true
+			}
+		case model.Timestamp:
 			if gen.timestampPackage != "" {
 				includes[gen.timestampPackage] = true //if expanded, then ["encoding/json","fmt","strings","time"]
 			}
@@ -362,123 +318,6 @@ func (gen *Generator)goImports() map[string]bool {
 	}
 	return includes
 }
-/*
-func (gen *Generator) createModelContext() *data.Struct {
-	top := data.NewStruct()
-	var types []data.Value
-	for _, td := range gen.Model.Schema.Types {
-		ty := createTemplateContext(td)
-		golangifyTypesAndNames(ty)
-		types = append(types, ty)
-	}
-	top.PutString("golang-package", "main")
-	top.PutString("golang-imports", gen.goImports())
-	top.Put(data.NewString("types"), data.NewVector(types...))
-	return top
-}
-*/
-/*
-func createServiceContext(model *model.Model, emitted map[string]bool) *data.Struct {
-	top := data.NewStruct()
-	top.PutString("name", model.Name)
-	if model.Comment != "" {
-		top.PutString("golang-comment", common.FormatComment("", "// ", model.Comment, 100, true))
-	}
-	var operations []data.Value
-	var optypes []data.Value
-	errtypes := make(map[string]data.Value, 0)
-	for _, op := range model.Operations {
-		opd := data.StructValueOf(op) //converts the whole thing to generic data
-		operations = append(operations, opd)
-		if op.Input != nil {
-			opdi := data.AsStruct(opd.Get(data.NewString("input")))
-			intype := op.Input.Name
-			if intype == "" {
-				intype = op.Name + "Input"
-			}
-			intypename := golangTypeName(intype)
-			optypes = append(optypes, data.NewString(intypename))
-			opdi.PutString("golang-name", intypename)
-			opdi.PutString("golang-ref", golangTypeRef(intype, false))
-			for _, i := range opdi.GetSlice("fields") {
-				s := data.AsStruct(i)
-				optional := true
-				if s.GetBool("required") {
-					optional = false
-				}
-				ftype := s.GetString("type")
-				s.PutString("golang-ref", golangTypeRef(ftype, optional))
-			}
-		}
-		if op.Output != nil {
-			opdo := data.AsStruct(opd.Get(data.NewString("output")))
-			outtype := op.Output.Name
-			if outtype == "" {
-				outtype = op.Name + "Output"
-			}
-			outtypename := golangTypeName(outtype)
-			optypes = append(optypes, data.NewString(outtypename))
-			opdo.PutString("golang-name", outtypename)
-			opdo.PutString("golang-ref", golangTypeRef(outtype, false))
-			for _, i := range opdo.GetSlice("fields") {
-				s := data.AsStruct(i)
-				optional := true
-				if s.GetBool("required") {
-					optional = false
-				}
-				ftype := s.GetString("type")
-				s.PutString("golang-ref", golangTypeRef(ftype, optional))
-			}
-		}
-		if op.Exceptions != nil {
-			//as above, but N times? It is *likely* that each error will get reused in other operations
-			//so generate a list for the entire service
-			//check for congruence for a given name (guaranteed if smithy-originated, but not otherwise)
-			for _, ods := range opd.GetStructSlice("exceptions") {
-				outtype := ods.GetString("name")
-				//assert outtype != ""
-				outtypename := golangTypeName(outtype)
-				if _, ok := errtypes[outtypename]; ok {
-					//fmt.Println("duplicate error:", outtypename)
-					//TO DO: ensure congruent
-				} else {
-					for _, i := range ods.GetSlice("fields") {
-						s := data.AsStruct(i)
-						optional := true
-						if s.GetBool("required") {
-							optional = false
-						}
-						ftype := s.GetString("type")
-						s.PutString("golang-ref", golangTypeRef(ftype, optional))
-					}
-					errtypes[outtypename] = ods
-				}
-			}
-		}
-	}
-	var errs []data.Value
-	for k, v := range errtypes {
-		errs = append(errs, v)
-		emitted[k] = true
-	}
-	for _, k := range optypes {
-		emitted[data.AsString(k)] = true
-	}
-	top.Put(data.NewString("operations"), data.NewVector(operations...))
-	top.Put(data.NewString("golang-optypes"), data.NewVector(optypes...))
-	top.Put(data.NewString("golang-exceptions"), data.NewVector(errs...))
-	fmt.Println("service context:", data.Pretty(top))
-	return top
-}
-
-func createTemplateContext(td *model.TypeDef) *data.Struct {
-	context := data.StructValueOf(td)
-	golangifyTypesAndNames(context)
-	return context
-}
-
-*/
-
 
 func stripNamespace(trait model.AbsoluteIdentifier) string {
 	s := string(trait)
@@ -501,13 +340,13 @@ func stripLocalNamespace(trait model.AbsoluteIdentifier, ns model.Namespace) str
 	return t
 }
 
-func (w *GolangWriter) golangTypeRef(typeRef model.AbsoluteIdentifier, required bool) string {
+func (w *GolangWriter) xgolangTypeRef(typeRef model.AbsoluteIdentifier, required bool) string {
 	bt := w.gen.Schema.BaseType(typeRef)
 	switch bt {
 	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.String:
 		return stripLocalNamespace(typeRef, w.gen.Schema.ServiceNamespace())
 	}
-	return golangTypeRef(typeRef, required)
+	return w.gen.golangTypeRef(typeRef)
 }
 
 func (gen *Generator) generateTypeComment(td *model.TypeDef, w *GolangWriter) {
@@ -523,42 +362,123 @@ func (gen *Generator) GenerateType(td *model.TypeDef, w *GolangWriter) {
 	switch td.Base {
 	case model.Struct:
 		gen.generateTypeComment(td, w)
-		w.Emitf("type %s struct {\n", golangTypeName(td.Id))
+		w.Emitf("type %s struct {\n", gen.golangTypeName(td.Id))
 		for _, f := range td.Fields {
 			opt := ""
 			if !f.Required {
 				opt = ",omitempty"
 			}
-			w.Emitf("    %s %s `json:\"%s%s\"`\n", common.Capitalize(f.Name), w.gen.golangTypeRef(f.Type), common.Uncapitalize(f.Name), opt)
+			name := string(f.Name)
+			w.Emitf("    %s %s `json:\"%s%s\"`\n", common.Capitalize(name), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name), opt)
 		}
+		w.Emitf("}\n")
+	case model.Union:
+		gen.generateTypeComment(td, w)
+		tname := gen.golangTypeName(td.Id)
+		w.Emitf("type %sVariantTag int\n", tname)
+		w.Emitf("const (\n")
+		w.Emitf("    _ %sVariantTag = iota\n", tname)
+		for _, f := range td.Fields {
+			w.Emitf("    %sVariantTag%s\n", tname, common.Capitalize(string(f.Name)))
+		}
+		w.Emitf(")\n")
+		w.Emitf("type %s struct {\n", tname) 
+		w.Emitf("    Variant %sVariantTag `json:\"-\"`\n", tname) //seems convenient, but how to set on json.Unmarshal?
+		for _, f := range td.Fields {
+			opt := ",omitempty"
+			name := string(f.Name)
+			w.Emitf("    %s %s `json:\"%s%s\"`\n", common.Capitalize(name), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name), opt)
+		}
+		w.Emitf("}\n")
+		w.Emitf("type raw%s struct {\n", tname)
+		for _, f := range td.Fields {
+			name := string(f.Name)
+			w.Emitf("    %s %s%s `json:\"%s,omitempty\"`\n", common.Capitalize(name), gen.indirectOp(f.Type), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name))
+		}
+		w.Emitf("}\n")
+		w.Emitf("func (u *%s) UnmarshalJSON(b []byte) error {\n", tname)
+		w.Emitf("    var tmp raw%d\n", tname)
+		w.Emitf("    if err := json.Unmarshal(b, &tmp); err != nil {\n")
+		w.Emitf("        return err\n")
+		w.Emitf("    }\n")
+		p := "if "
+		for _, f := range td.Fields {
+			fname := common.Capitalize(string(f.Name))
+			w.Emitf("    %s tmp.%s != nil {\n", p, fname)
+			w.Emitf("        u.Variant = %s%s\n", tname, fname)
+			w.Emitf("        u.%s = %stmp.&s\n", fname, gen.indirectOp(f.Type), fname)
+			p = "} else if "
+		}
+		w.Emitf("    } else {\n")
+		w.Emitf("        return fmt.Errorf(\"%s: Missing required variant\")\n", tname)
+		w.Emitf("    }\n")
+		w.Emitf("    return nil\n")
 		w.Emitf("}\n")
 	case model.String, model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64:
 		if gen.inlinePrimitives {
 			gen.generateTypeComment(td, w)
-			w.Emitf("type %s %s\n", golangTypeName(td.Id), golangBaseTypeName(td.Base))
+			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), golangBaseTypeName(td.Base))
 		}
 		//    case model.BaseTypeTimestamp:
 		//		return comment + "type " + gname + " *data.Timestamp\n"
 	case model.List:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
-			w.Emitf("type %s []%s\n", golangTypeName(td.Id), golangTypeRef(td.Items, false))
+			w.Emitf("type %s []%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Items))
 		}
     case model.Map:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
-			w.Emitf("type %s map[%s]%s\n", golangTypeName(td.Id), golangTypeRef(td.Keys, false), golangTypeRef(td.Items, false))
+			w.Emitf("type %s map[%s]%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Keys), gen.golangTypeRef(td.Items))
 		}
+	case model.Enum:
+		gen.generateTypeComment(td, w)
+		tname := gen.golangTypeName(td.Id)
+		w.Emitf("type %s int\n", tname)
+		w.Emitf("const (\n")
+		w.Emitf("    _ ItemStatus = iota\n")
+		for _, e := range td.Elements {
+			w.Emitf("    %s\n", e.Symbol)
+		}
+		w.Emitf(")\n")
+		w.Emitf("var names%s = []string{\n", tname)
+		for _, e := range td.Elements {		
+			w.Emitf("    %s: %q,\n", e.Symbol, e.Value) //assumes string enum!
+		}
+		w.Emitf("}\n")
+		w.Emitf("func (e %s) String() string {\n", tname)
+		w.Emitf("    return names%s[e]\n", tname)
+		w.Emitf("}\n")
+		w.Emitf("func (e %s) MarshalJSON() ([]byte, error) {\n", tname)
+		w.Emitf("    return json.Marshal(e.String())\n")
+		w.Emitf("}\n")
+		w.Emitf("func (e *%s) UnmarshalJSON(b []byte) error {\n", tname)
+		w.Emitf("    var s string\n")
+		w.Emitf("    err := json.Unmarshal(b, &s)\n")
+		w.Emitf("    if err == nil {\n")
+		w.Emitf("        for v, s2 := range names%s {\n", tname)
+		w.Emitf("            if s == s2 {\n")
+		w.Emitf("                *e = %s(v)\n", tname)
+		w.Emitf("                return nil\n")
+		w.Emitf("             }\n")
+		w.Emitf("        }\n")
+		w.Emitf("        err = fmt.Errorf(\"Bad enum symbol for type %s: %%s\", s)\n", tname)
+		w.Emitf("    }\n")
+		w.Emitf("    return err\n")
+		w.Emitf("}\n\n")
 	default:
 		gen.generateTypeComment(td, w)
-		w.Emitf("type %s %s\n", golangTypeName(td.Id), golangBaseTypeName(td.Base))
-		//	case model.BaseTypeInt:
-		//		return comment + "type " + gname + " big.Int\n"
-		//    case model.BaseTypeDecimal:
-		//		return comment + "type " + gname + " big.Decimal\n"
-		//    case model.BaseTypeBlob:
-		//		return comment + "type " + gname + " []byte\n"
+		w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), golangBaseTypeName(td.Base))
 	}
+}
+
+func (gen *Generator) indirectOp(id model.AbsoluteIdentifier) string {
+	indirect := ""
+	switch gen.Schema.BaseType(id) {
+	case model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.String:
+		indirect = "*"
+	}
+	return indirect
 }
 
 func (gen *Generator) GenerateTypes() string {
@@ -567,12 +487,11 @@ func (gen *Generator) GenerateTypes() string {
 	}
 	w.Begin()
 	w.Emit("/* Generated */\n")
-	w.Emitf("\npackage %s\n", gen.ns)
-	imports := gen.goImports()
+	w.Emitf("\npackage %s\n", gen.pkg)
+	imports := gen.goImports(true)
 	if len(imports) > 0 {
 		w.Emit(declareImports(imports))
 	}
-	
 	for _, td := range gen.Schema.Types {
 		gen.GenerateType(td, w)
 	}
@@ -585,8 +504,8 @@ func (gen *Generator) GenerateOperations() string {
 	}
 	w.Begin()
 	w.Emit("/* Generated */\n")
-	w.Emitf("\npackage %s\n", gen.ns)
-	imports := gen.goImports()
+	w.Emitf("\npackage %s\n", gen.pkg)
+	imports := gen.goImports(false)
 	if len(imports) > 0 {
 		w.Emit(declareImports(imports))
 	}
@@ -610,19 +529,40 @@ func declareImports(imports map[string]bool) string {
 	return s
 }
 
+func (gen *Generator) baseConverter(typeref model.AbsoluteIdentifier, def interface{}, body string) string {
+	s := gen.golangTypeRef(typeref) //this expands to primitives. Still need a typecast if golang.inlinePrimitives=false
+	switch s {
+	case "int8", "int16", "int32", "int64":
+		r := fmt.Sprintf("intParam(%s, %d)", body, data.AsInt64(def))
+		if s != "int64" {
+			r = s + "(" + r + ")"
+		}
+		return r
+	case "*data.Timestamp":
+		return fmt.Sprintf("timestampParam(%s, %q)", body, data.AsString(def))
+	default:
+		return fmt.Sprintf("stringParam(%s, %q)", body, data.AsString(def))
+	}
+}
+
 func (gen *Generator) GenerateServer() string {
 	schema := gen.Schema
 	w := &GolangWriter{
 		gen:       gen,
 	}
-	serviceName := golangTypeName(schema.Id)
+	serviceName := gen.golangTypeName(schema.Id)
 	w.Begin()
 	w.Emit("\n/* Generated */\n")
-	w.Emitf("\npackage %s\n", gen.ns)
-	imports := gen.goImports()
+	w.Emitf("\npackage %s\n", gen.pkg)
+	imports := gen.goImports(false)
 	imports["github.com/gorilla/mux"] = true
 	imports["github.com/gorilla/handlers"] = true
 	imports["net/http"] = true
+	imports["net/url"] = true
+	imports["encoding/json"] = true
+	imports["strings"] = true
+	imports["strconv"] = true
+	imports["log"] = true
 	imports["fmt"] = true
 	imports["io"] = true
 	imports["os"] = true
@@ -638,23 +578,54 @@ func (gen *Generator) GenerateServer() string {
 	w.Emit("\n")
 	
 	for _, op := range schema.Operations {
-		opName := golangTypeName(op.Id)
+		opName := gen.golangTypeName(op.Id)
 		opInput := ""
 		opOutput := ""
 		opStatus := int32(0)
 		if op.Input != nil {
-			opInput = golangTypeName(op.Input.Id)
+			opInput = gen.golangTypeName(op.Input.Id)
 		}
 		if op.Output != nil {
-			opOutput = golangTypeName(op.Output.Id)
+			opOutput = gen.golangTypeName(op.Output.Id)
 			opStatus = op.Output.HttpStatus
 		}
 		w.Emitf("func (handler *%s) %sHandler(w http.ResponseWriter, r *http.Request) {\n", adaptorName, opName)
 		arg := ""
+		q := false
 		if opInput != "" {
 			w.Emitf("    req := new(%s)\n", opInput)
-			//iterate over the pathparams, queryparams, headerparams and bind them
-			//bind entity if needed
+			for _, f := range op.Input.Fields {
+				if f.HttpQuery != "" {
+					q = true
+				} else if f.HttpPath {
+					body := fmt.Sprintf("mux.Vars(r)[%q]", f.Name)
+					w.Emitf("    req.%s = %s\n", common.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
+				} else if f.HttpPayload {
+					w.Emitf("    err := json.NewDecoder(r.Body).Decode(&req.%s)\n", common.Capitalize(string(f.Name)))
+					w.Emitf("    if err != nil {\n")
+					w.Emitf("        errorResponse(w, 400, fmt.Sprint(err))\n")
+					w.Emitf("        return\n")
+					w.Emitf("    }\n")
+				} else {
+					//?headers
+				}
+			}
+			if q {
+				w.Emitf("    err := r.ParseForm()\n")
+				w.Emitf("    if err != nil {\n")
+				w.Emitf("        errorResponse(w, 400, fmt.Sprint(err))\n")
+				w.Emitf("        return\n")
+				w.Emitf("    }\n")
+				for _, f := range op.Input.Fields {
+					if f.HttpQuery != "" {
+						body := fmt.Sprintf("r.Form.Get(%q)", f.Name)
+						w.Emitf("    req.%s = %s\n", common.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
+					}
+				}
+				w.Emitf("    // emit the query params here\n")
+			}
+			//headers!
+			//entity!
 			arg = "req"
 		}
 		result := ""
@@ -666,15 +637,39 @@ func (gen *Generator) GenerateServer() string {
 		w.Emitf("    %serr := handler.impl.%s(%s)\n", result, opName, arg)
 		w.Emit("    if err != nil {\n")
 		w.Emit("        switch err.(type) {\n")
-		//iterate over declared exceptions
+		for _, e := range op.Exceptions {
+			w.Emitf("       case %s:\n", gen.golangTypeRef(e.Id))
+			w.Emitf("           jsonResponse(w, %d, err)\n", e.HttpStatus)
+		}
 		w.Emit("        default:\n")
 		w.Emit("            jsonResponse(w, 500, &serverError{Message: fmt.Sprint(err)})\n")
 		w.Emit("        }\n")
 		w.Emit("    } else {\n")
-		w.Emitf("        jsonResponse(w, %d, %s)\n", opStatus, resPayload) //fixme: ensure payload declaration exists
+		w.Emitf("        jsonResponse(w, %d, %s)\n", opStatus, resPayload)
 		w.Emit("    }\n")
 		w.Emit("}\n\n")
 	}
+	w.Emitf("func InitServer(impl %s, baseURL string) http.Handler {\n", serviceName)
+	w.Emitf("    adaptor := &%s{\n", adaptorName)
+	w.Emitf("        impl: impl,\n")
+	w.Emitf("    }\n")
+	w.Emitf("    u, err := url.Parse(strings.TrimSuffix(baseURL, \"/\"))\n")
+	w.Emitf("    if err != nil {\n")
+	w.Emitf("        log.Fatal(err)\n")
+	w.Emitf("    }\n")
+	w.Emitf("    b := u.Path\n")
+	w.Emitf("    r := mux.NewRouter()\n\n")
+	for _, op := range schema.Operations {
+		opName := gen.golangTypeName(op.Id)
+		w.Emitf("    r.HandleFunc(b+%q, func(w http.ResponseWriter, r *http.Request) {\n", op.HttpUri)
+		w.Emitf("        adaptor.%sHandler(w, r)\n", opName)
+		w.Emitf("    }).Methods(%q)\n", op.HttpMethod)
+	}
+	w.Emitf("    r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n")
+    w.Emitf("        jsonResponse(w, 404, &serverError{Message: fmt.Sprintf(\"Not Found: %s\", r.URL.Path)})\n")
+	w.Emitf("    })\n")
+    w.Emitf("    return r\n")
+	w.Emitf("}\n\n")
 	w.Emit(serverUtilSource)	
 	return w.End()
 }
@@ -686,8 +681,8 @@ func (gen *Generator) GenerateClient() string {
 
 	w.Begin()
 	w.Emit("/* Generated */\n")
-	w.Emitf("\npackage %s\n", gen.ns)
-	w.Emitf("\n%s\n", gen.goImports())
+	w.Emitf("\npackage %s\n", gen.pkg)
+	w.Emitf("\n%s\n", gen.goImports(false))
 
 	return w.End()
 }
@@ -711,7 +706,8 @@ func (w *GolangWriter) Emitf(format string, args ...interface{}) {
 }
 
 func (w *GolangWriter) EmitServiceInterface() error {
-	schema := w.gen.Schema
+	gen := w.gen
+	schema := gen.Schema
 	if schema.Id != "" && !w.gen.HasEmitted(schema.Id) {
 		w.Emit("\n")
 		if schema.Comment != "" {
@@ -719,42 +715,81 @@ func (w *GolangWriter) EmitServiceInterface() error {
 			w.Emit(common.FormatComment("", "// ", schema.Comment, 80, true))
 			w.Emit("//\n")
 		}
-		w.Emitf("type %s interface {\n", golangTypeName(schema.Id)) //!
+		w.Emitf("type %s interface {\n", gen.golangTypeName(schema.Id)) //!
 		for _, op := range schema.Operations {
 			in := ""
 			if op.Input != nil {
-				in = w.golangTypeRef(op.Input.Id, false)
+				//in = w.golangTypeRef(op.Input.Id, false)
+				in = gen.golangTypeRef(op.Input.Id)
 			}
 			out := "error"
-			if op.Output != nil {
-				out = "(" + w.golangTypeRef(op.Output.Id, false) + ", error)"
+			if op.Output.Id != "" {
+				//out = "(" + w.golangTypeRef(op.Output.Id, false) + ", error)"
+				out = "(" + gen.golangTypeRef(op.Output.Id) + ", error)"
 			}
-			w.Emitf("    %s(%s) %s\n", golangTypeName(op.Id), in, out)
+			w.Emitf("    %s(%s) %s\n", gen.golangTypeName(op.Id), in, out)
 		}
 		w.Emit("}\n\n")
 		for _, op := range schema.Operations {
 			if op.Input != nil {
-				w.Emitf("type %s struct {\n", golangTypeName(op.Input.Id))
-				for _, f := range op.Input.Fields {
-					opt := ""
-					if !f.Required {
-						opt = ",omitempty"
+				if !w.gen.HasEmitted(op.Input.Id) {
+					w.Emitf("type %s struct {\n", gen.golangTypeName(op.Input.Id))
+					for _, f := range op.Input.Fields {
+						opt := ""
+						if !f.Required {
+							opt = ",omitempty"
+						}
+						w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), w.gen.golangTypeRef(f.Type), f.Name.Uncapitalized(), opt)
 					}
-					w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), w.gen.golangTypeRef(f.Type), f.Name.Uncapitalized(), opt)
+					w.Emitf("}\n\n")
+					w.gen.Emitted(op.Input.Id)
 				}
-				w.Emitf("}\n\n")
 			}
-			if op.Output != nil {
-				w.Emitf("type %s struct {\n", golangTypeName(op.Output.Id))
-				for _, f := range op.Output.Fields {
-					isRequired := true //Should I support f.Required?
-					opt := ""
-					if !isRequired {
-						opt = ",omitempty"
+			if op.Output.Id != "" {
+				if !w.gen.HasEmitted(op.Output.Id) {
+					w.Emitf("type %s struct {\n", gen.golangTypeName(op.Output.Id))
+					for _, f := range op.Output.Fields {
+						isRequired := true //Should I support f.Required?
+						opt := ""
+						if !isRequired {
+							opt = ",omitempty"
+						}
+						//w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), golangTypeRef(f.Type, !isRequired), f.Name.Uncapitalized(), opt)
+						w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), gen.golangTypeRef(f.Type), f.Name.Uncapitalized(), opt)
 					}
-					w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), golangTypeRef(f.Type, !isRequired), f.Name.Uncapitalized(), opt)
+					w.Emitf("}\n\n")
+					w.gen.Emitted(op.Output.Id)
 				}
-				w.Emitf("}\n\n")
+			}
+			if op.Exceptions != nil {
+				for _, e := range op.Exceptions {
+					if !w.gen.HasEmitted(e.Id) {
+						eType := gen.golangTypeName(e.Id)
+						w.Emitf("type %s struct {\n", eType)
+						//hack: the first string field defined will be used to create the error message
+						msg := ""
+						for _, f := range e.Fields {
+							isRequired := true //Should I support f.Required?
+							if string(f.Type) == "base#String" { //fix: isStringBase(e.Type)
+								msg = common.Capitalize(string(f.Name))
+							}
+							opt := ""
+							if !isRequired {
+								opt = ",omitempty"
+							}
+							//w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), golangTypeRef(f.Type, !isRequired), f.Name.Uncapitalized(), opt)
+							w.Emitf("    %s %s `json:\"%s%s\"`\n", f.Name.Capitalized(), gen.golangTypeRef(f.Type), f.Name.Uncapitalized(), opt)
+						}
+						if msg == "" {
+							msg = "String()"
+						}
+						w.Emitf("}\n\n")
+						w.Emitf("func (e *%s) Error() string {\n", eType)
+						w.Emitf("    return e.%s\n", msg)
+						w.Emitf("}\n\n")
+						w.gen.Emitted(e.Id)
+					}
+				}
 			}
 		}
 		w.gen.Emitted(schema.Id)
@@ -774,6 +809,37 @@ func param(r *http.Request, name string) string {
 
 func errorResponse(w http.ResponseWriter, status int, message string) {
     jsonResponse(w, status, &serverError{Error: http.StatusText(status), Message: message})
+}
+
+func stringParam(val string, def string) string {
+    if val == "" {
+        return def
+    }
+    return val
+}
+
+func timestampParam(val string, def string) *data.Timestamp {
+    if val != "" {
+        ts, err := data.ParseTimestamp(val)
+        if err != nil {
+            return &ts
+        }
+    }
+    ts, err := data.ParseTimestamp(def)
+    if err != nil {
+        return &ts
+    }
+    return nil
+}
+
+func intParam(val string, def int64) int64 {
+    if val != "" {
+        i, err := strconv.ParseInt(val, 10, 64)
+        if err == nil {
+            return i
+        }
+    }
+    return def
 }
 
 func normalizeHeaderValue(key string, value interface{}) string {
