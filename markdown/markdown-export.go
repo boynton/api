@@ -54,7 +54,7 @@ func (gen *Generator) GenerateSummary() {
 	gen.Emit(common.FormatComment("", "", gen.Schema.Comment, 80, true))
 	gen.Emit("\n")
 	if gen.name != "" {
-		gen.Emitf("- **name**: %q\n", gen.name)
+		gen.Emitf("- **service**: %q\n", gen.name)
 	}
 	if gen.Schema.Version != "" {
 		gen.Emitf("- **version**: %q\n", gen.Schema.Version)
@@ -113,87 +113,41 @@ func summarySignature(op *model.OperationDef) string {
 	return fmt.Sprintf("%s(%s) → (%s)", s, in, out)
 }
 
+func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
+	g := new(common.ApiGenerator)
+	conf := data.NewObject()
+	err := g.Configure(gen.Schema, conf)
+	if err != nil {
+		return "Whoops: " + err.Error()
+	}
+	g.Begin()
+	g.GenerateOperation(op)
+	s := g.End()
+	return s
+}
+
 func (gen *Generator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
 	gen.Emitf("## Operations\n\n")
 	for _, op := range gen.Schema.Operations {
 		opId := StripNamespace(op.Id)
 		gen.Emitf("### %s\n\n", opId)
-		gen.Emitf("- **Method**: %s\n", op.HttpMethod)
-		gen.Emitf("- **URI**: %s\n", op.HttpUri)
-		//gen.Emitf("- **%s**:\n", StripNamespace(op.Input.Id))
-		if op.Input != nil {
-			gen.Emitf("- **Input**:\n")
-			for _, f := range op.Input.Fields {
-				var opts []string
-				if f.Required {
-					opts = append(opts, "required")
-				}
-				if f.Default != nil {
-					opts = append(opts, "default=" + fmt.Sprint(f.Default))
-				}
-				if f.HttpPayload {
-					opts = append(opts, "httpPayload")
-				}
-				if f.HttpPath {
-					opts = append(opts, "httpPath")
-				}
-				if f.HttpQuery != "" {
-					opts = append(opts, "httpQuery="+string(f.HttpQuery))
-				}
-				if f.HttpHeader != "" {
-					opts = append(opts, "header=\""+string(f.HttpHeader) + "\"")
-				}
-				com := ""
-				if f.Comment != "" {
-					com = " // %s"
-				}
-				sopts := ""
-				if len(opts) > 0 {
-					sopts = " (" + strings.Join(opts, ", ") + ")"
-				}
-				stype := StripNamespace(f.Type)
-				if gen.Schema.IsBaseType(f.Type) {
-					stype = "_" + stype + "_"
-				} else {
-					stype = "[" + stype + "](#" + strings.ToLower(stype) +")"
-				}
-				gen.Emitf("    - **%s**: %s %s%s\n", f.Name, stype, sopts, com)
-			}
-		}
-		if op.Output.Fields != nil {
-			gen.Emitf("- **Output** (httpStatus=%d):\n", op.Output.HttpStatus)
-			for _, f := range op.Output.Fields {
-				sopts := ""
-				com := ""
-				stype := StripNamespace(f.Type)
-				if gen.Schema.IsBaseType(f.Type) {
-					stype = "_" + stype + "_"
-				} else {
-					stype = "[" + stype + "](#" + strings.ToLower(stype) +")"
-				}
-				gen.Emitf("    - **%s**: %s %s%s\n", f.Name, stype, sopts, com)
-			}
-		}
-		if op.Exceptions != nil {
-			gen.Emitf("- **Exceptions**:\n")
-			for _, e := range op.Exceptions {
-				gen.Emitf("    - **%s** (httpStatus=%d):\n", StripNamespace(e.Id), e.HttpStatus)
-				for _, f := range e.Fields {
-					sopts := ""
-					com := ""
-					stype := StripNamespace(f.Type)
-					if gen.Schema.IsBaseType(f.Type) {
-						stype = "_" + stype + "_"
-					} else {
-						stype = "[" + stype + "](#" + strings.ToLower(stype) +")"
-					}
-					gen.Emitf("        - **%s**: %s %s%s\n", f.Name, stype, sopts, com)
-				}
-			}
-		}
+		gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
 	}
 	gen.Emit("\n")
+}
+
+func (gen *Generator) generateApiType(op *model.TypeDef) string {
+	g := new(common.ApiGenerator)
+	conf := data.NewObject()
+	err := g.Configure(gen.Schema, conf)
+	if err != nil {
+		return "Whoops: " + err.Error()
+	}
+	g.Begin()
+	g.GenerateType(op)
+	s := g.End()
+	return s
 }
 
 func (gen *Generator) GenerateTypes() {
@@ -201,6 +155,8 @@ func (gen *Generator) GenerateTypes() {
 	for _, td := range gen.Schema.Types {
 		s := StripNamespace(td.Id)
 		gen.Emitf("\n### %s\n\n", s)
+		gen.Emitf("```\n%s```\n\n", gen.generateApiType(td))
+		/*
 		//gen.Emitf("\n### %s\n\n```\noperation %s(%s) → (%s)%s\n```\n", s, s, in, out, errs)
 		switch td.Base {
 		case model.Struct:
@@ -236,6 +192,7 @@ func (gen *Generator) GenerateTypes() {
 		default:
 			panic("Handle this type: " + fmt.Sprint(td.Base))
 		}
+		*/
 	}
 	gen.Emit("\n")
 }

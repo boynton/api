@@ -81,7 +81,7 @@ func (gen *ApiGenerator) GenerateOperations() {
 
 func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) {
 	gen.GenerateBlockComment(op.Comment, "")
-	gen.Emitf("http %s %q (name=%s) {\n", op.HttpMethod, op.HttpUri, StripNamespace(op.Id))
+	gen.Emitf("operation %s (method=%s, url=%q) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri)
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
 	gen.GenerateOperationExceptions(op)

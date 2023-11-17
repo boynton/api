@@ -131,8 +131,10 @@ func (p *Parser) Parse() error {
 				//				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
-			case "http":
+			case "operation":
 				err = p.parseOperation(comment)
+			case "http":
+				err = p.parseHttp(comment)
 			default:
 				if strings.HasPrefix(tok.Text, "x_") {
 					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
@@ -376,6 +378,18 @@ func (p *Parser) getIdentifier() string {
 }
 
 func (p *Parser) parseOperation(comment string) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	options, err := p.ParseOptions("operation", []string{"method", "url"})
+	if err != nil {
+		return err
+	}
+	return p.finishOperation(name, options.Method, options.Url, comment)
+}
+
+func (p *Parser) parseHttp(comment string) error {
 	sym, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -407,6 +421,10 @@ func (p *Parser) parseOperation(comment string) error {
 		//operation CreateItem POST "/items" {...} -> looks a little wonky
 		//operation CreateItem (method="POST", path="/items") {...} -> no, those are also required
 	}
+	return p.finishOperation(name, method, pathTemplate, comment)
+}
+
+func (p *Parser) finishOperation(name, method, pathTemplate, comment string) error {
 	op := &OperationDef{
 		Id:        p.schema.Namespaced(name),
 		HttpMethod:      method,
@@ -419,11 +437,15 @@ func (p *Parser) parseOperation(comment string) error {
 		return p.EndOfFileError()
 	}
 	if tok.Type == OPEN_BRACE {
+		var err error
 		var done bool
 		op.Comment = p.ParseTrailingComment(comment)
 		comment = ""
 		for {
 			done, comment, err = p.IsBlockDone(comment)
+			if err != nil {
+				return err
+			}
 			if done {
 				break
 			}
@@ -927,6 +949,7 @@ type Options struct {
 	Default     interface{}
 	Pattern     string
 	Value       string
+	Url         string
 	MinSize     *int64
 	MaxSize     *int64
 	MinValue    *data.Decimal
@@ -934,6 +957,7 @@ type Options struct {
 	Action      string
 	Header      string
 	Name        string
+	Method      string
 	//Annotations map[string]string
 }
 
@@ -972,8 +996,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Pattern, err = p.expectEqualsString()
 					case "value":
 						options.Value, err = p.expectEqualsString()
-						//					case "values":
-						//						options.Values, err = p.expectEqualsStringArray()
+					case "url":
+						options.Url, err = p.expectEqualsString()
 					case "required":
 						options.Required = true
 					case "payload":
@@ -982,12 +1006,10 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Path = true
 					case "default":
 						options.Default, err = p.parseEqualsLiteral()
+					case "method":
+						options.Method, err = p.expectEqualsIdentifier()
 					case "action", "operation":
 						options.Action, err = p.expectEqualsIdentifier()
-						//case "resource":
-						//options.Resource, err = p.expectEqualsIdentifier()
-						//case "reference":
-						//options.Reference, err = p.expectEqualsIdentifier()
 					case "header":
 						options.Header, err = p.expectEqualsString()
 					case "query":

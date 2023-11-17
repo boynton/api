@@ -49,132 +49,9 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
 	fname := gen.FileName(gen.name, ".sadl")
-	//	err = gen.Validate()
-	//	if err != nil {
-	//		return err
-	//	}
 	s := gen.ToSadl()
 	return gen.Write(s, fname, "")
 }
-
-/*
-func (gen *Generator) Validate() error {
-	schema := gen.Schema
-	ns := config.GetString("namespace")
-	for _, nsk := range schema.Shapes.Keys() {
-		shape := schema.GetShape(nsk)
-		if shape == nil {
-			return fmt.Errorf("Undefined shape: %s\n", nsk)
-		}
-		lst := strings.Split(nsk, "#")
-		k := lst[1]
-		if shape.Type == "operation" {
-			err := gen.validateOperation(lst[0], k, shape)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := gen.validateType(lst[0], k, shape
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (gen *Generator) validateType(ns, n string, shape *smithy.Shape) error {
-	switch shape.Type {
-	case "intEnum":
-		return fmt.Errorf("intEnum not supported by SADL: %s#%s", ns, n)
-	}
-	return nil
-}
-
-func (gen *Generator) validateOperation(ns, n string, shape *smithy.Shape) error {
-	fullName := ns + "#" + n
-	httpTrait := shape.Traits.GetDocument("smithy.api#http")
-	if httpTrait == nil {
-		return fmt.Errorf("Operation without @http trait not valid for SADL: %s", fullName)
-	}
-	method := httpTrait.GetString("method")
-	expectInputPayload := method == "PUT" || method == "POST" || method == "PATCH"
-	inputPayload := false
-	if shape.Input != nil {
-		inShape := ast.GetShape(shape.Input.Target)
-		if inShape == nil {
-			return fmt.Errorf("Undefined shape: %s\n", shape.Input.Target)
-		}
-		for _, k := range inShape.Members.Keys() {
-			var isPayload, isHeader, isQuery, isLabel bool
-			v := inShape.Members.Get(k)
-			if v.Traits != nil {
-				if v.Traits.Has("smithy.api#httpPayload") {
-					if inputPayload {
-						return fmt.Errorf("More than one @httpPayload specified in the input for operation %s", fullName)
-					}
-					inputPayload = true
-					isPayload = true
-				} else if v.Traits.Has("smithy.api#httpHeader") {
-					//check header value
-					isHeader = true
-				} else if v.Traits.Has("smithy.api#httpLabel") {
-					//check that label is present in path template
-					isLabel = true
-				} else if v.Traits.Has("smithy.api#httpQuery") {
-					isQuery = true
-				}
-				if !isPayload && !isHeader && !isQuery && !isLabel {
-					return fmt.Errorf("An input with no HTTP binding is present in operation %s: %s", fullName, k)
-				}
-			} else {
-				return fmt.Errorf("An input with no HTTP binding is present in operation %s: %s", fullName, k)
-			}
-		}
-	}
-	if inputPayload != expectInputPayload {
-		if inputPayload {
-			return fmt.Errorf("HTTP operation '%s' with method %s expects no input payload, but one was specified", fullName, method)
-		} else {
-			return fmt.Errorf("HTTP operation '%s' with method %s expects an input payload, but none is specified", fullName, method)
-		}
-	}
-	status := httpTrait.GetInt("code")
-	expectOutputPayload := status != 204 && status != 304
-	outputPayload := false
-	if shape.Output != nil {
-		outShape := ast.GetShape(shape.Output.Target)
-		if outShape == nil {
-			return fmt.Errorf("Undefined shape: %s\n", shape.Output.Target)
-		}
-		for _, k := range outShape.Members.Keys() {
-			v := outShape.Members.Get(k)
-			if v.Traits != nil {
-				if v.Traits.Has("smithy.api#httpPayload") {
-					if outputPayload {
-						return fmt.Errorf("More than one @httpPayload specified in output for operation %s", fullName)
-					}
-					outputPayload = true
-				} else if v.Traits.Has("smithy.api#httpResponseCode") {
-					//
-				} else if !v.Traits.Has("smithy.api#httpHeader") {
-					return fmt.Errorf("An output with no HTTP binding is present in operation %s: %s", fullName, k)
-				}
-			} else {
-				return fmt.Errorf("An output with no HTTP binding is present in operation %s: %s", fullName, k)
-			}
-		}
-	}
-	if outputPayload != expectOutputPayload {
-		if outputPayload {
-			return fmt.Errorf("HTTP operation '%s' with code %d expects no output payload, but one was specified", fullName, status)
-		} else {
-			return fmt.Errorf("HTTP operation '%s' with code %d expects an output payload, but none is specified", fullName, status)
-		}
-	}
-	return nil
-}
-*/
 
 func (gen *Generator) ToSadl() string {
 	gen.Begin()
@@ -184,9 +61,6 @@ func (gen *Generator) ToSadl() string {
 	if gen.ns != "" {
 		gen.Emitf("namespace %s\n", gen.ns)
 	}
-	//	if ast.RequiresDocumentType() {
-	//		gen.Emit("\ntype Document Struct //SADL has no built-in Document type\n")
-	//	}
 
 	if len(gen.Schema.Operations) > 0 {
 		for _, op := range gen.Schema.Operations {
@@ -381,18 +255,12 @@ func (gen *Generator) EmitOperation(op *model.OperationDef, opts []string) {
 	queryParams := gen.queryParams(op.Input)
 	gen.Emitf("http %s %q %s {\n", method, path+queryParams, sopts)
 	if op.Input != nil {
-		//if inputIsPayload {
-		//			k := "body"
-		//			tref := w.stripNamespace(inType)
-		//			gen.Emitf("\t%s %s (required)\n", k, tref)
-		//} else {
 		gen.EmitOperationInputFields(op.Input.Fields)
-		//}
 		gen.Emit("\n")
 	}
 
 	if len(op.Output.Fields) == 0 {
-		gen.Emitf("    expect %d\n", expected) //no content
+		gen.Emitf("    expect %d\n", expected) //no content/payload
 	} else {
 		gen.Emitf("    expect %d {\n", expected)
 		gen.EmitOperationOutputFields(op.Output.Fields, "    ")
@@ -449,13 +317,8 @@ func (gen *Generator) EmitOperationInputFields(fields []*model.OperationInputFie
 
 func (gen *Generator) queryParams(in *model.OperationInput) string {
 	queryParams := ""
-	//inputIsPayload := false //method == "PUT" || method == "POST" || method == "PATCH"
 	if in != nil {
 		for _, f := range in.Fields {
-			//if f.HttpPayload { //bogus, should *always* be true
-			//	inputIsPayload = false
-			//	break
-			//}
 			s := string(f.HttpQuery)
 			if s != "" {
 				p := s + "={" + string(f.Name) + "}"
