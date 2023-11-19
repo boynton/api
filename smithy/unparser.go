@@ -48,6 +48,32 @@ func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
 	return namespace, name, version
 }
 
+func (ast *AST) IDLForOperationShape(shapeId string) string {
+	shape := ast.GetShape(shapeId)
+	w := &IdlWriter{
+		ast:       ast,
+		namespace: shapeIdNamespace(shapeId),
+		version:   ast.AssemblyVersion(),
+	}
+	w.Begin()
+	emitted := make(map[string]bool, 0)
+	w.EmitOperationShape(shapeId, shape, emitted)
+	return w.End()
+}
+
+func (ast *AST) IDLForTypeShape(shapeId string) string {
+	shape := ast.GetShape(shapeId)
+	w := &IdlWriter{
+		ast:       ast,
+		namespace: shapeIdNamespace(shapeId),
+		version:   ast.AssemblyVersion(),
+	}
+	w.Begin()
+	w.EmitShape(shapeId, shape)
+	return w.End()
+}
+
+
 // Generate Smithy IDL to describe the Smithy model for a specified namespace
 func (ast *AST) IDL(ns string) string {
 	w := &IdlWriter{

@@ -23,6 +23,14 @@ func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) err
 	return gen.Write(model.Pretty(gen.ast), "model.json", "")
 }
 
+func (gen *AstGenerator) GenerateOperation(op *model.OperationDef) error {
+	return nil
+}
+
+func (gen *AstGenerator) GenerateType(td *model.TypeDef) error {
+	return nil
+}
+
 func SmithyAST(schema *model.Schema) (*AST, error) {
 	gen := &AstGenerator{}
 	gen.Configure(schema, data.NewObject())

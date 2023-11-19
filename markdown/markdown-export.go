@@ -22,6 +22,7 @@ import (
 	"github.com/boynton/data"
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
+	"github.com/boynton/api/smithy"
 )
 
 const IndentAmount = "    "
@@ -30,6 +31,7 @@ type Generator struct {
 	common.BaseGenerator
 	ns string
 	name string
+	detailGenerator string
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -39,6 +41,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	}
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
+	gen.detailGenerator = config.GetString("detail-generator") //should be either "smithy" or "
 	gen.Begin()
 	gen.GenerateSummary()
 	gen.GenerateOperations()
@@ -47,6 +50,14 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	fname := gen.FileName(gen.name, ".md")
 	err = gen.Write(s, fname, "")
 	return err
+}
+
+func (gen *Generator) getDetailGenerator() common.Generator {
+	switch gen.detailGenerator {
+	case "smithy":
+		return new(smithy.IdlGenerator)		
+	}
+	return new(common.ApiGenerator)
 }
 
 func (gen *Generator) GenerateSummary() {
@@ -114,7 +125,7 @@ func summarySignature(op *model.OperationDef) string {
 }
 
 func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
-	g := new(common.ApiGenerator)
+	g := gen.getDetailGenerator()
 	conf := data.NewObject()
 	err := g.Configure(gen.Schema, conf)
 	if err != nil {
@@ -126,21 +137,33 @@ func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
 	return s
 }
 
+func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
+	opId := StripNamespace(op.Id)
+	gen.Emitf("### %s\n\n", opId)
+	gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+	return nil
+}
+
 func (gen *Generator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
 	gen.Emitf("## Operations\n\n")
 	if len(gen.Schema.Operations) > 0 {
 		for _, op := range gen.Operations() {
-			opId := StripNamespace(op.Id)
-			gen.Emitf("### %s\n\n", opId)
-			gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+			gen.GenerateOperation(op)
 		}
 		gen.Emit("\n")
 	}
 }
 
+func (gen *Generator) GenerateType(td *model.TypeDef) error {
+	s := StripNamespace(td.Id)
+	gen.Emitf("\n### %s\n\n", s)
+	gen.Emitf("```\n%s```\n\n", gen.generateApiType(td))
+	return nil
+}
+
 func (gen *Generator) generateApiType(op *model.TypeDef) string {
-	g := new(common.ApiGenerator)
+	g := gen.getDetailGenerator()
 	conf := data.NewObject()
 	err := g.Configure(gen.Schema, conf)
 	if err != nil {
@@ -157,10 +180,10 @@ func (gen *Generator) GenerateTypes() {
 	if len(tds) > 0 {
 		gen.Emitf("## Types\n\n")
 		for _, td := range gen.Types() {
-			s := StripNamespace(td.Id)
-			gen.Emitf("\n### %s\n\n", s)
-			gen.Emitf("```\n%s```\n\n", gen.generateApiType(td))
+			gen.GenerateType(td)
 		}
+		//to do: generate exception types for operations, since Smithy does not inline them
+		//
 		gen.Emit("\n")
 	}
 }

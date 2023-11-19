@@ -29,7 +29,13 @@ import (
 )
 
 type Generator interface {
+	Configure(schema *model.Schema, conf *data.Object) error
 	Generate(schema *model.Schema, config *data.Object) error
+	GenerateOperation(op *model.OperationDef) error
+	GenerateType(td *model.TypeDef) error
+	Begin()
+	End() string
+	
 }
 
 type BaseGenerator struct {

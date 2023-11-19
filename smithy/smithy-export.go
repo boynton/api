@@ -4,11 +4,37 @@ import(
 	"fmt"
 	
 	"github.com/boynton/data"
+	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 )
 
 type IdlGenerator struct {
-	AstGenerator
+	common.BaseGenerator
+	ast *AST
+}
+
+func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
+	if gen.ast == nil {
+		ast, err := SmithyAST(gen.Schema)
+		if err != nil {
+			return err
+		}
+		gen.ast = ast
+	}
+	gen.Emit(gen.ast.IDLForOperationShape(string(op.Id)))
+	return nil
+}
+
+func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
+	if gen.ast == nil {
+		ast, err := SmithyAST(gen.Schema)
+		if err != nil {
+			return err
+		}
+		gen.ast = ast
+	}
+	gen.Emit(gen.ast.IDLForTypeShape(string(op.Id)))
+	return nil
 }
 
 func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) error {
@@ -17,7 +43,7 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 		return err
 	}
 
-	ast, err := gen.ToAST()
+	ast, err := SmithyAST(schema)
 	if err != nil {
 		return err
 	}

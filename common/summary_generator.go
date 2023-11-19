@@ -98,42 +98,52 @@ func ExplodeOutputs(out *model.OperationOutput) string {
 	return strings.Join(types, ", ")
 }
 
+func (gen *SummaryGenerator) GenerateOperation(op *model.OperationDef) error {
+	in := ExplodeInputs(op.Input)
+	out := ExplodeOutputs(op.Output)
+	errs := ""
+	gen.Emitf("operation %s(%s) → (%s)%s\n", StripNamespace(op.Id), in, out, errs)
+	return nil
+}
+
 func (gen *SummaryGenerator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
 	ops := gen.Operations()
 	if len(ops) > 0 {
 		for _, op := range ops {
-			in := ExplodeInputs(op.Input)
-			out := ExplodeOutputs(op.Output)
-			errs := ""
-			gen.Emitf("operation %s(%s) → (%s)%s\n", StripNamespace(op.Id), in, out, errs)
+			gen.GenerateOperation(op)
 		}
 		gen.Emit("\n")
 	}
+}
+
+func (gen *SummaryGenerator) GenerateType(td *model.TypeDef) error {
+	switch td.Base {
+	case model.Struct, model.Union:
+		var lst []string
+		for _, fd := range td.Fields {
+			lst = append(lst, string(fd.Name))
+		}
+		s := ""
+		if len(lst) > 0 {
+			s = "{" + strings.Join(lst, ", ") + "}"
+		}
+		gen.Emitf("type %s %s %s\n", StripNamespace(td.Id), td.Base, s)
+	case model.List:
+		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), StripNamespace(td.Items))
+	case model.Map:
+		gen.Emitf("type %s Map[%s → %s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
+	default:
+		gen.Emitf("type %s %s\n", StripNamespace(td.Id), td.Base)
+	}
+	return nil
 }
 
 func (gen *SummaryGenerator) GenerateTypes() {
 	tds := gen.Types()
 	if len(tds) > 0 {
 		for _, td := range tds {
-			switch td.Base {
-			case model.Struct, model.Union:
-				var lst []string
-				for _, fd := range td.Fields {
-					lst = append(lst, string(fd.Name))
-				}
-				s := ""
-				if len(lst) > 0 {
-					s = "{" + strings.Join(lst, ", ") + "}"
-				}
-				gen.Emitf("type %s %s %s\n", StripNamespace(td.Id), td.Base, s)
-			case model.List:
-				gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), StripNamespace(td.Items))
-			case model.Map:
-				gen.Emitf("type %s Map[%s → %s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
-			default:
-				gen.Emitf("type %s %s\n", StripNamespace(td.Id), td.Base)
-			}
+			gen.GenerateType(td)
 		}
 		gen.Emit("\n")
 	}

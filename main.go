@@ -182,14 +182,18 @@ The '' and 'namespace' options allow specifying those attributes for input forma
 that do not require or support them. Otherwise a default is used based on the model being parsed.
 
 Supported generators and options used from config if present
-	api: Prints the native API representation to stdout. This is the default.
-	json: Prints the parsed API data representation in JSON to stdout
-	smithy: Prints the Smithy IDL representation to stdout.
-	smithy-ast: Prints the Smithy AST representation to stdout
-    sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
-	openapi: Prints the OpenAPI Spec v3 representation to stdout
-	markdown: Prints markdown to stdout
-	go: Generate Go server code for the model. By default, send output to stdout
+- api: Prints the native API representation to stdout. This is the default.
+- json: Prints the parsed API data representation in JSON to stdout
+- smithy: Prints the Smithy IDL representation to stdout.
+- smithy-ast: Prints the Smithy AST representation to stdout
+- sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
+- openapi: Prints the OpenAPI Spec v3 representation to stdout
+- markdown: Prints markdown to stdout
+   "-a detail-generator=smithy" - to generate the detail entries with "smithy" instead of "api", which is the default
+- go: Generate Go server code for the model. By default, send output to stdout
+
+For any generator the following additional parameters are accepted:
+- "-a sort" - causes the operations and types to be alphabetically sorted, by default the original order is preserved
 
 `
 	fmt.Println(msg)

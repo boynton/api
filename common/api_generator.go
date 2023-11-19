@@ -79,13 +79,14 @@ func (gen *ApiGenerator) GenerateOperations() {
 	}
 }
 
-func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) {
+func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) error {
 	gen.GenerateBlockComment(op.Comment, "")
 	gen.Emitf("operation %s (method=%s, url=%q) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri)
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
 	gen.GenerateOperationExceptions(op)
 	gen.Emit("}\n")
+	return nil
 }
 
 func (gen *ApiGenerator) GenerateOperationInput(op *model.OperationDef) {
@@ -200,7 +201,7 @@ func (gen *ApiGenerator) GenerateTypes() {
 	}
 }
 
-func (gen *ApiGenerator) GenerateType(td *model.TypeDef) {
+func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 	gen.GenerateBlockComment(td.Comment, "")
 	switch td.Base {
 	case model.String:
@@ -254,5 +255,6 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) {
 	default:
 		gen.Emitf("type %s %s //FIX ME\n", StripNamespace(td.Id), td.Base)
 	}
+	return nil
 }
 

@@ -30,3 +30,11 @@ type Generator struct {
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
 	return fmt.Errorf("openapi.Generator NYI")
 }
+
+func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
+	return nil
+}
+
+func (gen *Generator) GenerateType(td *model.TypeDef) error {
+	return nil
+}

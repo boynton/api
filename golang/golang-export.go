@@ -41,6 +41,14 @@ type Generator struct {
 	timestampPrefix string
 }
 
+func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
+	return nil
+}
+
+func (gen *Generator) GenerateType(td *model.TypeDef) error {
+	return nil
+}
+
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
 	err := gen.Configure(schema, config)
 	if err != nil {
@@ -357,7 +365,7 @@ func (gen *Generator) generateTypeComment(td *model.TypeDef, w *GolangWriter) {
 	}
 }
 
-func (gen *Generator) GenerateType(td *model.TypeDef, w *GolangWriter) {
+func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 	w.Emit("\n")
 	switch td.Base {
 	case model.Struct:
@@ -493,7 +501,7 @@ func (gen *Generator) GenerateTypes() string {
 		w.Emit(declareImports(imports))
 	}
 	for _, td := range gen.Schema.Types {
-		gen.GenerateType(td, w)
+		gen.generateType(td, w)
 	}
 	return w.End()
 }
