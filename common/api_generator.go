@@ -92,7 +92,7 @@ func (gen *ApiGenerator) GenerateOperationInput(op *model.OperationDef) {
 	in := op.Input
 	if in != nil {
 		inname := ""
-		if op.Input.Id != (op.Id + "Input") {
+		if op.Input.Id != (op.Id + "Input") && op.Input.Id != ""{
 			inname = "(name=" + StripNamespace(op.Input.Id) + ") "
 		}
 		gen.Emitf("    input %s{\n", inname)
@@ -162,7 +162,12 @@ func (gen *ApiGenerator) GenerateOperationOutput(op *model.OperationDef) {
 func (gen *ApiGenerator) GenerateOperationExceptions(op *model.OperationDef) {
 	if len(op.Exceptions) > 0 {
 		for _, errdef := range op.Exceptions {
-			gen.Emitf("    exception %d (name=%s) {\n", errdef.HttpStatus, StripNamespace(errdef.Id))
+			defaultId := model.AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, errdef.HttpStatus))
+			errname := ""
+			if errdef.Id != "" && errdef.Id != defaultId {
+				errname = "(name=" + StripNamespace(errdef.Id) + ") "
+			}
+			gen.Emitf("    exception %d%s {\n", errdef.HttpStatus, errname)
 			gen.GenerateOperationOutputFields(errdef, "    ")
 			gen.Emit("    }\n")
 		}
@@ -224,7 +229,7 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) {
 		sopt := ""
 		for _, el := range td.Elements {
 			if el.Type != "" {
-				//panic("")
+				panic("alternate enum types NYI")
 			}
 		}
 		gen.Emitf("type %s Enum %s{\n", StripNamespace(td.Id), sopt)

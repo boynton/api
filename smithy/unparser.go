@@ -60,7 +60,7 @@ func (ast *AST) IDL(ns string) string {
 	w.Emit("$version: \"%d\"\n", w.version)
 	emitted := make(map[string]bool, 0)
 
-	if ast.Metadata.Length() > 0 {
+	if ast.Metadata != nil && ast.Metadata.Length() > 0 {
 		w.Emit("\n")
 		for _, k := range ast.Metadata.Keys() {
 			v := ast.Metadata.Get(k)
@@ -236,7 +236,7 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 	switch s {
 	case "boolean":
 		w.EmitBooleanShape(name, shape)
-	case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigdecimal":
+	case "byte", "short", "integer", "long", "float", "double", "biginteger", "bigdecimal":
 		w.EmitNumericShape(shape.Type, name, shape)
 	case "blob":
 		w.EmitBlobShape(name, shape)
@@ -258,7 +258,6 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 		w.EmitResourceShape(name, shape)
 	case "operation", "service":
 		// already emitted
-		// w.EmitOperationShape(name, shape, emitted)
 	default:
 		panic("fix: shape " + name + " of type " + data.Pretty(shape))
 	}
@@ -382,9 +381,9 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 		uri = data.GetString(v, "uri")
 		code = data.GetInt(v, "code")
 	case *NodeValue:
-		method = data.AsString(v.Get("method"))
-		uri = data.AsString(v.Get("uri"))
-		code = data.AsInt(v.Get("code"))
+		method = v.GetString("method")
+		uri = v.GetString("uri")
+		code = v.GetInt("code", 0)
 	default:
 		panic("What?!")
 	}
@@ -518,7 +517,7 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 		v := traits.Get(k)
 		switch k {
 		case "smithy.api#documentation":
-			w.EmitDocumentation(data.AsString(v), indent)
+			w.EmitDocumentation(v.AsString(), indent)
 		}
 	}
 	for _, k := range traits.Keys() {
@@ -527,11 +526,11 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 		case "smithy.api#documentation", "smithy.api#examples", "smithy.api#enumValue":
 			//do nothing, handled elsewhere
 		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
-			w.EmitBooleanTrait(data.AsBool(v), w.stripNamespace(k), indent)
+			w.EmitBooleanTrait(v.AsBool(), w.stripNamespace(k), indent)
 		case "smithy.api#httpLabel", "smithy.api#httpPayload":
-			w.EmitBooleanTrait(data.AsBool(v), w.stripNamespace(k), indent)
+			w.EmitBooleanTrait(v.AsBool(), w.stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader", "smithy.api#timestampFormat":
-			w.EmitStringTrait(data.AsString(v), w.stripNamespace(k), indent)
+			w.EmitStringTrait(v.AsString(), w.stripNamespace(k), indent)
 		case "smithy.api#deprecated":
 			w.EmitDeprecatedTrait(v, indent)
 		case "smithy.api#http":
@@ -545,7 +544,7 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 		case "smithy.api#tags":
 			w.EmitTagsTrait(v, indent)
 		case "smithy.api#pattern", "smithy.api#error":
-			w.EmitStringTrait(data.AsString(v), w.stripNamespace(k), indent)
+			w.EmitStringTrait(v.AsString(), w.stripNamespace(k), indent)
 		case "aws.protocols#restJson1":
 			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
 		case "smithy.api#paginated":
@@ -655,6 +654,7 @@ func listOfStrings(label string, format string, lst []string) string {
 }
 
 func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
+	fmt.Println("EmitServiceShape, doc:", shape.Traits.Get("smithy.api#documentation"))
 	comma := ""
 	if w.version < 2 {
 		comma = ","

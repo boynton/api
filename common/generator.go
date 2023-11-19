@@ -18,10 +18,10 @@ package common
 import (
 	"bufio"
 	"bytes"
-	//	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/boynton/api/model"
@@ -39,9 +39,8 @@ type BaseGenerator struct {
 	ForceOverwrite bool
 	buf            bytes.Buffer
 	writer         *bufio.Writer
-	//	_file          *os.File
-	//	_writer        *bufio.Writer
 	Err            error
+	Sort           bool
 	typesEmitted   map[model.AbsoluteIdentifier]bool
 }
 
@@ -51,9 +50,51 @@ func (gen *BaseGenerator) Configure(schema *model.Schema, conf *data.Object) err
 	//validate the config
 	gen.Config = conf
 	gen.OutDir = conf.GetString("outdir")
+	gen.Sort = conf.GetBool("sort")
 	gen.ForceOverwrite = conf.GetBool("force")
 	return nil
 }
+
+func (gen *BaseGenerator) Operations() []*model.OperationDef {
+	if gen.Sort {
+		return gen.SortedOperations()
+	}
+	return gen.Schema.Operations
+}
+
+func (gen *BaseGenerator) SortedOperations() []*model.OperationDef {
+	var r []*model.OperationDef
+	if len(gen.Schema.Operations) > 0 {
+		for _, i := range gen.Schema.Operations {
+			r = append(r, i)
+		}
+		sort.Slice(r, func(i, j int) bool {
+			return StripNamespace(r[i].Id) < StripNamespace(r[j].Id)
+		})
+	}
+	return r
+}
+
+func (gen *BaseGenerator) Types() []*model.TypeDef {
+	if gen.Sort {
+		return gen.SortedTypes()
+	}
+	return gen.Schema.Types
+}
+
+func (gen *BaseGenerator) SortedTypes() []*model.TypeDef {
+	var r []*model.TypeDef
+	if len(gen.Schema.Types) > 0 {
+		for _, i := range gen.Schema.Types {
+			r = append(r, i)
+		}
+		sort.Slice(r, func(i, j int) bool {
+			return StripNamespace(r[i].Id) < StripNamespace(r[j].Id)
+		})
+	}
+	return r
+}
+	
 
 func (gen *BaseGenerator) HasEmitted(id model.AbsoluteIdentifier) bool {
 	if gen.typesEmitted != nil {

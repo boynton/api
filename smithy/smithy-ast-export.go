@@ -8,6 +8,7 @@ import(
 
 type AstGenerator struct {
 	common.BaseGenerator
+	ast *AST
 }
 
 func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) error {
@@ -15,11 +16,17 @@ func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) err
 	if err != nil {
 		return err
 	}
-	ast, err := gen.ToAST()
+	gen.ast, err = gen.ToAST()
 	if err != nil {
 		return err
 	}
-	return gen.Write(model.Pretty(ast), "model.json", "")
+	return gen.Write(model.Pretty(gen.ast), "model.json", "")
+}
+
+func SmithyAST(schema *model.Schema) (*AST, error) {
+	gen := &AstGenerator{}
+	gen.Configure(schema, data.NewObject())
+	return gen.ToAST()
 }
 
 func (gen *AstGenerator) ToAST() (*AST, error) {
@@ -57,6 +64,7 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 		}
 		ast.PutShape(shapeId, shape)
 	}
+	gen.ast = ast
 	return ast, nil
 }
 

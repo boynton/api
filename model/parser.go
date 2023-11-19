@@ -285,7 +285,7 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 			} else if options.Payload {
 				in.HttpPayload = true
 			} else {
-				return nil, p.Error("Input field must be either come from 'path', 'query', 'header', or 'payload': " + string(in.Name))
+				return nil, p.Error("Input field must specified as 'path', 'query', 'header', or 'payload': " + string(in.Name))
 			}
 			input.Fields = append(input.Fields, in)
 		}
@@ -352,7 +352,7 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, elName s
 			} else if options.Payload {
 				out.HttpPayload = true
 			} else {
-				return nil, p.Error("Output field must be either be in 'header' or 'payload': " + string(out.Name))
+				return nil, p.Error("Output field must be specified as 'header' or 'payload': " + string(out.Name))
 			}
 			output.Fields = append(output.Fields, out)
 		}

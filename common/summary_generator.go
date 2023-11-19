@@ -40,7 +40,7 @@ func (gen *SummaryGenerator) Generate(schema *model.Schema, config *data.Object)
 	gen.Begin()
 	gen.GenerateSummary()
 	gen.GenerateOperations()
-	//	gen.GenerateTypes()
+	gen.GenerateTypes()
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".txt")
 	err = gen.Write(s, fname, "")
@@ -48,21 +48,27 @@ func (gen *SummaryGenerator) Generate(schema *model.Schema, config *data.Object)
 }
 
 func (gen *SummaryGenerator) GenerateSummary() {
-	title := gen.name
-	if gen.Schema.Version != "" {
-		title = title + " v" + gen.Schema.Version
+	anything := false
+	if gen.Schema.Comment != "" {
+		gen.Emit(FormatComment("", "// ", gen.Schema.Comment, 80, true))
+		anything = true
 	}
-	gen.Emit("//\n")
-	gen.Emit(FormatComment("", "// ", gen.Schema.Comment, 80, true))
-	gen.Emit("//\n")
 	if gen.ns != "" {
 		gen.Emitf("namespace %s\n", gen.ns)
+		anything = true
 	}
 	if gen.name != "" {
 		gen.Emitf("service %s\n", gen.name)
+		anything = true
+	}
+	if gen.Schema.Version != "" {
+		gen.Emitf("version %s\n", gen.Schema.Version)
+		anything = true
 	}
 	//other metadata?
-	gen.Emit("\n")
+	if anything {
+		gen.Emit("\n")
+	}
 }
 
 func StripNamespace(target model.AbsoluteIdentifier) string {
@@ -94,11 +100,41 @@ func ExplodeOutputs(out *model.OperationOutput) string {
 
 func (gen *SummaryGenerator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
-	for _, op := range gen.Schema.Operations {
-		in := ExplodeInputs(op.Input)
-		out := ExplodeOutputs(op.Output)
-		errs := ""
-		gen.Emitf("operation %s(%s) → (%s)%s\n", StripNamespace(op.Id), in, out, errs)
+	ops := gen.Operations()
+	if len(ops) > 0 {
+		for _, op := range ops {
+			in := ExplodeInputs(op.Input)
+			out := ExplodeOutputs(op.Output)
+			errs := ""
+			gen.Emitf("operation %s(%s) → (%s)%s\n", StripNamespace(op.Id), in, out, errs)
+		}
+		gen.Emit("\n")
 	}
-	gen.Emit("\n")
+}
+
+func (gen *SummaryGenerator) GenerateTypes() {
+	tds := gen.Types()
+	if len(tds) > 0 {
+		for _, td := range tds {
+			switch td.Base {
+			case model.Struct, model.Union:
+				var lst []string
+				for _, fd := range td.Fields {
+					lst = append(lst, string(fd.Name))
+				}
+				s := ""
+				if len(lst) > 0 {
+					s = "{" + strings.Join(lst, ", ") + "}"
+				}
+				gen.Emitf("type %s %s %s\n", StripNamespace(td.Id), td.Base, s)
+			case model.List:
+				gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), StripNamespace(td.Items))
+			case model.Map:
+				gen.Emitf("type %s Map[%s → %s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
+			default:
+				gen.Emitf("type %s %s\n", StripNamespace(td.Id), td.Base)
+			}
+		}
+		gen.Emit("\n")
+	}
 }

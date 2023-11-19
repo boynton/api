@@ -66,13 +66,13 @@ func (gen *Generator) GenerateSummary() {
 		gen.Emitf("- **base**: %q\n", gen.Schema.Base)
 	}
 	gen.Emit("\n### Operation Index\n\n")
-	for _, op := range gen.Schema.Operations {
+	for _, op := range gen.Operations() {
 		sum := summarySignature(op)
 		s := StripNamespace(op.Id)
 		gen.Emitf("- [%s](#%s)\n", sum, strings.ToLower(s))
 	}
 	gen.Emit("\n### Type Index\n\n")
-	for _, td := range gen.Schema.Types {
+	for _, td := range gen.Types() {
 		s := StripNamespace(td.Id)
 		gen.Emitf("- [%s](#%s) → _%s_\n", s, strings.ToLower(s), td.Base)
 	}
@@ -129,12 +129,14 @@ func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
 func (gen *Generator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
 	gen.Emitf("## Operations\n\n")
-	for _, op := range gen.Schema.Operations {
-		opId := StripNamespace(op.Id)
-		gen.Emitf("### %s\n\n", opId)
-		gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+	if len(gen.Schema.Operations) > 0 {
+		for _, op := range gen.Operations() {
+			opId := StripNamespace(op.Id)
+			gen.Emitf("### %s\n\n", opId)
+			gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+		}
+		gen.Emit("\n")
 	}
-	gen.Emit("\n")
 }
 
 func (gen *Generator) generateApiType(op *model.TypeDef) string {
@@ -151,49 +153,15 @@ func (gen *Generator) generateApiType(op *model.TypeDef) string {
 }
 
 func (gen *Generator) GenerateTypes() {
-	gen.Emitf("## Types\n\n")
-	for _, td := range gen.Schema.Types {
-		s := StripNamespace(td.Id)
-		gen.Emitf("\n### %s\n\n", s)
-		gen.Emitf("```\n%s```\n\n", gen.generateApiType(td))
-		/*
-		//gen.Emitf("\n### %s\n\n```\noperation %s(%s) → (%s)%s\n```\n", s, s, in, out, errs)
-		switch td.Base {
-		case model.Struct:
-			gen.Emitf("- **Type**: Structure\n")
-		case model.Union:
-			gen.Emitf("- **Type**: Union\n")
-		case model.List:
-			gen.Emitf("- **Type**: List\n")
-		case model.Map:
-			gen.Emitf("- **Type**: Map\n")
-		case model.Enum:
-			gen.Emitf("- **Type**: Enum\n")
-		case model.String:
-			gen.Emitf("- **Type**: String\n")
-		case model.Timestamp:
-			gen.Emitf("- **Type**: Timestamp\n")
-		case model.Int8:
-			gen.Emitf("- **Type**: Int8\n")
-		case model.Int16:
-			gen.Emitf("- **Type**: Int16\n")
-		case model.Int32:
-			gen.Emitf("- **Type**: Int32\n")
-		case model.Int64:
-			gen.Emitf("- **Type**: Int64\n")
-		case model.Integer:
-			gen.Emitf("- **Type**: Integer\n")
-		case model.Decimal:
-			gen.Emitf("- **Type**: Decimal\n")
-		case model.Float32:
-			gen.Emitf("- **Type**: Float32\n")
-		case model.Float64:
-			gen.Emitf("- **Type**: Float64\n")
-		default:
-			panic("Handle this type: " + fmt.Sprint(td.Base))
+	tds := gen.Schema.Types
+	if len(tds) > 0 {
+		gen.Emitf("## Types\n\n")
+		for _, td := range gen.Types() {
+			s := StripNamespace(td.Id)
+			gen.Emitf("\n### %s\n\n", s)
+			gen.Emitf("```\n%s```\n\n", gen.generateApiType(td))
 		}
-		*/
+		gen.Emit("\n")
 	}
-	gen.Emit("\n")
 }
 

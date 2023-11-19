@@ -37,10 +37,11 @@ var Version string = "development version"
 func main() {
 	conf := data.NewObject()
 	pVersion := flag.Bool("v", false, "Show api tool version and exit")
+	pHelp := flag.Bool("h", false, "Show more help information")
 	pList := flag.Bool("l", false, "List the entities in the model")
 	pEntity := flag.String("e", "", "Show the specified entity.")
 	pForce := flag.Bool("f", false, "Force overwrite if output file exists")
-	pGen := flag.String("g", "json", "The generator for output")
+	pGen := flag.String("g", "api", "The generator for output")
 	pNs := flag.String("ns", "example", "The namespace to force if none is present")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
 	var params Params
@@ -50,6 +51,9 @@ func main() {
 	flag.Parse()
 	if *pVersion {
 		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
+		os.Exit(0)
+	} else if *pHelp {
+		help()
 		os.Exit(0)
 	}
 	gen := *pGen
@@ -165,4 +169,28 @@ func Generator(genName string) (common.Generator, error) {
 	default:
 		return nil, fmt.Errorf("Unknown generator: %q", genName)
 	}
+}
+
+func help() {
+	msg := `
+Supported API description formats for each input file extension:
+   .api      api (the default for this tool
+   .smithy   smithy
+   .json     api, smithy, openapi, swagger (inferred by looking at the file contents)
+
+The '' and 'namespace' options allow specifying those attributes for input formats
+that do not require or support them. Otherwise a default is used based on the model being parsed.
+
+Supported generators and options used from config if present
+	api: Prints the native API representation to stdout. This is the default.
+	json: Prints the parsed API data representation in JSON to stdout
+	smithy: Prints the Smithy IDL representation to stdout.
+	smithy-ast: Prints the Smithy AST representation to stdout
+    sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
+	openapi: Prints the OpenAPI Spec v3 representation to stdout
+	markdown: Prints markdown to stdout
+	go: Generate Go server code for the model. By default, send output to stdout
+
+`
+	fmt.Println(msg)
 }

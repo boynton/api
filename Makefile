@@ -1,6 +1,8 @@
 all:: bin/api
-#	./bin/api -g json /tmp/simple.api
-	./bin/api -g markdown _examples/simple.api > /tmp/simple.md
+	./bin/api -g summary _examples/simple.api
+#	./bin/api -g json _examples/crudl-openapi.json
+#	./bin/api -g smithy /tmp/simple.api
+#	./bin/api -g markdown _examples/simple.api > /tmp/simple.md
 #	./bin/api -g json _examples/simple-api.json
 #	./bin/api -g api _examples/simple-api.json
 #	./bin/api -g markdown /tmp/test.smithy > /tmp/test.md

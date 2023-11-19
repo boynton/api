@@ -324,11 +324,6 @@ case Array:
 	}
 }
 
-func (schema *Schema) Validate() error {
-	//todo fix
-	return nil
-}
-
 func (od *OperationDef) OutputHttpPayloadName() string {
 	if od.Output != nil {
 		for _, o := range od.Output.Fields {
