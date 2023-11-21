@@ -202,9 +202,17 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 	//outputs
 	expectedStatus := ""
 	for status, _ := range pop.Responses {
-		if strings.HasPrefix(status, "2") || strings.HasPrefix(status, "3") {
+		if strings.HasPrefix(status, "2") {
 			expectedStatus = status
 			break
+		}
+	}
+	if expectedStatus == "" {
+		for status, _ := range pop.Responses {
+			if strings.HasPrefix(status, "3") {
+				expectedStatus = status
+				break
+			}
 		}
 	}
 	expected := 204
@@ -355,7 +363,6 @@ func (mb *ModelBuilder) ImportSchema(name string, s *Schema) error {
 		//check t.Format
 		td.Base = model.Decimal
 	}
-	fmt.Println(name, "->", model.Pretty(s), "->", model.Pretty(td))
 	return mb.schema.AddTypeDef(td)
 }
 

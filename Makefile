@@ -1,4 +1,4 @@
-all:: bin/api
+-include _test.make
 
 bin/api:: go.mod *.go */*.go
 	mkdir -p bin

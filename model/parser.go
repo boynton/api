@@ -294,9 +294,8 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 	return nil, nil
 }
 
-func (p *Parser) parseOperationOutput(op *OperationDef, comment string, elName string) (*OperationOutput, error) {
+func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isException bool) (*OperationOutput, error) {
 	output := &OperationOutput{
-		Id: op.Id + "Output",
 		Comment: comment,
 	}
 	comment = ""
@@ -305,12 +304,19 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, elName s
 		return nil, err
 	}
 	output.HttpStatus = estatus
+	if isException {
+		output.Id = AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, estatus))
+	} else {
+		output.Id = op.Id + "Output"
+	}
+	elName := StripNamespace(output.Id)
 	options, err := p.ParseOptions(elName, []string{"name"})
 	if err != nil {
 		return nil, err
 	}
 	if options.Name != "" {
 		output.Id = p.schema.Namespaced(options.Name)
+		elName = StripNamespace(output.Id)
 	}
 	tok := p.GetToken()
 	if tok.Type != OPEN_BRACE {
@@ -466,12 +472,12 @@ func (p *Parser) finishOperation(name, method, pathTemplate, comment string) err
 				if op.Output != nil {
 					return p.SyntaxError()
 				}
-				op.Output, err = p.parseOperationOutput(op, comment, "operation.output")
+				op.Output, err = p.parseOperationOutput(op, comment, false)
 				if err != nil {
 					return err
 				}
 			case "exception":
-				exception, err := p.parseOperationOutput(op, comment, "operation.exception")
+				exception, err := p.parseOperationOutput(op, comment, true)
 				if err != nil {
 					return err
 				}
