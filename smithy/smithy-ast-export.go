@@ -234,6 +234,8 @@ func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error
 		id, shape, err = gen.ShapeFromTimestamp(td)
 	case model.Union:
 		id, shape, err = gen.ShapeFromUnion(td)
+	case model.Any:
+		id, shape, err = gen.ShapeFromAny(td)
 	default:
 		panic("handle this type:" + model.Pretty(td))
 	}
@@ -249,6 +251,13 @@ func (gen *AstGenerator) ShapeFromString(td *model.TypeDef) (string, *Shape, err
 	}
 	if td.Pattern != "" {
 		ensureShapeTraits(shape).Put("smithy.api#pattern", td.Pattern)
+	}
+	return string(td.Id), shape, nil
+}
+
+func (gen *AstGenerator) ShapeFromAny(td *model.TypeDef) (string, *Shape, error) {
+	shape := &Shape{
+		Type: "document",
 	}
 	return string(td.Id), shape, nil
 }

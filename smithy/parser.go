@@ -156,7 +156,6 @@ func (p *Parser) Parse() error {
 				if tok.Type != AT {
 					return p.SyntaxError()
 				}
-				//to do: support apply on shape members
 				lst := strings.Split(ftype, "$")
 				field := ""
 				if len(lst) == 2 {
@@ -200,14 +199,14 @@ func (p *Parser) Parse() error {
 			}
 			switch variable {
 			case "version":
-				if s, ok := v.(*string); ok {
-					if strings.HasPrefix(*s, "1") {
+				if s, ok := v.(string); ok {
+					if strings.HasPrefix(s, "1") {
 						p.version = 1
-					} else if strings.HasPrefix(*s, "2") {
+					} else if strings.HasPrefix(s, "2") {
 						p.ast.Smithy = "2"
 						p.version = 2
 					} else {
-						return fmt.Errorf("Unsupported version: %s\n", *s)
+						return fmt.Errorf("Unsupported version: %s\n", s)
 					}
 				} else {
 					return fmt.Errorf("Bad control statement (only version 1 or 1.0 is supported): $%s: %v\n", variable, v)
@@ -269,6 +268,9 @@ func (p *Parser) expect(toktype TokenType) error {
 	}
 	if tok.Type == toktype {
 		return nil
+	}
+	if tok.Type == NEWLINE {
+		return p.expect(toktype)
 	}
 	return p.Error(fmt.Sprintf("Expected %v, found %v", toktype, tok.Type))
 }
@@ -337,6 +339,9 @@ func (p *Parser) ExpectInt() (int, error) {
 
 func (p *Parser) ExpectString() (string, error) {
 	tok := p.GetToken()
+	if tok.Type == NEWLINE {
+		return p.ExpectString()
+	}
 	return p.assertString(tok)
 }
 
@@ -632,6 +637,7 @@ func (p *Parser) addShapeDefinition(name string, shape *Shape) error {
 	return nil
 }
 
+
 func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
 	tname, err := p.ExpectIdentifier()
 	if err != nil {
@@ -904,6 +910,39 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 			mtraits, err = p.parseTrait(mtraits)
 			if err != nil {
 				return nil, err
+			}
+		} else if tok.Type == DOLLAR {
+			//create a new 'apply' shape on the traits we've got here. Let mixin do its thing
+			//note: apply also is eager now, should wait until at least assembly time.
+			//so for now, 
+			//Target elision with a mixin
+			tok := p.GetToken()
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			fname := tok.Text
+			mem := &Member{
+				Traits: mtraits,
+			}
+			mtraits = nil
+			mems.Put(fname, mem)
+			for _, mixin := range shape.Mixins {
+				mixshape := p.ast.GetShape(mixin.Target)
+				for _, mixname := range mixshape.Members.Keys() {
+					if mixname == fname {
+						mixmem := mixshape.Members.Get(fname)
+						if mixmem == nil {
+							fmt.Println("mixin field name match:", fname)
+							panic("whoops, nil!")
+						}
+						if mem.Target == "" {
+							mem.Target = mixmem.Target
+						}
+						for _, k := range mixmem.Traits.Keys() {
+							mem.Traits = withTrait(mem.Traits, k, mixmem.Traits.Get(k))
+						}
+					}
+				}
 			}
 		} else if tok.Type == SYMBOL {
 			fname := tok.Text
@@ -1444,9 +1483,10 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 			} else if tok.Type == COMMA || tok.Type == NEWLINE {
 				//ignore
 			} else if tok.Type == STRING {
-				panic("STRING TOKEN!")
+				literal = tok.Text
+				args = nil
 			} else if tok.Type == NUMBER {
-				val, err := p.parseLiteral(tok)
+				val, err := p.parseLiteralNumber(tok)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -1651,8 +1691,8 @@ func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
 		return nil, p.Error(fmt.Sprintf("Not a valid symbol: %s", tok.Text))
 	}
 }
-func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
-	return &tok.Text, nil
+func (p *Parser) parseLiteralString(tok *Token) (interface{}, error) {
+	return tok.Text, nil
 }
 
 func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {

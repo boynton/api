@@ -516,7 +516,7 @@ func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 				dval := data.AsInt(val)
 				eqval = fmt.Sprintf(" = %d", dval)
 			} else {
-				sval = data.AsString(val)
+				sval = fmt.Sprintf("%s", val)//data.AsString(val)
 				if sval != fname {
 					eqval = fmt.Sprintf(" = %q", sval)
 				}

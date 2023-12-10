@@ -4,7 +4,6 @@ namespace model
 
 /// BaseType - All other types are derived from these.
 enum BaseType {
-    Null,
     Bool,
     Int8,
     Int16,
@@ -12,17 +11,18 @@ enum BaseType {
     Int64,
     Float32,
     Float64,
+	Integer,
     Decimal,
     Blob,
     String,
     Timestamp,
-    Array,
-    Object,
+	Value,
     List,
     Map,
     Struct,
     Enum,
-    Union
+    Union,
+	Any,
 }
 
 /// Identifier - a simple symbolic name that most programming languages can use, i.e. "Blah"
@@ -37,151 +37,135 @@ string Namespace
 @pattern("^([a-zA-Z_][a-zA-Z_0-9]*\\.)*[a-zA-Z_][a-zA-Z_0-9]*#[a-zA-Z_][a-zA-Z_0-9]*$")
 string AbsoluteIdentifier
 
+@mixin
+structure GenericTraits {
+    comment: String
+    tags: StringList
+}
+
+list StringList {
+    member: String
+}
+
+@mixin
+structure TypeTraits with [GenericTraits] {
+    minValue: BigDecimal
+    maxValue: BigDecimal
+    minSize: Long
+    maxSize: Long
+    required: Boolean
+    pattern: String
+    items: AbsoluteIdentifier
+    keys: AbsoluteIdentifier
+    fields: FieldDefList
+    elements: EnumElementList
+}
+
+list FieldDefList {
+    member: FieldDef
+}
+
+list EnumElementList {
+    member: EnumElement
+}
+
 /// TypeDef - a structure defining a new type in this system. New types cannot be derived from
 /// these, but this new type can be used to specify the type of members in aggregate types. TypeDef
 /// could more properly be defined as a Union of various types, but this structure is more
 /// convenient.
-structure TypeDef {
-    @required
-    id: AbsoluteIdentifier
-
-    @required
-    base: BaseType
-
-    comment: String
-
-    minValue: BigDecimal
-
-    maxValue: BigDecimal
-
-    minSize: Long
-
-    maxSize: Long
-
-    pattern: String
-
-    items: AbsoluteIdentifier
-
-    keys: AbsoluteIdentifier
-
-    fields: List
-
-    elements: List
-
-    tags: List
+structure TypeDef with [TypeTraits] {
+    @required id: AbsoluteIdentifier
+    @required base: BaseType
 }
 
-/// FieldDef - describes each field in a structure or union.
-structure FieldDef {
-    name: String
-
-    type: AbsoluteIdentifier
-
-    required: Boolean
-
-    comment: String
+/// Field - describes each field in a structure or union.
+structure FieldDef with [TypeTraits] {
+    @required name: Identifier
+    @required type: AbsoluteIdentifier
 }
 
-/// EnumElement - describes each element of an Enum type
-structure EnumElement {
-    @required
-    symbol: Identifier
-
+/// Element - describes each element of an Enum type
+structure EnumElement with [GenericTraits] {
+    @required symbol: Identifier
     value: String
-
-    type: AbsoluteIdentifier
-
-    comment: String
+//    type: AbsoluteIdentifier //defaults to String. This is to accomodate IntEnums in Smithy?
 }
 
 /// OperationDef - describes an operation, including its HTTP bindings
-structure OperationDef {
+structure OperationDef with [GenericTraits] {
     @required
     id: AbsoluteIdentifier
-
-    comment: String
-
     httpMethod: String
-
     httpUri: String
-
     input: OperationInput
-
     output: OperationOutput
+    exceptions: OperationOutputList
+}
 
-    exceptions: List
+list OperationOutputList {
+  member: OperationOutput
 }
 
 /// OperationInput - the description of an operation input. It is similar to a Struct definition,
 /// but with HTTP bindings.
-structure OperationInput {
+structure OperationInput with [GenericTraits] {
     id: AbsoluteIdentifier
+    fields: OperationInputFieldList
+}
 
-    fields: List
-
-    comment: String
+list OperationInputFieldList {
+  member: OperationInputField
 }
 
 /// OperationInputField - the description of an operation input field
-structure OperationInputField {
-    @required
-    name: Identifier
+structure OperationInputField with [TypeTraits] {
+  @required
+  name: Identifier
+		  
+  @required
+  type: AbsoluteIdentifier
 
-    @required
-    type: AbsoluteIdentifier
+  default: Document
 
-    required: Boolean
-
-	default: Document
-
-    comment: String
-
-    httpHeader: Identifier
-
-    httpQuery: Identifier
-
-    httpPath: Boolean
-
-    httpPayload: Boolean
+  httpHeader: String
+  httpQuery: Identifier
+  httpPath: Boolean
+  httpPayload: Boolean
 }
 
 /// OperationOutput - the description of an operation output. Similar to a Struct definition, but
 /// with HTTP bindings. Also used for OperationExceptions.
-structure OperationOutput {
+structure OperationOutput with [GenericTraits] {
     id: AbsoluteIdentifier
-
     httpStatus: Integer
+    fields: OperationOutputFieldList
+}
 
-    fields: List
-
-    comment: String
+list OperationOutputFieldList {
+  member: OperationOutputField
 }
 
 /// OperationOutputField
-structure OperationOutputField {
-    @required
-    name: Identifier
-
-    @required
-    type: AbsoluteIdentifier
-
-    comment: String
-
-    httpHeader: Identifier
-
+structure OperationOutputField with [TypeTraits] {
+    @required name: Identifier
+    @required type: AbsoluteIdentifier
+    httpHeader: String
     httpPayload: Boolean
 }
 
+list TypeDefList {
+  member: TypeDef
+}
+
+list OperationDefList {
+  member: OperationDef
+}
+
 /// ServiceDef - the definition of a service, consisting of Types and Operations
-structure ServiceDef {
-    @required
-    id: AbsoluteIdentifier
-
+structure ServiceDef with [GenericTraits] {
+    @required id: AbsoluteIdentifier
     version: String
-
-    comment: String
-
-    types: List
-
-    operations: List
+	base: String
+	types: TypeDefList
+    operations: OperationDefList
 }

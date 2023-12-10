@@ -880,17 +880,17 @@ func (p *Parser) expectInt64() (int64, error) {
 	return 0, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
 
-func (p *Parser) expectEqualsInt64() (*int64, error) {
+func (p *Parser) expectEqualsInt64() (int64, error) {
 	var val int64
 	err := p.expect(EQUALS)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	val, err = p.expectInt64()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return &val, nil
+	return val, nil
 }
 
 func (p *Parser) expectNumber() (*data.Decimal, error) {
@@ -956,8 +956,8 @@ type Options struct {
 	Pattern     string
 	Value       string
 	Url         string
-	MinSize     *int64
-	MaxSize     *int64
+	MinSize     int64
+	MaxSize     int64
 	MinValue    *data.Decimal
 	MaxValue    *data.Decimal
 	Action      string
@@ -1146,10 +1146,10 @@ func (p *Parser) parseBytesOptions(typedef *TypeDef) error {
 				}
 				if expected == "minsize" {
 					i := val.AsInt64()
-					typedef.MinSize = &i
+					typedef.MinSize = i
 				} else if expected == "maxsize" {
 					i := val.AsInt64()
-					typedef.MinSize = &i
+					typedef.MinSize = i
 				} else {
 					return p.Error("bytes option must have numeric value")
 				}
@@ -1429,7 +1429,7 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 }
 
 func (p *Parser) parseLiteralObject() (interface{}, error) {
-	//either a map or a struct, i.e. a JSON object
+	// a JSON object
 	obj := make(map[string]interface{}, 0)
 	for {
 		tok := p.GetToken()

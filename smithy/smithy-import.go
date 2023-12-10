@@ -107,6 +107,8 @@ func toCanonicalTypeName(name string) model.AbsoluteIdentifier {
 		return "base#Enum"
 	case "union", "smithy.api#Union":
 		return "base#Union"
+	case "document", "smithy.api#Document":
+		return "base#Any"
 	default:
 		return toCanonicalAbsoluteId(name)
 	}
@@ -246,7 +248,7 @@ func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 
 func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	if shape == nil {
-		panic("OpOutput refers to undefined shape: " + shapeId)
+		return nil
 	}
 	td := &model.TypeDef{
 		Id: toCanonicalAbsoluteId(shapeId),
@@ -331,6 +333,10 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 						fd.Comment = comment
 					}
 				}
+				//BUG: arbitrary traits on the field are not preserved. Notably: base#Int32 cannot have a smithy.api#range
+				// trait, the MinValue/MaxValue properties require that a new type be defined: type Foo Int32 (MinValue...)
+				// Yet, Smithy does not allow defining inline arrays or maps or other types. Just traits on the declared type
+				// That is: traits can be on the field, in addition to on the type. The field traits override the type traits
 				td.Fields = append(td.Fields, fd)
 			}
 		}

@@ -228,11 +228,11 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 		gen.Emitf("type %s Map[%s,%s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
 	case model.Enum:
 		sopt := ""
-		for _, el := range td.Elements {
-			if el.Type != "" {
-				panic("alternate enum types NYI")
-			}
-		}
+		//for _, el := range td.Elements {
+			//if el.Type != "" {
+			//	panic("alternate enum types NYI")
+			//}
+		//}
 		gen.Emitf("type %s Enum %s{\n", StripNamespace(td.Id), sopt)
 		for _, el := range td.Elements {
 			sopts := ""

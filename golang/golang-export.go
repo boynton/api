@@ -39,6 +39,8 @@ type Generator struct {
 	decimalPrefix string //derived from the decimalPackage
 	timestampPackage string //use this package for the Timestamp implementation. If "", then generate one in this package
 	timestampPrefix string
+	anyPackage string //use this package for the Any type, if "", then generate one in this package
+	anyPrefix string //derived from the anyPackage
 }
 
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
@@ -56,11 +58,16 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	}
 	gen.inlineSlicesAndMaps = config.GetBool("golang.inlineSlicesAndMaps")
 	gen.inlinePrimitives = config.GetBool("golang.inlinePrimitives")
-	gen.decimalPackage = config.GetString("golang.decimalPackage")
-	if gen.decimalPackage != "" {
-		gen.decimalPrefix = path.Base(gen.decimalPackage) + "."
-		gen.decimalPackage = gen.decimalPackage
+	gen.anyPackage = config.GetString("golang.anyPackage")
+	if gen.anyPackage == "" {
+		gen.anyPackage = "github.com/boynton/data"
 	}
+	gen.anyPrefix = path.Base(gen.anyPackage) + "."
+	gen.decimalPackage = config.GetString("golang.decimalPackage")
+	if gen.decimalPackage == "" {
+		gen.decimalPackage = "github.com/boynton/data"
+	}
+	gen.decimalPrefix = path.Base(gen.decimalPackage) + "."
 	gen.timestampPackage = config.GetString("golang.timestampPackage")
 	if gen.timestampPackage != "" {
 		gen.timestampPrefix = path.Base(gen.timestampPackage) + "."
@@ -70,7 +77,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	if gen.ns == "" {
 		gen.ns = schema.ServiceNamespace()
 		if gen.ns == "" {
-			gen.ns = "main"
+			gen.ns = schema.Namespace
 		}
 	}
 	//go doesn't like compound package names, take only the last component of namespace
@@ -130,7 +137,7 @@ type GolangWriter struct {
 	gen       *Generator
 }
 
-func golangBaseTypeName(bt model.BaseType) string {
+func (gen *Generator) golangBaseTypeName(bt model.BaseType) string {
 	switch bt {
     case model.Bool:
 		return "bool"
@@ -146,25 +153,18 @@ func golangBaseTypeName(bt model.BaseType) string {
 		return "float32"
     case model.Float64:
 		return "float64"
-    case model.Decimal:
-		//if @integral {
-		//    return "big.Int"
-		//}
-		return "data.Decimal"
     case model.Blob:
 		return "[]byte"
 	case model.String:
 		return "string"
+    case model.Integer:
+        return "*" + gen.decimalPrefix + "Integer"
+    case model.Decimal:
+        return "*" + gen.decimalPrefix + "Decimal"
     case model.Timestamp:
-		return "data.Timestamp"
-    //case model.List:
-		//		return "[]" + golangTypeRef(td.Items)
-    //case model.Map:
-		//		return "map[" + golangTypeRef(td.Keys) + "]" + golangTypeRef(td.Items)
-    //case model.Struct:
-    //case model.Enum:
-	//case model.Union:
-	//case model.Null:
+        return "*" + gen.timestampPrefix + "Timestamp"
+	case model.Any:
+        return gen.anyPrefix + "Any"
 	default:
 		fmt.Println("bt:", bt)
 		panic("not concrete")
@@ -193,11 +193,15 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
         return "float64"
     case "base#Decimal":
         return "*" + gen.decimalPrefix + "Decimal"
+    case "base#Integer":
+        return "*" + gen.decimalPrefix + "Integer"
     case "base#Timestamp":
         return "*" + gen.timestampPrefix + "Timestamp"
+	case "base#Any":
+        return gen.anyPrefix + "Any"
 	default:
 		//not a base type, but an operation input or output (looks like a Struct, but not declared as a type)
-		return "*" + stripLocalNamespace(typeRef, gen.Schema.ServiceNamespace())
+		return "*" + stripLocalNamespace(typeRef, gen.ns)
 	}
 }
 
@@ -244,6 +248,11 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 		if gen.inlinePrimitives {
 			return "[]byte"
 		}
+	case model.Integer:
+		if gen.inlinePrimitives {
+			return "*data.Integer"
+		}
+		indirect = "*"
 	case model.Decimal:
 		if gen.inlinePrimitives {
 			return "*data.Decimal"
@@ -258,16 +267,17 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 		if gen.inlineSlicesAndMaps {
 			return "[]" + gen.golangTypeRef(td.Items)
 		}
-		indirect = "*"	
 	case model.Map:
 		if gen.inlineSlicesAndMaps {
 			return "map[" + gen.golangTypeRef(td.Keys) + "]" + gen.golangTypeRef(td.Items)
 		}
 		indirect = "*"
+	case model.Enum:
+		//no indirection
 	default:
 		indirect = "*"
 	}
-	return indirect + stripLocalNamespace(typeRef, gen.Schema.ServiceNamespace())
+	return indirect + stripLocalNamespace(typeRef, gen.ns)
 }
 
 //for now, assume a single package, so we strip the namespace of non-language types
@@ -352,7 +362,7 @@ func (w *GolangWriter) xgolangTypeRef(typeRef model.AbsoluteIdentifier, required
 	bt := w.gen.Schema.BaseType(typeRef)
 	switch bt {
 	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.String:
-		return stripLocalNamespace(typeRef, w.gen.Schema.ServiceNamespace())
+		return stripLocalNamespace(typeRef, w.gen.ns)
 	}
 	return w.gen.golangTypeRef(typeRef)
 }
@@ -423,9 +433,9 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("    return nil\n")
 		w.Emitf("}\n")
 	case model.String, model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64:
-		if gen.inlinePrimitives {
+		if !gen.inlinePrimitives {
 			gen.generateTypeComment(td, w)
-			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), golangBaseTypeName(td.Base))
+			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td.Base))
 		}
 		//    case model.BaseTypeTimestamp:
 		//		return comment + "type " + gname + " *data.Timestamp\n"
@@ -444,7 +454,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		tname := gen.golangTypeName(td.Id)
 		w.Emitf("type %s int\n", tname)
 		w.Emitf("const (\n")
-		w.Emitf("    _ ItemStatus = iota\n")
+		w.Emitf("    _ %s = iota\n", tname)
 		for _, e := range td.Elements {
 			w.Emitf("    %s\n", e.Symbol)
 		}
@@ -476,7 +486,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("}\n\n")
 	default:
 		gen.generateTypeComment(td, w)
-		w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), golangBaseTypeName(td.Base))
+		w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td.Base))
 	}
 }
 

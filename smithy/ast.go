@@ -227,7 +227,6 @@ func (node *NodeValue) GetSlice(key string) []interface{} {
 }
 
 func (node *NodeValue) GetStringSlice(key string) []string {
-	fmt.Println("node:", node)
 	switch m := node.value.(type) {
 	case map[string]interface{}:
 		if tmp, ok := m[key]; ok {
@@ -698,6 +697,9 @@ func (ast *AST) expandMixins(shapeId string) error {
 			mixinId := mixinRef.Target
 			ast.expandMixins(mixinId) //this causes reverse order, not what we want
 			mixin := ast.Shapes.Get(mixinId) //expanded
+			if mixin == nil {
+				panic("oops, should have deferred elision and apply at assembly time")
+			}
 			if mixin.Members != nil {
 				if shape.Type != "structure" {
 					return fmt.Errorf("Target for mixin with members not a Structure:", shapeId)
@@ -708,8 +710,14 @@ func (ast *AST) expandMixins(shapeId string) error {
 					newMembers.Put(memKey, mem)
 				}
 				for _, memKey := range shape.Members.Keys() {
+					mem := shape.Members.Get(memKey)
 					if !newMembers.Has(memKey) {
-						newMembers.Put(memKey, shape.Members.Get(memKey))
+						newMembers.Put(memKey, mem)
+					} else {
+						newMem := newMembers.Get(memKey)
+						for _, trait := range mem.Traits.Keys() {
+							newMem.Traits.Put(trait, mem.Traits.Get(trait))
+						}
 					}
 				}
 				shape.Members = newMembers

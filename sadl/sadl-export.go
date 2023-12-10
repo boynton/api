@@ -194,11 +194,11 @@ func (gen *Generator) EmitBlobType(td *model.TypeDef) {
 
 func (gen *Generator) EmitListType(td *model.TypeDef) {
 	var opts []string
-	if td.MinSize != nil {
-		opts = append(opts, fmt.Sprintf("minsize=%v", *td.MinSize))
+	if td.MinSize != 0 {
+		opts = append(opts, fmt.Sprintf("minsize=%v", td.MinSize))
 	}
-	if td.MaxSize != nil {
-		opts = append(opts, fmt.Sprintf("maxsize=%v", *td.MaxSize))
+	if td.MaxSize != 0 {
+		opts = append(opts, fmt.Sprintf("maxsize=%v", td.MaxSize))
 	}
 	sopts := gen.annotationString(opts)
 	gen.EmitComment(td.Comment)
