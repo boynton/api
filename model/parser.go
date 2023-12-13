@@ -1284,6 +1284,8 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 				return p.EndOfFileError()
 			}
 			continue
+		} else if tok.Type == LINE_COMMENT {
+			comment = p.MergeComment(comment, tok.Text)
 		} else {
 			fd := &FieldDef{
 				Comment: comment,
@@ -1592,15 +1594,15 @@ func (p *Parser) ParseTrailingComment(comment string) string {
 }
 
 func (p *Parser) MergeComment(comment1 string, comment2 string) string {
-	comment1 = strings.TrimSpace(comment1)
+	comment1 = strings.TrimSpace(comment1) + "\n"
 	comment2 = strings.TrimSpace(comment2)
-	if comment1 == "" {
+	if comment1 == "" || comment1 == "\n" {
 		return comment2
 	}
-	if comment2 == "" {
+	if comment2 == "" || comment2 == "\n" {
 		return comment1
 	}
-	return comment1 + " " + comment2
+	return comment1 + comment2
 }
 
 func (p *Parser) expectedDirectiveError() error {

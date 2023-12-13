@@ -60,7 +60,6 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 	}
 	for _, op := range gen.Schema.Operations {
 		err := gen.AddShapesFromOperation(ast, op)
-		//shapeId, shape, err := gen.ShapeFromOperation(ast, od)
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +69,9 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 		if err != nil {
 			return nil, err
 		}
-		ast.PutShape(shapeId, shape)
+		if ast.GetShape(shapeId) == nil {
+			ast.PutShape(shapeId, shape)
+		}
 	}
 	gen.ast = ast
 	return ast, nil
@@ -190,7 +191,7 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 	shape := &Shape{
 		Type: "structure",
 	}
-	members := NewMap[*Member]()
+	shape.Members = NewMap[*Member]()
 	for _, fd := range output.Fields {
 		ftype := typeReference(string(fd.Type))
 		member := &Member{
@@ -201,11 +202,14 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 		} else if fd.HttpPayload {
 			ensureMemberTraits(member).Put("smithy.api#httpPayload", NewNodeValue())
 		}
-		members.Put(string(fd.Name), member)
+		shape.Members.Put(string(fd.Name), member)
 	}
-	shape.Members = members
 	if isException {
-		ensureShapeTraits(shape).Put("smithy.api#error", "client") //!
+		fault := "server"
+		if output.HttpStatus < 500 {
+			fault = "client"
+		}
+		ensureShapeTraits(shape).Put("smithy.api#error", fault)
 		ensureShapeTraits(shape).Put("smithy.api#httpError", output.HttpStatus)
 	} else {
 		ensureShapeTraits(shape).Put("smithy.api#output", NewNodeValue())
@@ -334,10 +338,6 @@ func httpTrait(method, path string, code int) *NodeValue {
 	return t
 }
 
-//func typeReference(ns string, td *model.TypeDef) string {
-//	return typeReferenceByName(ns, string(td.Id))
-//}
-
 func typeReference(name string) string {
 	switch name {
 	case "base#Bool":
@@ -419,16 +419,6 @@ func (gen *AstGenerator) ShapeFromStruct(td *model.TypeDef) (string, *Shape, err
 	members := NewMap[*Member]()
 	for _, fd := range td.Fields {
 		ftype := typeReference(string(fd.Type))
-		/*
-		switch ftype {
-		case "List":
-			ftype = listTypeReference(model, ns, shapes, tname, fd)
-		case "Map":
-			ftype = mapTypeReference(model, ns, shapes, tname, fd)
-		case "Enum":
-			ftype = enumTypeReference(model, ns, shapes, tname, fd)
-		}
-		*/
 		member := &Member{
 			Target: ftype,
 		}
@@ -448,16 +438,6 @@ func (gen *AstGenerator) ShapeFromUnion(td *model.TypeDef) (string, *Shape, erro
 	members := NewMap[*Member]()
 	for _, fd := range td.Fields {
 		ftype := typeReference(string(fd.Type))
-		/*
-		switch ftype {
-		case "List":
-			ftype = listTypeReference(model, ns, shapes, tname, fd)
-		case "Map":
-			ftype = mapTypeReference(model, ns, shapes, tname, fd)
-		case "Enum":
-			ftype = enumTypeReference(model, ns, shapes, tname, fd)
-		}
-		*/
 		member := &Member{
 			Target: ftype,
 		}
@@ -466,57 +446,3 @@ func (gen *AstGenerator) ShapeFromUnion(td *model.TypeDef) (string, *Shape, erro
 	shape.Members = members
 	return string(td.Id), shape, nil
 }
-
-/*
-func defineShapeFromTypeSpec(model *sadl.Model, ns string, shapes *smithylib.Shapes, ts *sadl.TypeSpec, name string, comment string, annos map[string]string) error {
-	var shape smithylib.Shape
-	switch ts.Type {
-	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
-		shape = shapeFromNumber(ts)
-	case "String":
-		shape = shapeFromString(ts)
-	case "Enum":
-		shape = shapeFromEnum(ts)
-	case "Struct":
-		shape = shapeFromStruct(model, ns, shapes, name, ts)
-	case "Array":
-		shape = shapeFromArray(model, ns, shapes, name, ts, annos)
-	case "Union":
-		shape = shapeFromUnion(model, ns, shapes, name, ts)
-	case "Map":
-		shape = shapeFromMap(model, ns, shapes, name, ts)
-	case "UUID":
-		shape = *uuidShape()
-	default:
-		fmt.Println("So far:", sadl.Pretty(model))
-		panic("handle this type:" + sadl.Pretty(ts))
-	}
-	if comment != "" {
-		ensureShapeTraits(&shape).Put("smithy.api#documentation", comment)
-	}
-	if annos != nil {
-		for k, v := range annos {
-			switch k {
-			case "x_tags":
-				ensureShapeTraits(&shape).Put("smithy.api#tags", strings.Split(v, ","))
-			case "x_sensitive":
-				ensureShapeTraits(&shape).Put("smithy.api#sensitive", true)
-			case "x_deprecated":
-				dep := make(map[string]interface{}, 0)
-				if v != "" {
-					n := strings.Index(v, "|")
-					if n >= 0 {
-						dep["since"] = v[:n]
-						dep["message"] = v[n+1:]
-					} else {
-						dep["message"] = v
-					}
-					ensureShapeTraits(&shape).Put("smithy.api#deprecated", dep)
-				}
-			}
-		}
-	}
-	shapes.Put(ns+"#"+name, &shape)
-	return nil
-}
-*/

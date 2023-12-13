@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"reflect"
 
 	"github.com/boynton/data" //for Decimal
 )
@@ -163,10 +164,16 @@ func (node *NodeValue) AsInt() int {
 		switch n := node.value.(type) {
 		case int:
 			return n
+		case *int:
+			return *n
 		case int64:
 			return int(n)
+		case *int64:
+			return int(*n)
 		case float64:
 			return int(n)
+		case *float64:
+			return int(*n)
 		case *data.Integer:
 			return n.AsInt()
 		case *data.Decimal:
@@ -174,10 +181,14 @@ func (node *NodeValue) AsInt() int {
 		case *NodeValue:
 			panic("double NodeValue wrapper, oops")
 		}
-		fmt.Println("asInt?", node)
+		fmt.Println("asInt?", node, Kind(*node))
 		panic("Whoa GetInt!")
 	}
 	return 0
+}
+
+func Kind(v interface{}) string {
+	return fmt.Sprintf("%v", reflect.ValueOf(v).Kind())
 }
 
 func (node *NodeValue) GetInt(key string, def int) int {

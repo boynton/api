@@ -176,6 +176,14 @@ func (gen *ApiGenerator) GenerateOperationExceptions(op *model.OperationDef) {
 }
 
 func (gen *ApiGenerator) GenerateFields(fields []*model.FieldDef, indent string) {
+	forceCommentHeaders := false
+	for _, f := range fields {
+		if f.Comment != "" {
+			if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+				forceCommentHeaders = true
+			}
+		}
+	}
 	for _, f := range fields {
 		var opts []string
 		if f.Required {
@@ -186,11 +194,21 @@ func (gen *ApiGenerator) GenerateFields(fields []*model.FieldDef, indent string)
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
 		comm := ""
+		pcomm := ""
 		if f.Comment != "" {
-			//format it?
-			comm = " // " + f.Comment
+			if forceCommentHeaders {
+				//if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+				pcomm = FormatComment(indent, "// ", f.Comment, 72, false)
+			} else {
+				comm = " // " + f.Comment
+			}
 		}
-		gen.Emitf("%s%s %s%s%s\n", indent, f.Name, StripNamespace(f.Type), sopts, comm)
+		//if pcomm != "" {
+		if forceCommentHeaders {
+			gen.Emitf("\n%s%s%s %s%s%s\n", pcomm, indent, f.Name, StripNamespace(f.Type), sopts, comm)
+		} else {
+			gen.Emitf("%s%s %s%s%s\n", indent, f.Name, StripNamespace(f.Type), sopts, comm)
+		}
 	}
 }
 

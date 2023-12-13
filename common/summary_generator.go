@@ -81,6 +81,9 @@ func StripNamespace(target model.AbsoluteIdentifier) string {
 }
 
 func ExplodeInputs(in *model.OperationInput) string {
+	if in == nil {
+		return ""
+	}
 	var types []string
 	for _, f := range in.Fields {
 		//types = append(types, string(f.Name) + " " + StripNamespace(f.Type))

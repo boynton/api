@@ -747,6 +747,7 @@ func (p *Parser) parseList(traits *NodeValue) error {
 		Traits: traits,
 	}
 	var mtraits *NodeValue
+	comment := ""
 	for {
 		tok := p.GetToken()
 		if tok == nil {
@@ -785,6 +786,10 @@ func (p *Parser) parseList(traits *NodeValue) error {
 			if shape.Member.Target == p.ensureNamespaced(name) {
 				return p.Error(fmt.Sprintf("Directly recursive type references not allowed: %s", ftype))
 			}
+		} else if tok.Type == LINE_COMMENT {
+			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
+				comment = p.MergeComment(comment, tok.Text[1:])
+			}
 		} else {
 			return p.SyntaxError()
 		}
@@ -812,6 +817,7 @@ func (p *Parser) parseMap(sname string, traits *NodeValue) error {
 		Traits: traits,
 	}
 	var mtraits *NodeValue
+	comment := ""
 	for {
 		tok := p.GetToken()
 		if tok == nil {
@@ -859,6 +865,10 @@ func (p *Parser) parseMap(sname string, traits *NodeValue) error {
 				mtraits = nil
 			} else {
 				return p.SyntaxError()
+			}
+		} else if tok.Type == LINE_COMMENT {
+			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
+				comment = p.MergeComment(comment, tok.Text[1:])
 			}
 		} else {
 			return p.SyntaxError()
@@ -1021,6 +1031,7 @@ func (p *Parser) parseUnion(traits *NodeValue) error {
 	mems := NewMap[*Member]()
 	var mtraits *NodeValue
 	for {
+		comment := ""
 		tok := p.GetToken()
 		if tok == nil {
 			return p.EndOfFileError()
@@ -1053,6 +1064,10 @@ func (p *Parser) parseUnion(traits *NodeValue) error {
 				Traits: mtraits,
 			})
 			mtraits = nil
+		} else if tok.Type == LINE_COMMENT {
+			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
+				comment = p.MergeComment(comment, tok.Text[1:])
+			}
 		} else {
 			return p.SyntaxError()
 		}
@@ -1364,7 +1379,7 @@ func (p *Parser) parseResource(traits *NodeValue) error {
 			shape.Operations, err = p.expectShapeRefs()
 		case "collectionOperations":
 			shape.CollectionOperations, err = p.expectShapeRefs()
-		case "Resources":
+		case "resources":
 			shape.Resources, err = p.expectShapeRefs()
 		default:
 			return p.SyntaxError()

@@ -421,16 +421,7 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 }
 
 func (w *IdlWriter) EmitHttpErrorTrait(rv interface{}, indent string) {
-	var status int
-	switch v := rv.(type) {
-	case int32:
-		status = int(v)
-	default:
-		//		fmt.Printf("http error arg, expected an int32, found %s with type %s\n", rv, Kind(rv))
-	}
-	if status != 0 {
-		w.Emit("@httpError(%d)\n", status)
-	}
+	w.Emit("@httpError(%v)\n", rv)
 }
 
 func (w *IdlWriter) EmitSimpleShape(shapeName, name string, shape *Shape) {

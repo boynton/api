@@ -52,6 +52,9 @@ func (schema *Schema) ValidateOperation(op *OperationDef) error {
 }
 
 func (schema *Schema) ValidateOperationInput(op *OperationDef) error {
+	if op.Input == nil {
+		return nil
+	}
 	for _, in := range op.Input.Fields {
 		if in.HttpPath {
 			if !(in.HttpQuery != "" || in.HttpHeader != "" || in.HttpPayload) {
@@ -88,6 +91,7 @@ func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOu
 			}
 		}
 		context := StripNamespace(op.Id) + "$" + string(out.Name)
+		fmt.Println("WHoops:", Pretty(op))
 		return schema.ValidationError(context, "Output field must specified as one of 'header' or 'payload'")
 	}
 	return nil

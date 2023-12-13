@@ -114,6 +114,63 @@ func toCanonicalTypeName(name string) model.AbsoluteIdentifier {
 	}
 }
 
+func addOperationFromRef(schema *model.Schema, ast *AST, ref *ShapeRef) error {
+	if ref != nil {
+		shapeId := ref.Target
+		shape := ast.GetShape(shapeId)
+		return addOperation(schema, ast, shapeId, shape)
+	}
+	return nil
+}
+
+func addResourceOperationsFromRef(schema *model.Schema, ast *AST, resRef *ShapeRef) error {
+	var err error
+	shape := ast.GetShape(resRef.Target)
+	for _, ref := range shape.Operations {
+		err = addOperationFromRef(schema, ast, ref)
+		if err != nil {
+			return err
+		}
+	}
+	for _, ref := range shape.Resources {
+		err = addResourceOperationsFromRef(schema, ast, ref)
+		if err != nil {
+			return err
+		}
+	}
+	err = addOperationFromRef(schema, ast, shape.Create)
+	if err != nil {
+		return err
+	}
+	err = addOperationFromRef(schema, ast, shape.Put)
+	if err != nil {
+		return err
+	}
+	err = addOperationFromRef(schema, ast, shape.Read)
+	if err != nil {
+		return err
+	}
+	err = addOperationFromRef(schema, ast, shape.Update)
+	if err != nil {
+		return err
+	}
+	err = addOperationFromRef(schema, ast, shape.Delete)
+	if err != nil {
+		return err
+	}
+	err = addOperationFromRef(schema, ast, shape.List)
+	if err != nil {
+		return err
+	}
+	for _, ref := range shape.CollectionOperations {
+		err = addOperationFromRef(schema, ast, ref)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func addService(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	if schema.Id != "" {
 		return fmt.Errorf("Cannot represent more than one service in model!")
@@ -122,12 +179,18 @@ func addService(schema *model.Schema, ast *AST, shapeId string, shape *Shape) er
 	schema.Version = shape.Version
 	schema.Comment = shape.Traits.GetString("smithy.api#documentation")
 	//TBD: other metadata
-	for _, opref := range shape.Operations {
-		shapeId := opref.Target
-		shape := ast.GetShape(shapeId)
-		addOperation(schema, ast, shapeId, shape)
+	for _, ref := range shape.Operations {
+		err := addOperationFromRef(schema, ast, ref)
+		if err != nil {
+			return err
+		}
 	}
-	//TBD: resources
+	for _, ref := range shape.Resources {
+		err := addResourceOperationsFromRef(schema, ast, ref)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -202,8 +265,7 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	//validate: that namespace is the same as the service we use (only one per model)
 	if shape == nil {
-		fmt.Println("shape not found!", shapeId)
-		panic("here")
+		return fmt.Errorf("Operation shape not found: %s", shapeId)
 	}
 	op := model.OperationDef{
 		Id: model.AbsoluteIdentifier(shapeId),
@@ -237,13 +299,35 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 		}
 		op.HttpMethod = httpTrait.GetString("method")
 		op.HttpUri = httpTrait.GetString("uri")
+		if op.HttpMethod == "POST" || op.HttpMethod == "PUT" {
+			//an HTTP payload is required, supply an empty one if missing.
+			hasPayload := false
+			for _, field := range op.Input.Fields {
+				if field.HttpPayload {
+					hasPayload = true
+					break
+				}
+			}
+			if !hasPayload {
+				return fmt.Errorf("Smithy operation input for %s must have a payload: %s", op.HttpMethod, model.Pretty(op))
+			}
+		}
+		hasPayload := false
+		for _, field := range op.Output.Fields {
+			if field.HttpPayload {
+				hasPayload = true
+			}
+		}
+ 		if op.Output.HttpStatus == 204 { //note: Smithy cannot do a 304, but would have same constraint
+			if hasPayload {
+				return fmt.Errorf("Smithy operation output for a 204 response must have no payload: %s", model.Pretty(op))
+			}
+		} else if !hasPayload {
+			return fmt.Errorf("Smithy operation output for a non-204 response must have a payload: %s", model.Pretty(op))
+		}
 	}
 	schema.Operations = append(schema.Operations, &op)
 	return nil
-}
-
-func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
-	panic("smithy resources NYI")
 }
 
 func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
@@ -363,14 +447,10 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		}
 	case "timestamp":
 		td.Base = model.Timestamp
-	case "operation": //done by service
-		return nil
-		//return addOperation(schema, ast, shapeId, shape)
 	case "service":
 		return addService(schema, ast, shapeId, shape)
-	case "resource": //done by service
+	case "operation", "resource": //done by service
 		return nil
-		//return addResource(schema, ast, shapeId, shape)
 	case "apply":
 		/*
 		//apply to another shape. Do I handle forward references? The model keeps separate. Hmm.

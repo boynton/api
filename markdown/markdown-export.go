@@ -84,6 +84,7 @@ func (gen *Generator) GenerateSummary() {
 	}
 	gen.Emit("\n### Type Index\n\n")
 	for _, td := range gen.Types() {
+		//check if a type has input or output trait, if so, omit it here.
 		s := StripNamespace(td.Id)
 		gen.Emitf("- [%s](#%s) → _%s_\n", s, strings.ToLower(s), td.Base)
 	}
@@ -101,11 +102,14 @@ func StripNamespace(target model.AbsoluteIdentifier) string {
 
 func ExplodeInputs(in *model.OperationInput) string {
 	var types []string
-	for _, f := range in.Fields {
-		//types = append(types, string(f.Name) + " " + StripNamespace(f.Type))
-		types = append(types, string(f.Name))
+	if in != nil {
+		for _, f := range in.Fields {
+			//types = append(types, string(f.Name) + " " + StripNamespace(f.Type))
+			types = append(types, string(f.Name))
+		}
+		return strings.Join(types, ", ")
 	}
-	return strings.Join(types, ", ")
+	return ""
 }
 
 func ExplodeOutputs(out *model.OperationOutput) string {
