@@ -122,14 +122,14 @@ func (node *NodeValue) Get(key string) *NodeValue {
 }
 
 func (node *NodeValue) AsString() string {
-	if node == nil {
+	if node == nil || node.value == nil {
 		return ""
 	}
 	switch s := node.value.(type) {
 	case string:
 		return s
-	case *string:
-		return *s
+	default:
+		panic("not a string, weird")
 	}
 	return ""
 }
@@ -305,6 +305,7 @@ func (ast *AST) GetShape(id string) *Shape {
 	if shape == nil {
 		if IsPreludeType(id) {
 			fmt.Println("WHOA: id not present, yet is a prelude shape:", id)
+			panic("here")
 		}
 	}
 	return shape
@@ -531,7 +532,7 @@ func (ast *AST) noteDependencies(included map[string]bool, name string) {
 		if shape.Identifiers != nil {
 			for _, k := range shape.Identifiers.Keys() {
 				v := shape.Identifiers.Get(k)
-				ast.noteDependenciesFromRef(included, v)
+				ast.noteDependencies(included, v.Target)
 			}
 		}
 		for _, o := range shape.Operations {

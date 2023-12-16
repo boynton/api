@@ -400,6 +400,22 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 	return items, nil
 }
 
+func (p *Parser) ExpectIdentifierMapConvertToRefs() (*Map[*ShapeRef], error) {
+	tmp, err := p.ExpectIdentifierMap()
+	if err != nil {
+		return nil, err
+	}
+	result := NewMap[*ShapeRef]()
+	for _, k := range tmp.Keys() {
+		id := p.ensureNamespaced(tmp.Get(k))
+		ref := &ShapeRef{
+			Target: id,
+		}
+		result.Put(k, ref)
+	}
+	return result, nil
+}
+
 func (p *Parser) ExpectIdentifierMap() (*Map[string], error) {
 	tok := p.GetToken()
 	if tok == nil {
@@ -701,20 +717,26 @@ func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
 }
 
 func (p *Parser) optionalMixins() ([]string, error) {
+	mixins, _, err := p.optionalMixinsOrResource()
+	return mixins, err
+}
+
+func (p *Parser) optionalMixinsOrResource() ([]string, *Shape, error) {
 	tok := p.GetToken()
 	if tok == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var mixins []string
+	var resource *Shape
 	if tok.Type == SYMBOL && tok.Text == "with" {
 		err := p.expect(OPEN_BRACKET)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for {
 			tok = p.GetToken()
 			if tok == nil {
-				return nil, p.EndOfFileError()
+				return nil, nil, p.EndOfFileError()
 			}
 			if tok.Type == CLOSE_BRACKET {
 				break
@@ -723,10 +745,17 @@ func (p *Parser) optionalMixins() ([]string, error) {
 				mixins = append(mixins, tok.Text)
 			}
 		}
+	} else if tok.Type == SYMBOL && tok.Text == "for" {
+		resourceName, err := p.ExpectIdentifier()
+		if err != nil {
+			return nil, nil, err
+		}
+		rid := p.ensureNamespaced(resourceName)
+		resource = p.ast.GetShape(rid)
 	} else {
 		p.UngetToken()
 	}
-	return mixins, nil
+	return mixins, resource, nil
 }
 
 func (p *Parser) parseList(traits *NodeValue) error {
@@ -888,7 +917,7 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 		Type:   "structure",
 		Traits: traits,
 	}
-	mixins, err := p.optionalMixins()
+	mixins, resource, err := p.optionalMixinsOrResource()
 	if err != nil {
 		return nil, err
 	}
@@ -936,20 +965,25 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 			}
 			mtraits = nil
 			mems.Put(fname, mem)
-			for _, mixin := range shape.Mixins {
-				mixshape := p.ast.GetShape(mixin.Target)
-				for _, mixname := range mixshape.Members.Keys() {
-					if mixname == fname {
-						mixmem := mixshape.Members.Get(fname)
-						if mixmem == nil {
-							fmt.Println("mixin field name match:", fname)
-							panic("whoops, nil!")
-						}
-						if mem.Target == "" {
-							mem.Target = mixmem.Target
-						}
-						for _, k := range mixmem.Traits.Keys() {
-							mem.Traits = withTrait(mem.Traits, k, mixmem.Traits.Get(k))
+			if resource != nil {
+				idType := resource.Identifiers.Get(fname)
+				mem.Target = p.ensureNamespaced(idType.Target)
+			} else {
+				for _, mixin := range shape.Mixins {
+					mixshape := p.ast.GetShape(mixin.Target)
+					for _, mixname := range mixshape.Members.Keys() {
+						if mixname == fname {
+							mixmem := mixshape.Members.Get(fname)
+							if mixmem == nil {
+								fmt.Println("mixin field name match:", fname)
+								panic("whoops, nil!")
+							}
+							if mem.Target == "" {
+								mem.Target = mixmem.Target
+							}
+							for _, k := range mixmem.Traits.Keys() {
+								mem.Traits = withTrait(mem.Traits, k, mixmem.Traits.Get(k))
+							}
 						}
 					}
 				}
@@ -1362,7 +1396,7 @@ func (p *Parser) parseResource(traits *NodeValue) error {
 		}
 		switch fname {
 		case "identifiers":
-			shape.Identifiers, err = p.expectNamedShapeRefs()
+			shape.Identifiers, err = p.ExpectIdentifierMapConvertToRefs()
 		case "create":
 			shape.Create, err = p.expectShapeRef()
 		case "put":
@@ -1374,7 +1408,7 @@ func (p *Parser) parseResource(traits *NodeValue) error {
 		case "delete":
 			shape.Delete, err = p.expectShapeRef()
 		case "list":
-			shape.Delete, err = p.expectShapeRef()
+			shape.List, err = p.expectShapeRef()
 		case "operations":
 			shape.Operations, err = p.expectShapeRefs()
 		case "collectionOperations":

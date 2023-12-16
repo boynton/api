@@ -133,8 +133,8 @@ func (p *Parser) Parse() error {
 				err = p.parseBaseDirective(comment)
 			case "operation":
 				err = p.parseOperation(comment)
-			case "http":
-				err = p.parseHttp(comment)
+				//			case "http":
+				//				err = p.parseHttp(comment)
 			default:
 				if strings.HasPrefix(tok.Text, "x_") {
 					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
@@ -388,13 +388,15 @@ func (p *Parser) parseOperation(comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("operation", []string{"method", "url"})
+	options, err := p.ParseOptions("operation", []string{"method", "url", "resource"})
 	if err != nil {
 		return err
 	}
-	return p.finishOperation(name, options.Method, options.Url, comment)
+	return p.finishOperation(name, options.Method, options.Url, options.Resource, comment)
 }
 
+
+/*	
 func (p *Parser) parseHttp(comment string) error {
 	sym, err := p.ExpectIdentifier()
 	if err != nil {
@@ -427,15 +429,15 @@ func (p *Parser) parseHttp(comment string) error {
 		//operation CreateItem POST "/items" {...} -> looks a little wonky
 		//operation CreateItem (method="POST", path="/items") {...} -> no, those are also required
 	}
-	return p.finishOperation(name, method, pathTemplate, comment)
+	return p.finishOperation(name, method, pathTemplate, resource, comment)
 }
-
-func (p *Parser) finishOperation(name, method, pathTemplate, comment string) error {
+*/
+   
+func (p *Parser) finishOperation(name, method, pathTemplate, resource, comment string) error {
 	op := &OperationDef{
 		Id:        p.schema.Namespaced(name),
 		HttpMethod:      method,
 		HttpUri:        pathTemplate,
-		//Resource:    options.Resource,
 		//Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -809,6 +811,14 @@ func (p *Parser) expectEqualsIdentifier() (string, error) {
 	return p.ExpectIdentifier()
 }
 
+func (p *Parser) expectEqualsCompoundIdentifier() (string, error) {
+	err := p.expect(EQUALS)
+	if err != nil {
+		return "", err
+	}
+	return p.ExpectCompoundIdentifier()
+}
+
 func (p *Parser) assertString(tok *Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
@@ -964,6 +974,7 @@ type Options struct {
 	Header      string
 	Name        string
 	Method      string
+	Resource    string
 	//Annotations map[string]string
 }
 
@@ -1022,6 +1033,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Query, err = p.expectEqualsString()
 					case "name":
 						options.Name, err = p.expectEqualsIdentifier()
+					case "resource":
+						options.Resource, err = p.expectEqualsCompoundIdentifier()
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}

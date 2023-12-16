@@ -1,6 +1,8 @@
 package smithy
 
 import(
+	"strings"
+	
 	"github.com/boynton/data"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/common"
@@ -37,12 +39,77 @@ func SmithyAST(schema *model.Schema) (*AST, error) {
 	return gen.ToAST()
 }
 
+func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.AbsoluteIdentifier]bool, error) {
+	resources := make(map[string]*Shape, 0)
+	operations := make(map[model.AbsoluteIdentifier]bool, 0)
+	for _, od := range gen.Schema.Operations {
+		if od.Resource != "" {
+			operations[od.Id] = true
+			rezId := gen.EnsureNamespaced(od.Resource)
+			var shape *Shape
+			if rez, ok := resources[rezId]; ok {
+				shape = rez
+			} else {
+				shape = &Shape{
+					Type: "resource",
+				}
+				resources[rezId] = shape
+			}
+			if od.Input != nil {
+				for _, fd := range od.Input.Fields {
+					if fd.HttpPath {
+						if shape.Identifiers == nil {
+							shape.Identifiers = NewMap[*ShapeRef]()
+						}
+						fref := &ShapeRef{
+							Target: typeReference(string(fd.Type)),
+						}
+						shape.Identifiers.Put(string(fd.Name), fref)
+					}
+				}
+			}
+			ref := &ShapeRef{
+				Target: string(od.Id),
+			}
+			switch od.Lifecycle {
+			case "create":
+				shape.Create = ref
+			case "read":
+				shape.Read = ref
+			case "update":
+				shape.Update = ref
+			case "delete":
+				shape.Delete = ref
+			case "list":
+				shape.List = ref
+			case "collection":
+				shape.CollectionOperations = append(shape.CollectionOperations, ref)
+			default:
+				shape.Operations = append(shape.Operations, ref)
+			}
+		}
+	}
+	return resources, operations, nil
+}
+
+func (gen *AstGenerator) EnsureNamespaced(name string) string {
+	if strings.Index(name, "#") < 0 {
+		return string(gen.Schema.Namespace) + "#" + name
+	}
+	return name
+}
+
 func (gen *AstGenerator) ToAST() (*AST, error) {
 	ast := &AST{
 		Smithy:   "2",
 		//		Metadata: NewNodeValue(),
 	}
+	resources, resourceOps, err := gen.GenerateResources()
+	if err != nil {
+		return nil, err
+	}
 	if gen.Schema.Id != "" {
+		//the service we create needs of include resources
 		shape := &Shape{
 			Type: "service",
 			Version: gen.Schema.Version,
@@ -50,13 +117,27 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 		if gen.Schema.Comment != "" {
 			ensureShapeTraits(shape).Put("smithy.api#documentation", gen.Schema.Comment)
 		}
-		for _, od := range gen.Schema.Operations {
+		for k, _ := range resources {
 			ref := &ShapeRef{
-				Target: string(od.Id),
+				Target: gen.EnsureNamespaced(k),
 			}
-			shape.Operations = append(shape.Operations, ref)
+			shape.Resources = append(shape.Resources, ref)
+		}
+		for _, od := range gen.Schema.Operations {
+			if _, ok := resourceOps[od.Id]; !ok {
+				ref := &ShapeRef{
+					Target: string(od.Id),
+				}
+				shape.Operations = append(shape.Operations, ref)
+			}
 		}
 		ast.PutShape(string(gen.Schema.Id), shape)
+		for k, shape := range resources {
+			ast.PutShape(k, shape)
+		}
+	}
+	for k, v := range resources {
+		ast.PutShape(k, v)
 	}
 	for _, op := range gen.Schema.Operations {
 		err := gen.AddShapesFromOperation(ast, op)
@@ -94,6 +175,13 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 	}
 	ensureShapeTraits(shape).Put("smithy.api#http", httpTrait(op.HttpMethod, op.HttpUri, status))
 
+	switch op.HttpMethod {
+	case "GET":
+		ensureShapeTraits(shape).Put("smithy.api#readonly", NewNodeValue())
+	case "DELETE":
+		ensureShapeTraits(shape).Put("smithy.api#idempotent", NewNodeValue())
+	}
+	
 	if op.Input != nil {
 		inputShapeId = string(op.Id) + "Input"
 		shape.Input = &ShapeRef{
@@ -172,9 +260,9 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 			ensureMemberTraits(member).Put("smithy.api#required", NewNodeValue())
 		}
 		if fd.HttpHeader != "" {
-			ensureMemberTraits(member).Put("smithy.api#httpHeader", fd.HttpHeader)
+			ensureMemberTraits(member).Put("smithy.api#httpHeader", string(fd.HttpHeader))
 		} else if fd.HttpQuery != "" {
-			ensureMemberTraits(member).Put("smithy.api#httpQuery", fd.HttpQuery)
+			ensureMemberTraits(member).Put("smithy.api#httpQuery", string(fd.HttpQuery))
 		} else if fd.HttpPath {
 			ensureMemberTraits(member).Put("smithy.api#httpLabel", NewNodeValue())
 		} else if fd.HttpPayload {

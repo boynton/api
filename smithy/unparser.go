@@ -121,6 +121,17 @@ func (ast *AST) IDL(ns string) string {
 		if lst[0] == ns {
 			shape := ast.GetShape(nsk)
 			k := lst[1]
+			if shape.Type == "resource" {
+				w.Emit("\n")
+				w.EmitResourceShape(k, shape)
+			}
+		}
+	}
+	for _, nsk := range ast.Shapes.Keys() {
+		lst := strings.Split(nsk, "#")
+		if lst[0] == ns {
+			shape := ast.GetShape(nsk)
+			k := lst[1]
 			if shape.Type == "operation" {
 				w.Emit("\n")
 				w.EmitOperationShape(k, shape, emitted)
@@ -281,7 +292,8 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 	case "enum", "intenum":
 		w.EmitEnumShape(shape.Type, name, shape)
 	case "resource":
-		w.EmitResourceShape(name, shape)
+		// already emitted
+		//w.EmitResourceShape(name, shape)
 	case "operation", "service":
 		// already emitted
 	default:
@@ -443,15 +455,19 @@ func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
 	w.EmitSimpleShape(shape.Type, name, shape)
 }
 
+func (w *IdlWriter) forResource(rezName string) string {
+	return ""
+}
+
 func (w *IdlWriter) withMixins(mixins []*ShapeRef) string {
-	if len(mixins) == 0 {
-		return ""
+	if len(mixins) > 0 {
+		var mixinNames []string
+		for _, ref := range mixins {
+			mixinNames = append(mixinNames, w.stripNamespace(ref.Target))
+		}
+		return fmt.Sprintf(" with [%s]", strings.Join(mixinNames, ", "))
 	}
-	var mixinNames []string
-	for _, ref := range mixins {
-		mixinNames = append(mixinNames, w.stripNamespace(ref.Target))
-	}
-	return fmt.Sprintf(" with [%s]", strings.Join(mixinNames, ", "))
+	return ""
 }
 
 func (w *IdlWriter) EmitTimestampShape(name string, shape *Shape) {
@@ -671,14 +687,15 @@ func listOfStrings(label string, format string, lst []string) string {
 }
 
 func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
-	fmt.Println("EmitServiceShape, doc:", shape.Traits.Get("smithy.api#documentation"))
 	comma := ""
 	if w.version < 2 {
 		comma = ","
 	}
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("service %s%s {\n", name, w.withMixins(shape.Mixins))
-	w.Emit("    version: %q%s\n", shape.Version, comma)
+	if shape.Version != "" {
+		w.Emit("    version: %q%s\n", shape.Version, comma)
+	}
 	if len(shape.Operations) > 0 {
 		w.Emit("    %s\n", w.listOfShapeRefs("operations", "%s", shape.Operations, false))
 	}
@@ -749,7 +766,8 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 			if b := inputShape.Traits.Get("smithy.api#input"); b != nil {
 				inputTraits := "" //?
 				inputMixins := w.withMixins(inputShape.Mixins)
-				w.Emit("%sinput := %s%s{\n", IndentAmount, inputTraits, inputMixins)
+				inputResource := ""//w.forResource(inputShape.Resource)
+				w.Emit("%sinput := %s%s%s{\n", IndentAmount, inputTraits, inputMixins, inputResource)
 				i2 := IndentAmount + IndentAmount
 				for i, k := range inputShape.Members.Keys() {
 					if i > 0 {
