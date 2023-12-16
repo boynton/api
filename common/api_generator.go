@@ -81,7 +81,14 @@ func (gen *ApiGenerator) GenerateOperations() {
 
 func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) error {
 	gen.GenerateBlockComment(op.Comment, "")
-	gen.Emitf("operation %s (method=%s, url=%q) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri)
+	rez := ""
+	if op.Resource != "" {
+		rez = ", resource=" + op.Resource
+		if op.Lifecycle != "" {
+			rez = rez + ", lifecycle=" + op.Lifecycle
+		}
+	}
+	gen.Emitf("operation %s (method=%s, url=%q%s) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri, rez)
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
 	gen.GenerateOperationExceptions(op)
@@ -168,7 +175,7 @@ func (gen *ApiGenerator) GenerateOperationExceptions(op *model.OperationDef) {
 			if errdef.Id != "" && errdef.Id != defaultId {
 				errname = "(name=" + StripNamespace(errdef.Id) + ") "
 			}
-			gen.Emitf("    exception %d%s {\n", errdef.HttpStatus, errname)
+			gen.Emitf("    exception %d %s{\n", errdef.HttpStatus, errname)
 			gen.GenerateOperationOutputFields(errdef, "    ")
 			gen.Emit("    }\n")
 		}

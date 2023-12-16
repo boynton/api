@@ -100,6 +100,8 @@ structure OperationDef with [GenericTraits] {
     input: OperationInput
     output: OperationOutput
     exceptions: OperationOutputList
+    resource: String
+    lifecycle: String
 }
 
 list OperationOutputList {

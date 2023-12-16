@@ -3,9 +3,9 @@
 package model
 
 import(
+    "github.com/boynton/data"
     "encoding/json"
     "fmt"
-    "github.com/boynton/data"
 )
 
 //
@@ -130,9 +130,9 @@ type EnumElementList []*EnumElement
 
 //
 // 
-// TypeDef - a structure defining a new type in this system. New types cannot be derived from
-// these, but this new type can be used to specify the type of members in aggregate types. TypeDef
-// could more properly be defined as a Union of various types, but this structure is more
+// TypeDef - a structure defining a new type in this system. New types cannot be
+// these, but this new type can be used to specify the type of members in aggregate
+// could more properly be defined as a Union of various types, but this structure
 // convenient.
 // 
 //
@@ -201,13 +201,15 @@ type OperationDef struct {
     Input *OperationInput `json:"input,omitempty"`
     Output *OperationOutput `json:"output,omitempty"`
     Exceptions OperationOutputList `json:"exceptions,omitempty"`
+    Resource string `json:"resource,omitempty"`
+    Lifecycle string `json:"lifecycle,omitempty"`
 }
 
 type OperationOutputList []*OperationOutput
 
 //
 // 
-// OperationInput - the description of an operation input. It is similar to a Struct definition,
+// OperationInput - the description of an operation input. It is similar to a
 // but with HTTP bindings.
 // 
 //
@@ -249,7 +251,7 @@ type OperationInputField struct {
 
 //
 // 
-// OperationOutput - the description of an operation output. Similar to a Struct definition, but
+// OperationOutput - the description of an operation output. Similar to a Struct
 // with HTTP bindings. Also used for OperationExceptions.
 // 
 //
