@@ -1,0 +1,112 @@
+// 
+// A simple service to demonstrate CRUDL operations
+// 
+namespace example
+service TestService
+
+// 
+// Create an item
+// 
+operation CreateItem (method=POST, url="/items", resource=ItemResource, lifecycle=create) {
+    input {
+        item Item (required, payload)
+    }
+    output 201 {
+        item Item (payload)
+    }
+    exception 400 (name=BadRequest) {
+        error Error (payload)
+    }
+}
+
+// 
+// Get an existing item
+// 
+operation GetItem (method=GET, url="/items/{itemId}", resource=ItemResource, lifecycle=read) {
+    input {
+        itemId String (required, path)
+    }
+    output 200 {
+        item Item (payload)
+    }
+    exception 404 (name=NotFound) {
+        error Error (payload)
+    }
+}
+
+// 
+// Update an existing item
+// 
+operation UpdateItem (method=PUT, url="/items/{itemId}", resource=ItemResource, lifecycle=update) {
+    input {
+        itemId String (required, path)
+        item Item (required, payload)
+    }
+    output 200 {
+        item Item (payload)
+    }
+    exception 404 (name=NotFound) {
+        error Error (payload)
+    }
+    exception 400 (name=BadRequest) {
+        error Error (payload)
+    }
+}
+
+// 
+// Delete an existing item
+// 
+operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResource, lifecycle=delete) {
+    input {
+        itemId String (required, path)
+    }
+    output 204 {
+    }
+    exception 404 (name=NotFound) {
+        error Error (payload)
+    }
+}
+
+// 
+// List existing items
+// 
+operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=list) {
+    input {
+        limit Int32 (query="limit")
+        skip String (query="skip")
+    }
+    output 200 {
+        listing ItemListing (payload)
+    }
+}
+
+// 
+// A list of Items
+// 
+type ItemList List[Item]
+
+// 
+// A generic Error entity, what is encoded on the wire in error responses
+// 
+type Error Struct {
+    message String
+}
+
+// 
+// The ItemListing is a paginated segment of the collection of items, with an
+// optional continuation token
+// 
+type ItemListing Struct {
+    items ItemList (required)
+    next String
+}
+
+// 
+// The Item resource itself
+// 
+type Item Struct {
+    id String (required) // the id of the item
+    modified Timestamp // when the item ast last modified
+    data String // arbitrary data
+}
+
