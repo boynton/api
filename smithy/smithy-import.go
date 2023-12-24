@@ -51,8 +51,13 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
 		return importShape(schema, ast, shapeId, shape)
 	})
+	if err != nil {
+		return nil, err
+	}
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
-		if shape.Type == "resource" {
+		if shape == nil {
+			fmt.Println("WHoops, nil shape in list:", shapeId)
+		} else if shape.Type == "resource" {
 			return addResource(schema, ast, shapeId, shape)
 		}
 		return nil
@@ -344,32 +349,39 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 		if op.HttpMethod == "POST" || op.HttpMethod == "PUT" {
 			//an HTTP payload is required, supply an empty one if missing.
 			hasPayload := false
+			hasAnythingElse := false
 			if op.Input == nil {
-				fmt.Println("whoops, no input for a PUT/POST:", httpTrait)
-				panic("here")
+				return fmt.Errorf("Smithy operation with Http Method %s requires a payload", op.HttpMethod)
 			}
 			for _, field := range op.Input.Fields {
 				if field.HttpPayload {
 					hasPayload = true
 					break
 				}
+				if field.HttpPath || field.HttpHeader != "" || field.HttpQuery != "" {
+					hasAnythingElse = true
+				}
 			}
-			if !hasPayload {
-				return fmt.Errorf("Smithy operation input for %s must have a payload: %s", op.HttpMethod, model.Pretty(op))
+			if !hasPayload && hasAnythingElse {
+				return fmt.Errorf("Smithy operation input for %s must have a payload specified when other Http bindings are specified: %s", op.HttpMethod, model.Pretty(op))
 			}
 		}
 		hasPayload := false
+		hasHeader := false
 		for _, field := range op.Output.Fields {
 			if field.HttpPayload {
 				hasPayload = true
+			}
+			if field.HttpHeader != "" {
+				hasHeader = true
 			}
 		}
  		if op.Output.HttpStatus == 204 { //note: Smithy cannot do a 304, but would have same constraint
 			if hasPayload {
 				return fmt.Errorf("Smithy operation output for a 204 response must have no payload: %s", model.Pretty(op))
 			}
-		} else if !hasPayload {
-			return fmt.Errorf("Smithy operation output for a non-204 response must have a payload: %s", model.Pretty(op))
+		} else if !hasPayload && hasHeader {
+			return fmt.Errorf("Smithy operation output for a non-204 response must have a payload specified when headers are present: %s", model.Pretty(op))
 		}
 	}
 	schema.Operations = append(schema.Operations, &op)

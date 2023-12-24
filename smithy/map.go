@@ -98,9 +98,6 @@ func JsonKeysInOrder(data []byte) ([]string, error) {
 }
 
 func (s *Map[V]) String() string {
-	if true {
-		return "BLAH"
-	}
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)

@@ -654,10 +654,11 @@ func (gen *Generator) GenerateServer() string {
 		}
 		w.Emitf("    %serr := handler.impl.%s(%s)\n", result, opName, arg)
 		w.Emit("    if err != nil {\n")
-		w.Emit("        switch err.(type) {\n")
+		w.Emit("        switch e := err.(type) {\n")
 		for _, e := range op.Exceptions {
 			w.Emitf("       case %s:\n", gen.golangTypeRef(e.Id))
-			w.Emitf("           jsonResponse(w, %d, err)\n", e.HttpStatus)
+			p := gen.entityPayload(e)
+			w.Emitf("           jsonResponse(w, %d, e%s)\n", e.HttpStatus, p)
 		}
 		w.Emit("        default:\n")
 		w.Emit("            jsonResponse(w, 500, &serverError{Message: fmt.Sprint(err)})\n")
@@ -690,6 +691,15 @@ func (gen *Generator) GenerateServer() string {
 	w.Emitf("}\n\n")
 	w.Emit(serverUtilSource)	
 	return w.End()
+}
+
+func (gen *Generator) entityPayload(out *model.OperationOutput) string {
+	for _, field := range out.Fields {
+		if field.HttpPayload {
+			return "." + common.Capitalize(string(field.Name))
+		}
+	}
+	return ""
 }
 
 func (gen *Generator) GenerateClient() string {

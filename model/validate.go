@@ -16,8 +16,11 @@ limitations under the License.
 package model
 
 import(
+	"os"
 	"fmt"
 )
+
+var showWarnings = false
 
 func (schema *Schema) Validate() error {
 	for _, op := range schema.Operations {
@@ -31,6 +34,12 @@ func (schema *Schema) Validate() error {
 
 func (schema *Schema) ValidationError(context, msg string) error {
 	return fmt.Errorf("*** Validation failure: " + context + ": " + msg)
+}
+
+func (schema *Schema) ValidationWarning(context, msg string) {
+	if showWarnings {
+		fmt.Fprintf(os.Stderr, "*** Validation warning: " + context + ": " + msg)
+	}
 }
 
 func (schema *Schema) ValidateOperation(op *OperationDef) error {
@@ -74,7 +83,7 @@ func (schema *Schema) ValidateOperationInput(op *OperationDef) error {
 			}
 		}
 		context := StripNamespace(op.Id) + "$" + string(in.Name)
-		return schema.ValidationError(context, "Input field must specified as one of 'path', 'query', 'header', or 'payload'")
+		return schema.ValidationError(context, "Input field should be specified as one of 'path', 'query', 'header', or 'payload'")
 	}
 	return nil
 }
@@ -90,9 +99,11 @@ func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOu
 				continue
 			}
 		}
+		//errors with inlined fields as the payload are actually common in the wild.
+		//it use to be: smithy openapi generation wopuld insert an XxxContent type to specify the
+		//payload.
 		context := StripNamespace(op.Id) + "$" + string(out.Name)
-		fmt.Println("WHoops:", Pretty(op))
-		return schema.ValidationError(context, "Output field must specified as one of 'header' or 'payload'")
+		schema.ValidationWarning(context, "Output field should be specified as one of 'header' or 'payload'\n")
 	}
 	return nil
 }
