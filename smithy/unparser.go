@@ -515,14 +515,13 @@ func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 	count := shape.Members.Length()
 	for _, fname := range shape.Members.Keys() {
 		mem := shape.Members.Get(fname)
-		sval := fname
 		eqval := ""
 		if val := mem.Traits.Get("smithy.api#enumValue"); val != nil {
 			if enumType == "intEnum" {
 				dval := data.AsInt(val)
 				eqval = fmt.Sprintf(" = %d", dval)
 			} else {
-				sval = fmt.Sprintf("%s", val) //data.AsString(val)
+				sval := fmt.Sprintf("%s", val) //data.AsString(val)
 				if sval != fname {
 					eqval = fmt.Sprintf(" = %q", sval)
 				}

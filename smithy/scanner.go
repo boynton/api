@@ -339,7 +339,6 @@ func (s *Scanner) scanString() Token {
 			switch ch {
 			case 'n':
 				buf.WriteRune('\n')
-				ch = '\n'
 			case 'r':
 				buf.WriteRune('\r')
 			case 't':
@@ -382,7 +381,6 @@ func (s *Scanner) scanString() Token {
 					}
 					s.unread(ch)
 				}
-				potentialTextBlock = false
 			}
 			return tok.finish(buf.String())
 		case '\\':
@@ -420,7 +418,6 @@ func (s *Scanner) scanTextBlock(tok Token) Token {
 			switch ch {
 			case 'n':
 				buf.WriteRune('\n')
-				ch = '\n'
 			case 'r':
 				buf.WriteRune('\r')
 			case 't':

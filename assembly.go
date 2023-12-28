@@ -108,6 +108,9 @@ func expandPaths(paths []string) ([]string, string, error) {
 					}
 					return nil
 				})
+				if err != nil {
+					return nil, "", err
+				}
 			}
 		}
 	}
