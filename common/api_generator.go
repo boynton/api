@@ -67,7 +67,7 @@ func (gen *ApiGenerator) GenerateSummary() {
 		gen.Emitf("namespace %s\n", gen.ns)
 	}
 	if gen.name != "" {
-		gen.Emitf("service %s\n", gen.name)
+		gen.Emitf("service %s\n", title)
 	}
 	//other metadata?
 	gen.Emit("\n")

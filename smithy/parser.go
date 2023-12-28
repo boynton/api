@@ -87,63 +87,51 @@ func (p *Parser) Parse() error {
 				err = p.parseMetadata()
 			case "service":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseService(traits)
 				traits = nil
 			case "document":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseSimpleTypeDef(tok.Text, traits)
 				traits = nil
 			case "blob":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseSimpleTypeDef(tok.Text, traits)
 				traits = nil
 			case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal", "string", "timestamp", "boolean":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseSimpleTypeDef(tok.Text, traits)
 				traits = nil
 			case "enum", "intEnum":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseEnum(traits, tok.Text == "intEnum")
 				traits = nil
 			case "structure":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseStructure(traits)
 				traits = nil
 			case "union":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseUnion(traits)
 				traits = nil
 			case "set":
 				p.Warning("Deprecated shape: set")
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseList(traits)
 				traits = nil
 			case "list":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseList(traits)
 				traits = nil
 			case "map":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseMap(tok.Text, traits)
 				traits = nil
 			case "operation":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseOperation(traits)
 				traits = nil
 			case "resource":
 				traits = withCommentTrait(traits, comment)
-				comment = ""
 				err = p.parseResource(traits)
 				traits = nil
 			case "use":
@@ -1113,6 +1101,9 @@ func (p *Parser) parseUnion(traits *NodeValue) error {
 				return err
 			}
 			err = p.ignore(COMMA)
+			if err != nil {
+				return err
+			}
 			mems.Put(fname, &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
@@ -1195,6 +1186,9 @@ func (p *Parser) parseEnum(traits *NodeValue, intEnum bool) error {
 				p.UngetToken()
 			}
 			err = p.ignore(COMMA)
+			if err != nil {
+				return err
+			}
 			mtraits = withCommentTrait(mtraits, comment)
 			comment = ""
 			mems.Put(fname, &Member{
@@ -1202,7 +1196,6 @@ func (p *Parser) parseEnum(traits *NodeValue, intEnum bool) error {
 				Traits: mtraits,
 			})
 			mtraits = nil
-			comment = ""
 		} else if tok.Type == LINE_COMMENT {
 			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
 				comment = p.MergeComment(comment, tok.Text[1:])
@@ -1310,6 +1303,9 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 			return err
 		}
 		err = p.ignore(COMMA)
+		if err != nil {
+			return err
+		}
 	}
 	return p.addShapeDefinition(name, shape)
 }
@@ -1366,6 +1362,9 @@ func (p *Parser) parseService(traits *NodeValue) error {
 			return err
 		}
 		err = p.ignore(COMMA)
+		if err != nil {
+			return err
+		}
 	}
 	return p.addShapeDefinition(name, shape)
 }
@@ -1382,13 +1381,13 @@ func (p *Parser) parseResource(traits *NodeValue) error {
 	if tok.Type != OPEN_BRACE {
 		return p.SyntaxError()
 	}
+	var comment string
+	traits = withCommentTrait(traits, comment)
+	comment = ""
 	shape := &Shape{
 		Type:   "resource",
 		Traits: traits,
 	}
-	var comment string
-	traits = withCommentTrait(traits, comment)
-	comment = ""
 	for {
 		tok := p.GetToken()
 		if tok == nil {
@@ -1444,6 +1443,9 @@ func (p *Parser) parseResource(traits *NodeValue) error {
 			return err
 		}
 		err = p.ignore(COMMA)
+		if err != nil {
+			return err
+		}
 	}
 	return p.addShapeDefinition(name, shape)
 }

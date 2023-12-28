@@ -496,6 +496,9 @@ func (p *Parser) finishOperation(name, method, pathTemplate, resource, comment s
 			}
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
+		if err != nil {
+			return err
+		}
 		p.schema.Operations = append(p.schema.Operations, op)
 	} else {
 		return p.SyntaxError()
@@ -1314,6 +1317,9 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 			}
 			fd.Required = options.Required
 			fd.Comment, err = p.EndOfStatement(fd.Comment)
+			if err != nil {
+				return err
+			}
 			td.Fields = append(td.Fields, fd)
 		}
 		tok = p.GetToken()
