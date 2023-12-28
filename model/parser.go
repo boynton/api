@@ -496,7 +496,6 @@ func (p *Parser) finishOperation(name, method, pathTemplate, resource, comment s
 			}
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
-		//		ensureRequiredParams(op)
 		p.schema.Operations = append(p.schema.Operations, op)
 	} else {
 		return p.SyntaxError()
