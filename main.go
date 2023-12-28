@@ -29,7 +29,6 @@ import (
 	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
-	//"github.com/boynton/api/swagger"
 )
 
 var Version string = "development version"

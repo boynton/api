@@ -1,11 +1,11 @@
 package smithy
 
-import(
+import (
 	"strings"
-	
-	"github.com/boynton/data"
-	"github.com/boynton/api/model"
+
 	"github.com/boynton/api/common"
+	"github.com/boynton/api/model"
+	"github.com/boynton/data"
 )
 
 type AstGenerator struct {
@@ -101,7 +101,7 @@ func (gen *AstGenerator) EnsureNamespaced(name string) string {
 
 func (gen *AstGenerator) ToAST() (*AST, error) {
 	ast := &AST{
-		Smithy:   "2",
+		Smithy: "2",
 		//		Metadata: NewNodeValue(),
 	}
 	resources, resourceOps, err := gen.GenerateResources()
@@ -111,13 +111,13 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 	if gen.Schema.Id != "" {
 		//the service we create needs of include resources
 		shape := &Shape{
-			Type: "service",
+			Type:    "service",
 			Version: gen.Schema.Version,
 		}
 		if gen.Schema.Comment != "" {
 			ensureShapeTraits(shape).Put("smithy.api#documentation", gen.Schema.Comment)
 		}
-		for k, _ := range resources {
+		for k := range resources {
 			ref := &ShapeRef{
 				Target: gen.EnsureNamespaced(k),
 			}
@@ -181,7 +181,7 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 	case "DELETE":
 		ensureShapeTraits(shape).Put("smithy.api#idempotent", NewNodeValue())
 	}
-	
+
 	if op.Input != nil {
 		inputShapeId = string(op.Id) + "Input"
 		shape.Input = &ShapeRef{
@@ -231,7 +231,7 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 	if outputShape != nil {
 		ast.PutShape(outputShapeId, outputShape)
 	}
-	for _,  errId := range errShapeIds {
+	for _, errId := range errShapeIds {
 		errShape := errShapes[errId]
 		prev := ast.GetShape(errId)
 		if prev != nil {
@@ -302,7 +302,7 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 	} else {
 		ensureShapeTraits(shape).Put("smithy.api#output", NewNodeValue())
 	}
-	return shape, nil	
+	return shape, nil
 }
 
 func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error) {
@@ -372,7 +372,6 @@ func (gen *AstGenerator) ShapeFromNumber(td *model.TypeDef) (string, *Shape, err
 	case model.Decimal:
 		shape.Type = "bigDecimal"
 	case model.Integer:
-		panic("whoa!")
 		shape.Type = "bigInteger"
 	}
 	if td.MinValue != nil || td.MaxValue != nil {
@@ -463,7 +462,7 @@ func typeReference(name string) string {
 
 func (gen *AstGenerator) ShapeFromEnum(td *model.TypeDef) (string, *Shape, error) {
 	shape := &Shape{
-		Type: "enum",
+		Type:    "enum",
 		Members: NewMap[*Member](),
 	}
 	for _, el := range td.Elements {

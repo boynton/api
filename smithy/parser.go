@@ -320,7 +320,7 @@ func (p *Parser) ExpectNumber() (float64, error) {
 		return 0.0, p.EndOfFileError()
 	}
 	if tok.IsNumeric() {
-        return strconv.ParseFloat(tok.Text, 64)
+		return strconv.ParseFloat(tok.Text, 64)
 	}
 	return 0.0, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
@@ -653,7 +653,6 @@ func (p *Parser) addShapeDefinition(name string, shape *Shape) error {
 	return nil
 }
 
-
 func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
 	tname, err := p.ExpectIdentifier()
 	if err != nil {
@@ -953,7 +952,7 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 		} else if tok.Type == DOLLAR {
 			//create a new 'apply' shape on the traits we've got here. Let mixin do its thing
 			//note: apply also is eager now, should wait until at least assembly time.
-			//so for now, 
+			//so for now,
 			//Target elision with a mixin
 			tok := p.GetToken()
 			if tok.Type != SYMBOL {
@@ -1745,7 +1744,7 @@ func (p *Parser) parseLiteralString(tok *Token) (interface{}, error) {
 }
 
 func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
-    num, err := strconv.ParseFloat(tok.Text, 64)
+	num, err := strconv.ParseFloat(tok.Text, 64)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
 	}
@@ -1828,7 +1827,7 @@ func (p *Parser) relativePath(path string) string {
 			p2 = p2[1:]
 		}
 		s := strings.Join(p1, "/")
-		for _, _ = range p2 {
+		for range p2 {
 			s = "../" + s
 		}
 		return s

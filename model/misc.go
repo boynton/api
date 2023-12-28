@@ -1,7 +1,7 @@
-//to do: move to data
+// to do: move to data
 package model
 
-import(
+import (
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -51,5 +51,3 @@ func JsonEncode(obj interface{}) string {
 func JsonDecodeAs[T any](j string, target *T) error {
 	return json.Unmarshal([]byte(j), target)
 }
-
-

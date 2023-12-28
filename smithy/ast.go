@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 	"reflect"
+	"strings"
 
 	"github.com/boynton/data" //for Decimal
 )
@@ -31,17 +31,18 @@ const UnspecifiedNamespace = "example"
 const UnspecifiedVersion = "0.0"
 
 type AST struct {
-	Smithy   string            `json:"smithy"`
-	Metadata *NodeValue       `json:"metadata,omitempty"`
+	Smithy   string       `json:"smithy"`
+	Metadata *NodeValue   `json:"metadata,omitempty"`
 	Shapes   *Map[*Shape] `json:"shapes,omitempty"`
 }
 
 type NodeValue struct {
 	value interface{}
 }
+
 func NewNodeValue() *NodeValue {
-//to do: use Map to preserve order of keys
-	return &NodeValue{value:make(map[string]interface{}, 0)}
+	//to do: use Map to preserve order of keys
+	return &NodeValue{value: make(map[string]interface{}, 0)}
 }
 
 func AsNodeValue(v interface{}) *NodeValue {
@@ -52,16 +53,16 @@ func AsNodeValue(v interface{}) *NodeValue {
 }
 
 func (node NodeValue) MarshalJSON() ([]byte, error) {
-    return json.Marshal(node.value)
+	return json.Marshal(node.value)
 }
 
 func (node *NodeValue) UnmarshalJSON(b []byte) error {
-    var v interface{}
-    err := json.Unmarshal(b, &v)
-    if err == nil {
+	var v interface{}
+	err := json.Unmarshal(b, &v)
+	if err == nil {
 		node.value = v
-    }
-    return err
+	}
+	return err
 }
 
 func (node *NodeValue) RawValue() interface{} {
@@ -84,7 +85,7 @@ func (node *NodeValue) Keys() []string {
 	switch val := node.value.(type) {
 	case map[string]interface{}:
 		var keys []string
-		for k, _ := range val {
+		for k := range val {
 			keys = append(keys, k)
 		}
 		return keys
@@ -128,8 +129,6 @@ func (node *NodeValue) AsString() string {
 	switch s := node.value.(type) {
 	case string:
 		return s
-	default:
-		panic("not a string, weird")
 	}
 	return ""
 }
@@ -282,7 +281,6 @@ func (node *NodeValue) Put(key string, val interface{}) *NodeValue {
 	return node
 }
 
-
 func (ast *AST) AssemblyVersion() int {
 	if strings.HasPrefix(ast.Smithy, "1") {
 		return 1
@@ -323,7 +321,7 @@ func (ast *AST) ForAllShapes(visitor func(shapeId string, shape *Shape) error) e
 }
 
 type Shape struct {
-	Type   string       `json:"type"`
+	Type string `json:"type"`
 
 	//Service
 	Version string `json:"version,omitempty"`
@@ -336,8 +334,8 @@ type Shape struct {
 	Value *Member `json:"value,omitempty"`
 
 	//Structure and Union
-	Members *Map[*Member]    `json:"members,omitempty"` //keys must be case-insensitively unique. For union, len(Members) > 0,
-	Mixins  []*ShapeRef `json:"mixins,omitempty"`  //mixins for the shape
+	Members *Map[*Member] `json:"members,omitempty"` //keys must be case-insensitively unique. For union, len(Members) > 0,
+	Mixins  []*ShapeRef   `json:"mixins,omitempty"`  //mixins for the shape
 
 	//Resource
 	Identifiers *Map[*ShapeRef] `json:"identifiers,omitempty"`
@@ -381,7 +379,7 @@ type ShapeRef struct {
 }
 
 type Member struct {
-	Target string       `json:"target"`
+	Target string     `json:"target"`
 	Traits *NodeValue `json:"traits,omitempty"`
 }
 
@@ -469,7 +467,7 @@ func (ast *AST) Namespaces() []string {
 		}
 	}
 	nss := make([]string, 0, len(m))
-	for k, _ := range m {
+	for k := range m {
 		nss = append(nss, k)
 	}
 	return nss
@@ -699,22 +697,22 @@ func (ast *AST) expandMixins(shapeId string) error {
 	//destructive: every mixin is merged once
 	shape := ast.Shapes.Get(shapeId)
 	if shape == nil {
-		return fmt.Errorf("Shape not available:", shapeId)
+		return fmt.Errorf("Shape not available: %s", shapeId)
 	}
 	//for _, mixinRef := range shape.Mixins {
 	if shape.Mixins != nil {
 		last := len(shape.Mixins) - 1
-		for i := last; i >= 0; i--  {
+		for i := last; i >= 0; i-- {
 			mixinRef := shape.Mixins[i]
 			mixinId := mixinRef.Target
-			ast.expandMixins(mixinId) //this causes reverse order, not what we want
+			ast.expandMixins(mixinId)        //this causes reverse order, not what we want
 			mixin := ast.Shapes.Get(mixinId) //expanded
 			if mixin == nil {
 				panic("oops, should have deferred elision and apply at assembly time")
 			}
 			if mixin.Members != nil {
 				if shape.Type != "structure" {
-					return fmt.Errorf("Target for mixin with members not a Structure:", shapeId)
+					return fmt.Errorf("Target for mixin with members not a Structure: %s", shapeId)
 				}
 				newMembers := NewMap[*Member]()
 				for _, memKey := range mixin.Members.Keys() {
@@ -770,7 +768,7 @@ func (ast *AST) FilterDependencies(root []string) {
 		}
 	}
 	filtered := NewMap[*Shape]()
-	for name, _ := range included {
+	for name := range included {
 		if !strings.HasPrefix(name, "smithy.api#") {
 			filtered.Put(name, ast.GetShape(name))
 		}
@@ -821,7 +819,7 @@ func (ast *AST) Filter(tags []string) {
 			include = append(include, tag)
 		}
 	}
-	
+
 	for _, k := range ast.Shapes.Keys() {
 		shape := ast.Shapes.Get(k)
 		if shape == nil {
@@ -840,18 +838,18 @@ func (ast *AST) Filter(tags []string) {
 	}
 	ast.FilterDependencies(root)
 	/*
-	included := make(map[string]bool, 0)
-	for _, k := range root {
-		if _, ok := included[k]; !ok {
-			ast.noteDependencies(included, k)
+		included := make(map[string]bool, 0)
+		for _, k := range root {
+			if _, ok := included[k]; !ok {
+				ast.noteDependencies(included, k)
+			}
 		}
-	}
-	filtered := NewMap[*Shape]()
-	for name, _ := range included {
-		if !strings.HasPrefix(name, "smithy.api#") {
-			filtered.Put(name, ast.GetShape(name))
+		filtered := NewMap[*Shape]()
+		for name, _ := range included {
+			if !strings.HasPrefix(name, "smithy.api#") {
+				filtered.Put(name, ast.GetShape(name))
+			}
 		}
-	}
 	*/
 	if len(exclude) > 0 {
 		fmt.Print("TBD: exclude by tag: ", exclude)
@@ -867,4 +865,3 @@ func containsString(ary []string, val string) bool {
 	}
 	return false
 }
-

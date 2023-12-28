@@ -15,25 +15,24 @@ limitations under the License.
 */
 package model
 
-import(
+import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
-	
 	//	"github.com/boynton/data"
 )
 
-//Q: do I want to *require* a service? I think not. I use codegen for types all the time.
+// Q: do I want to *require* a service? I think not. I use codegen for types all the time.
 type Schema struct {
 	ServiceDef
 	Namespace Namespace `json:"-"`
 	typeIndex map[AbsoluteIdentifier]*TypeDef
-	opIndex map[AbsoluteIdentifier]*OperationDef
+	opIndex   map[AbsoluteIdentifier]*OperationDef
 	//Metadata *data.Object `json:"metadata,omitempty"`
 }
 
-func Load(paths []string, tags[]string) (*Schema, error) {
+func Load(paths []string, tags []string) (*Schema, error) {
 	if len(paths) != 1 {
 		return nil, fmt.Errorf("Openapi import can aonly accept a single file")
 	}
@@ -67,16 +66,16 @@ func (ident Identifier) Capitalized() string {
 	s := string(ident)
 	if s == "" {
 		return s
-    }
-    return strings.ToUpper(s[0:1]) + s[1:]
+	}
+	return strings.ToUpper(s[0:1]) + s[1:]
 }
 
 func (ident Identifier) Uncapitalized() string {
 	s := string(ident)
 	if s == "" {
 		return s
-    }
-    return strings.ToLower(s[0:1]) + s[1:]
+	}
+	return strings.ToLower(s[0:1]) + s[1:]
 }
 
 func BaseTypeByName(name string) BaseType {
@@ -144,31 +143,31 @@ func (out *OperationOutput) String() string {
 }
 
 func (schema *Schema) BaseType(id AbsoluteIdentifier) BaseType {
-    switch id {
-    case "base#Blob":
-        return Blob
-    case "base#Bool":
-        return Bool
-    case "base#String":
-        return String
-    case "base#Int8":
-        return Int8
-    case "base#Int16":
-        return Int16
-    case "base#Int32":
-        return Int32
-    case "base#Int64":
-        return Int64
-    case "base#Float32":
-        return Float32
-    case "base#Float64":
-        return Float64
-    case "base#Decimal":
+	switch id {
+	case "base#Blob":
+		return Blob
+	case "base#Bool":
+		return Bool
+	case "base#String":
+		return String
+	case "base#Int8":
+		return Int8
+	case "base#Int16":
+		return Int16
+	case "base#Int32":
+		return Int32
+	case "base#Int64":
+		return Int64
+	case "base#Float32":
+		return Float32
+	case "base#Float64":
+		return Float64
+	case "base#Decimal":
 		return Decimal
-    case "base#Integer":
+	case "base#Integer":
 		panic("big int!")
 		return Integer
-    case "base#Timestamp":
+	case "base#Timestamp":
 		return Timestamp
 	}
 	td := schema.GetTypeDef(id)
@@ -263,7 +262,6 @@ func (schema *Schema) Namespaced(name string) AbsoluteIdentifier {
 	return AbsoluteIdentifier(string(schema.Namespace) + "#" + name)
 }
 
-
 func (schema *Schema) Filter(tags []string) {
 	var root []AbsoluteIdentifier
 	for _, td := range schema.Types {
@@ -282,7 +280,7 @@ func (schema *Schema) Filter(tags []string) {
 		}
 	}
 	var filtered []*TypeDef
-	for name, _ := range included {
+	for name := range included {
 		if !strings.HasPrefix(string(name), "api#") {
 			filtered = append(filtered, schema.GetTypeDef(name))
 		}
@@ -294,7 +292,7 @@ func (schema *Schema) noteDependencies(included map[AbsoluteIdentifier]bool, id 
 	if id == "" {
 		return
 	}
-	
+
 	if _, ok := included[id]; ok {
 		return
 	}
@@ -309,10 +307,10 @@ func (schema *Schema) noteDependencies(included map[AbsoluteIdentifier]bool, id 
 			schema.noteDependencies(included, f.Type)
 		}
 		/*
-case Array:
-		//could be *any*, do we need to mark that?
-	case Object:
-		//could be *any*, do we need to mark that?
+			case Array:
+					//could be *any*, do we need to mark that?
+				case Object:
+					//could be *any*, do we need to mark that?
 		*/
 	case List:
 		schema.noteDependencies(included, td.Items)

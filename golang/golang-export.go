@@ -22,25 +22,25 @@ import (
 	"path"
 	"strings"
 
-	"github.com/boynton/data"
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
+	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
 
 type Generator struct {
 	common.BaseGenerator
-	ns model.Namespace
-	pkg string
-	inlineSlicesAndMaps bool //more idiomatic, but prevents validating constraints (i.e. list.maxLength)
-	inlinePrimitives bool //more idomatic, but prevents validating constraints (i.e. string.Pattern)
-	decimalPackage string //use this package for the Decimal implementation. If "", then generate one in this package
-	decimalPrefix string //derived from the decimalPackage
-	timestampPackage string //use this package for the Timestamp implementation. If "", then generate one in this package
-	timestampPrefix string
-	anyPackage string //use this package for the Any type, if "", then generate one in this package
-	anyPrefix string //derived from the anyPackage
+	ns                  model.Namespace
+	pkg                 string
+	inlineSlicesAndMaps bool   //more idiomatic, but prevents validating constraints (i.e. list.maxLength)
+	inlinePrimitives    bool   //more idomatic, but prevents validating constraints (i.e. string.Pattern)
+	decimalPackage      string //use this package for the Decimal implementation. If "", then generate one in this package
+	decimalPrefix       string //derived from the decimalPackage
+	timestampPackage    string //use this package for the Timestamp implementation. If "", then generate one in this package
+	timestampPrefix     string
+	anyPackage          string //use this package for the Any type, if "", then generate one in this package
+	anyPrefix           string //derived from the anyPackage
 }
 
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
@@ -71,7 +71,6 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.timestampPackage = config.GetString("golang.timestampPackage")
 	if gen.timestampPackage != "" {
 		gen.timestampPrefix = path.Base(gen.timestampPackage) + "."
-		gen.timestampPackage = gen.timestampPackage
 	}
 	gen.ns = model.Namespace(config.GetString("namespace"))
 	if gen.ns == "" {
@@ -93,34 +92,34 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 		return err
 	}
 
-	fname := gen.FileName(fbase + "_types", ".go")
+	fname := gen.FileName(fbase+"_types", ".go")
 	s := gen.GenerateTypes()
-	err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+	err = gen.Write(s, fname, "\n\n------------------"+fname+"\n")
 	if err != nil {
 		return err
 	}
 	if len(gen.Schema.Operations) > 0 {
 		s = gen.GenerateOperations()
-		fname = gen.FileName(fbase + "_operations", ".go")	
-		err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+		fname = gen.FileName(fbase+"_operations", ".go")
+		err = gen.Write(s, fname, "\n\n------------------"+fname+"\n")
 		if err != nil {
 			return err
 		}
 	}
 	if len(gen.Schema.Operations) > 0 {
-		fname = gen.FileName(fbase + "_server", ".go")
+		fname = gen.FileName(fbase+"_server", ".go")
 		s = gen.GenerateServer()
-		err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+		err = gen.Write(s, fname, "\n\n------------------"+fname+"\n")
 		if err != nil {
 			return err
 		}
 		/*
-	fname = gen.FileName(fbase + "_client", ".go")
-	s = gen.GenerateClient(ns, model)
-	err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
-	if err != nil {
-		return err
-	}
+			fname = gen.FileName(fbase + "_client", ".go")
+			s = gen.GenerateClient(ns, model)
+			err = gen.Write(s, fname, "\n\n------------------" + fname + "\n")
+			if err != nil {
+				return err
+			}
 		*/
 	}
 	return nil
@@ -132,39 +131,39 @@ func (gen *Generator) Validate() error {
 }
 
 type GolangWriter struct {
-	buf       bytes.Buffer
-	writer    *bufio.Writer
-	gen       *Generator
+	buf    bytes.Buffer
+	writer *bufio.Writer
+	gen    *Generator
 }
 
 func (gen *Generator) golangBaseTypeName(bt model.BaseType) string {
 	switch bt {
-    case model.Bool:
+	case model.Bool:
 		return "bool"
-    case model.Int8:
+	case model.Int8:
 		return "int8"
-    case model.Int16:
+	case model.Int16:
 		return "int16"
 	case model.Int32:
 		return "int" //!
-    case model.Int64:
+	case model.Int64:
 		return "int64"
-    case model.Float32:
+	case model.Float32:
 		return "float32"
-    case model.Float64:
+	case model.Float64:
 		return "float64"
-    case model.Blob:
+	case model.Blob:
 		return "[]byte"
 	case model.String:
 		return "string"
-    case model.Integer:
-        return "*" + gen.decimalPrefix + "Integer"
-    case model.Decimal:
-        return "*" + gen.decimalPrefix + "Decimal"
-    case model.Timestamp:
-        return "*" + gen.timestampPrefix + "Timestamp"
+	case model.Integer:
+		return "*" + gen.decimalPrefix + "Integer"
+	case model.Decimal:
+		return "*" + gen.decimalPrefix + "Decimal"
+	case model.Timestamp:
+		return "*" + gen.timestampPrefix + "Timestamp"
 	case model.Any:
-        return gen.anyPrefix + "Any"
+		return gen.anyPrefix + "Any"
 	default:
 		fmt.Println("bt:", bt)
 		panic("not concrete")
@@ -172,33 +171,33 @@ func (gen *Generator) golangBaseTypeName(bt model.BaseType) string {
 }
 
 func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
-    switch typeRef {
-    case "base#Bytes":
-        return "[]byte"
-    case "base#Bool":
-        return "bool"
-    case "base#String":
-        return "string"
-    case "base#Int8":
-        return "int8"
-    case "base#Int16":
-        return "int16"
-    case "base#Int32":
-        return "int32"
-    case "base#Int64":
-        return "int64"
-    case "base#Float32":
-        return "float32"
-    case "base#Float64":
-        return "float64"
-    case "base#Decimal":
-        return "*" + gen.decimalPrefix + "Decimal"
-    case "base#Integer":
-        return "*" + gen.decimalPrefix + "Integer"
-    case "base#Timestamp":
-        return "*" + gen.timestampPrefix + "Timestamp"
+	switch typeRef {
+	case "base#Bytes":
+		return "[]byte"
+	case "base#Bool":
+		return "bool"
+	case "base#String":
+		return "string"
+	case "base#Int8":
+		return "int8"
+	case "base#Int16":
+		return "int16"
+	case "base#Int32":
+		return "int32"
+	case "base#Int64":
+		return "int64"
+	case "base#Float32":
+		return "float32"
+	case "base#Float64":
+		return "float64"
+	case "base#Decimal":
+		return "*" + gen.decimalPrefix + "Decimal"
+	case "base#Integer":
+		return "*" + gen.decimalPrefix + "Integer"
+	case "base#Timestamp":
+		return "*" + gen.timestampPrefix + "Timestamp"
 	case "base#Any":
-        return gen.anyPrefix + "Any"
+		return gen.anyPrefix + "Any"
 	default:
 		//not a base type, but an operation input or output (looks like a Struct, but not declared as a type)
 		return "*" + stripLocalNamespace(typeRef, gen.ns)
@@ -280,7 +279,7 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 	return indirect + stripLocalNamespace(typeRef, gen.ns)
 }
 
-//for now, assume a single package, so we strip the namespace of non-language types
+// for now, assume a single package, so we strip the namespace of non-language types
 func (gen *Generator) golangTypeName(typeRef model.AbsoluteIdentifier) string {
 	switch typeRef {
 	case "base#Bytes":
@@ -310,7 +309,7 @@ func (gen *Generator) golangTypeName(typeRef model.AbsoluteIdentifier) string {
 	}
 }
 
-func (gen *Generator)goImports(forDef bool) map[string]bool {
+func (gen *Generator) goImports(forDef bool) map[string]bool {
 	includes := make(map[string]bool, 0)
 	deps := gen.AllTypeDependencies()
 	for _, dep := range deps {
@@ -400,7 +399,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 			w.Emitf("    %sVariantTag%s\n", tname, common.Capitalize(string(f.Name)))
 		}
 		w.Emitf(")\n")
-		w.Emitf("type %s struct {\n", tname) 
+		w.Emitf("type %s struct {\n", tname)
 		w.Emitf("    Variant %sVariantTag `json:\"-\"`\n", tname) //seems convenient, but how to set on json.Unmarshal?
 		for _, f := range td.Fields {
 			opt := ",omitempty"
@@ -415,7 +414,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		}
 		w.Emitf("}\n")
 		w.Emitf("func (u *%s) UnmarshalJSON(b []byte) error {\n", tname)
-		w.Emitf("    var tmp raw%d\n", tname)
+		w.Emitf("    var tmp raw%s\n", tname)
 		w.Emitf("    if err := json.Unmarshal(b, &tmp); err != nil {\n")
 		w.Emitf("        return err\n")
 		w.Emitf("    }\n")
@@ -424,7 +423,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 			fname := common.Capitalize(string(f.Name))
 			w.Emitf("    %s tmp.%s != nil {\n", p, fname)
 			w.Emitf("        u.Variant = %s%s\n", tname, fname)
-			w.Emitf("        u.%s = %stmp.&s\n", fname, gen.indirectOp(f.Type), fname)
+			w.Emitf("        u.%s = %stmp.%s\n", fname, gen.indirectOp(f.Type), fname)
 			p = "} else if "
 		}
 		w.Emitf("    } else {\n")
@@ -444,7 +443,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 			gen.generateTypeComment(td, w)
 			w.Emitf("type %s []%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Items))
 		}
-    case model.Map:
+	case model.Map:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
 			w.Emitf("type %s map[%s]%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Keys), gen.golangTypeRef(td.Items))
@@ -460,7 +459,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		}
 		w.Emitf(")\n")
 		w.Emitf("var names%s = []string{\n", tname)
-		for _, e := range td.Elements {		
+		for _, e := range td.Elements {
 			w.Emitf("    %s: %q,\n", e.Symbol, e.Value) //assumes string enum!
 		}
 		w.Emitf("}\n")
@@ -501,7 +500,7 @@ func (gen *Generator) indirectOp(id model.AbsoluteIdentifier) string {
 
 func (gen *Generator) GenerateTypes() string {
 	w := &GolangWriter{
-		gen:       gen,
+		gen: gen,
 	}
 	w.Begin()
 	w.Emit("/* Generated */\n")
@@ -518,7 +517,7 @@ func (gen *Generator) GenerateTypes() string {
 
 func (gen *Generator) GenerateOperations() string {
 	w := &GolangWriter{
-		gen:       gen,
+		gen: gen,
 	}
 	w.Begin()
 	w.Emit("/* Generated */\n")
@@ -531,7 +530,7 @@ func (gen *Generator) GenerateOperations() string {
 	if gen.Schema.Operations != nil && gen.Schema.ServiceName() != "" {
 		w.EmitServiceInterface()
 	}
-	
+
 	return w.End()
 }
 
@@ -539,7 +538,7 @@ func declareImports(imports map[string]bool) string {
 	s := ""
 	if len(imports) > 0 {
 		s = "\nimport(\n"
-		for i, _ := range imports {
+		for i := range imports {
 			s = s + fmt.Sprintf("    %q\n", i)
 		}
 		s = s + ")\n"
@@ -566,7 +565,7 @@ func (gen *Generator) baseConverter(typeref model.AbsoluteIdentifier, def interf
 func (gen *Generator) GenerateServer() string {
 	schema := gen.Schema
 	w := &GolangWriter{
-		gen:       gen,
+		gen: gen,
 	}
 	serviceName := gen.golangTypeName(schema.Id)
 	w.Begin()
@@ -594,7 +593,7 @@ func (gen *Generator) GenerateServer() string {
 	w.Emitf("    impl %s\n", serviceName)
 	w.Emit("}\n")
 	w.Emit("\n")
-	
+
 	for _, op := range schema.Operations {
 		opName := gen.golangTypeName(op.Id)
 		opInput := ""
@@ -685,11 +684,11 @@ func (gen *Generator) GenerateServer() string {
 		w.Emitf("    }).Methods(%q)\n", op.HttpMethod)
 	}
 	w.Emitf("    r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n")
-    w.Emitf("        jsonResponse(w, 404, &serverError{Message: fmt.Sprintf(\"Not Found: %s\", r.URL.Path)})\n")
+	w.Emit("        jsonResponse(w, 404, &serverError{Message: fmt.Sprintf(\"Not Found: %s\", r.URL.Path)})\n")
 	w.Emitf("    })\n")
-    w.Emitf("    return r\n")
+	w.Emitf("    return r\n")
 	w.Emitf("}\n\n")
-	w.Emit(serverUtilSource)	
+	w.Emit(serverUtilSource)
 	return w.End()
 }
 
@@ -704,13 +703,16 @@ func (gen *Generator) entityPayload(out *model.OperationOutput) string {
 
 func (gen *Generator) GenerateClient() string {
 	w := &GolangWriter{
-		gen:       gen,
+		gen: gen,
 	}
 
 	w.Begin()
 	w.Emit("/* Generated */\n")
 	w.Emitf("\npackage %s\n", gen.pkg)
-	w.Emitf("\n%s\n", gen.goImports(false))
+	imports := gen.goImports(false)
+	if len(imports) > 0 {
+		w.Emit(declareImports(imports))
+	}
 
 	return w.End()
 }
@@ -797,7 +799,7 @@ func (w *GolangWriter) EmitServiceInterface() error {
 						//hack: the first string field defined will be used to create the error message
 						msg := ""
 						for _, f := range e.Fields {
-							isRequired := true //Should I support f.Required?
+							isRequired := true                   //Should I support f.Required?
 							if string(f.Type) == "base#String" { //fix: isStringBase(e.Type)
 								msg = common.Capitalize(string(f.Name))
 							}

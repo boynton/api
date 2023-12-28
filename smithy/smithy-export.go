@@ -1,11 +1,11 @@
 package smithy
 
-import(
+import (
 	"fmt"
-	
-	"github.com/boynton/data"
+
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
+	"github.com/boynton/data"
 )
 
 type IdlGenerator struct {

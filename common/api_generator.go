@@ -19,17 +19,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/data"
 	"github.com/boynton/api/model"
+	"github.com/boynton/data"
 )
+
 const IndentAmount = "    "
 
-//the generator for this tool's native format.
+// the generator for this tool's native format.
 type ApiGenerator struct {
 	BaseGenerator
 	indent string
-	ns string
-	name string
+	ns     string
+	name   string
 }
 
 func (gen *ApiGenerator) Generate(schema *model.Schema, config *data.Object) error {
@@ -100,7 +101,7 @@ func (gen *ApiGenerator) GenerateOperationInput(op *model.OperationDef) {
 	in := op.Input
 	if in != nil {
 		inname := ""
-		if op.Input.Id != (op.Id + "Input") && op.Input.Id != ""{
+		if op.Input.Id != (op.Id+"Input") && op.Input.Id != "" {
 			inname = "(name=" + StripNamespace(op.Input.Id) + ") "
 		}
 		gen.Emitf("    input %s{\n", inname)
@@ -134,31 +135,31 @@ func (gen *ApiGenerator) GenerateOperationInput(op *model.OperationDef) {
 }
 
 func (gen *ApiGenerator) GenerateOperationOutputFields(out *model.OperationOutput, indent string) {
-		for _, f := range out.Fields {
-			var opts []string
-			if f.HttpPayload {
-				opts = append(opts, "payload")
-			}
-			if f.HttpHeader != "" {
-				opts = append(opts, fmt.Sprintf("header=%q", f.HttpHeader))
-			}
-			sopts := ""
-			if len(opts) > 0 {
-				sopts = " (" + strings.Join(opts, ", ") + ")"
-			}
-			comm := ""
-			if f.Comment != "" {
-				//format it?
-				comm = " // " + f.Comment
-			}
-			gen.Emitf("    %s%s %s%s%s\n", indent, f.Name, StripNamespace(f.Type), sopts, comm)
+	for _, f := range out.Fields {
+		var opts []string
+		if f.HttpPayload {
+			opts = append(opts, "payload")
 		}
+		if f.HttpHeader != "" {
+			opts = append(opts, fmt.Sprintf("header=%q", f.HttpHeader))
+		}
+		sopts := ""
+		if len(opts) > 0 {
+			sopts = " (" + strings.Join(opts, ", ") + ")"
+		}
+		comm := ""
+		if f.Comment != "" {
+			//format it?
+			comm = " // " + f.Comment
+		}
+		gen.Emitf("    %s%s %s%s%s\n", indent, f.Name, StripNamespace(f.Type), sopts, comm)
+	}
 }
 
 func (gen *ApiGenerator) GenerateOperationOutput(op *model.OperationDef) {
 	if op.Output != nil {
 		outname := ""
-		if op.Output.Id != "" && op.Output.Id != (op.Id + "Output") {
+		if op.Output.Id != "" && op.Output.Id != (op.Id+"Output") {
 			outname = "(name=" + StripNamespace(op.Output.Id) + ") "
 		}
 		gen.Emitf("    output %d %s{\n", op.Output.HttpStatus, outname)
@@ -254,9 +255,9 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 	case model.Enum:
 		sopt := ""
 		//for _, el := range td.Elements {
-			//if el.Type != "" {
-			//	panic("alternate enum types NYI")
-			//}
+		//if el.Type != "" {
+		//	panic("alternate enum types NYI")
+		//}
 		//}
 		gen.Emitf("type %s Enum %s{\n", StripNamespace(td.Id), sopt)
 		for _, el := range td.Elements {
@@ -282,4 +283,3 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 	}
 	return nil
 }
-

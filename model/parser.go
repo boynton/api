@@ -37,7 +37,6 @@ func (p *Parser) Validate() (*Schema, error) {
 	return p.schema, nil
 }
 
-
 type Parser struct {
 	path           string
 	source         string
@@ -234,7 +233,7 @@ func (p *Parser) addAnnotation(annos map[string]string, name, val string) map[st
 
 func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*OperationInput, error) {
 	input := &OperationInput{
-		Id: op.Id + "Input",
+		Id:      op.Id + "Input",
 		Comment: comment,
 	}
 	options, err := p.ParseOptions("operation.input", []string{"name"})
@@ -271,7 +270,7 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 				return nil, p.SyntaxError()
 			}
 			in.Type = p.schema.Namespaced(tok.Text)
-			options, err := p.ParseOptions("operation.input." + string(in.Name), []string{"path", "query", "header", "payload", "required"})
+			options, err := p.ParseOptions("operation.input."+string(in.Name), []string{"path", "query", "header", "payload", "required"})
 			if err != nil {
 				return nil, err
 			}
@@ -395,8 +394,7 @@ func (p *Parser) parseOperation(comment string) error {
 	return p.finishOperation(name, options.Method, options.Url, options.Resource, comment)
 }
 
-
-/*	
+/*
 func (p *Parser) parseHttp(comment string) error {
 	sym, err := p.ExpectIdentifier()
 	if err != nil {
@@ -432,12 +430,12 @@ func (p *Parser) parseHttp(comment string) error {
 	return p.finishOperation(name, method, pathTemplate, resource, comment)
 }
 */
-   
+
 func (p *Parser) finishOperation(name, method, pathTemplate, resource, comment string) error {
 	op := &OperationDef{
-		Id:        p.schema.Namespaced(name),
-		HttpMethod:      method,
-		HttpUri:        pathTemplate,
+		Id:         p.schema.Namespaced(name),
+		HttpMethod: method,
+		HttpUri:    pathTemplate,
 		//Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -568,7 +566,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		return err
 	}
 	td := &TypeDef{
-		Id: p.schema.Namespaced(typeName),
+		Id:      p.schema.Namespaced(typeName),
 		Comment: comment,
 	}
 	switch base {
@@ -639,7 +637,7 @@ func (p *Parser) parseNumberDef(td *TypeDef, ntype string) error {
 		td.Base = Decimal
 	case "Integer":
 		td.Base = Integer
-	}		
+	}
 	err := p.parseTypeOptions(td, "minvalue", "maxvalue")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -958,23 +956,23 @@ func (p *Parser) parseTypeOptions(td *TypeDef, acceptable ...string) error {
 }
 
 type Options struct {
-	Required    bool
-	Path        bool
-	Query       string
-	Payload     bool
-	Default     interface{}
-	Pattern     string
-	Value       string
-	Url         string
-	MinSize     int64
-	MaxSize     int64
-	MinValue    *data.Decimal
-	MaxValue    *data.Decimal
-	Action      string
-	Header      string
-	Name        string
-	Method      string
-	Resource    string
+	Required bool
+	Path     bool
+	Query    string
+	Payload  bool
+	Default  interface{}
+	Pattern  string
+	Value    string
+	Url      string
+	MinSize  int64
+	MaxSize  int64
+	MinValue *data.Decimal
+	MaxValue *data.Decimal
+	Action   string
+	Header   string
+	Name     string
+	Method   string
+	Resource string
 	//Annotations map[string]string
 }
 
@@ -1261,16 +1259,15 @@ func (p *Parser) parseEnumElement() (*EnumElement, error) {
 		return nil, err
 	}
 	comment = p.ParseTrailingComment(comment)
-	
+
 	return &EnumElement{
-		Symbol:      Identifier(sym),
-		Value: options.Value,
+		Symbol: Identifier(sym),
+		Value:  options.Value,
 		//Type: etype,
-		Comment:     comment,
+		Comment: comment,
 		//Annotations: options.Annotations,
 	}, nil
 }
-
 
 func (p *Parser) expectNewline() error {
 	tok := p.GetToken()
@@ -1312,7 +1309,7 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 				return p.SyntaxError()
 			}
 			fd.Type = p.schema.Namespaced(tok.Text)
-			options, err := p.ParseOptions(string(td.Id) + "." + string(fd.Name), fieldOptions)
+			options, err := p.ParseOptions(string(td.Id)+"."+string(fd.Name), fieldOptions)
 			if err != nil {
 				return err
 			}
@@ -1324,7 +1321,6 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 	}
 	return nil
 }
-
 
 /*
 

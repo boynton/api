@@ -35,7 +35,6 @@ type Generator interface {
 	GenerateType(td *model.TypeDef) error
 	Begin()
 	End() string
-	
 }
 
 type BaseGenerator struct {
@@ -100,7 +99,6 @@ func (gen *BaseGenerator) SortedTypes() []*model.TypeDef {
 	}
 	return r
 }
-	
 
 func (gen *BaseGenerator) HasEmitted(id model.AbsoluteIdentifier) bool {
 	if gen.typesEmitted != nil {
@@ -162,7 +160,7 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 	writer.Flush()
 	return gen.Err
 }
-   
+
 /*
    func (gen *BaseGenerator) RenderTemplate(tmplFs embed.FS, tmplName string, context *data.Object) (string, error) {
 	ts := NewFSTemplateSet(tmplFs)
@@ -251,7 +249,7 @@ func (gen *BaseGenerator) TypeDependencies(td *model.TypeDef) []model.AbsoluteId
 	deps := make(map[model.AbsoluteIdentifier]bool, 0)
 	gen.accumulateDependencies(deps, td)
 	var result []model.AbsoluteIdentifier
-	for k, _ := range deps {
+	for k := range deps {
 		result = append(result, k)
 	}
 	return result
@@ -263,12 +261,12 @@ func (gen *BaseGenerator) AllTypeDependencies() []model.AbsoluteIdentifier {
 		gen.accumulateDependencies(deps, td)
 	}
 	if true {
-	for _, op := range gen.Schema.Operations {
-		gen.accumulateOpDependencies(deps, op)
-	}
+		for _, op := range gen.Schema.Operations {
+			gen.accumulateOpDependencies(deps, op)
+		}
 	}
 	var result []model.AbsoluteIdentifier
-	for k, _ := range deps {
+	for k := range deps {
 		result = append(result, k)
 	}
 	return result

@@ -7,7 +7,7 @@ import (
 	"github.com/boynton/api/model"
 )
 
-func Import(paths []string, tags[]string) (*model.Schema, error) {
+func Import(paths []string, tags []string) (*model.Schema, error) {
 	ast, err := Assemble(paths)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,6 @@ func toCanonicalAbsoluteId(id string) model.AbsoluteIdentifier {
 		return model.AbsoluteIdentifier(strings.Join(lst, "#"))
 	}
 	fmt.Printf("WARNING: non-absolute id: %q\n", id)
-	panic("here")
 	//FIX: apply default namespace
 	return model.AbsoluteIdentifier("fixme#" + id)
 }
@@ -221,9 +220,9 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 	}
 	//shape.Traits.GetBool("smithy.api#input") should be true
 	ti := &model.OperationInput{
-		Id: model.AbsoluteIdentifier(shapeId),
+		Id:      model.AbsoluteIdentifier(shapeId),
 		Comment: shape.Traits.GetString("smithy.api#documentation"),
-	}	
+	}
 	for _, k := range shape.Members.Keys() {
 		mem := shape.Members.Get(k)
 		if mem == nil || mem.Target == "" {
@@ -309,9 +308,9 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 	}
 	//use tags for the resource and lifecycle, i.e. tags: [resource=ItemResource, lifecycle:Read]
 	op := model.OperationDef{
-		Id: id,
-		Comment: shape.GetStringTrait("smithy.api#documentation"),
-		Resource: resource,
+		Id:        id,
+		Comment:   shape.GetStringTrait("smithy.api#documentation"),
+		Resource:  resource,
 		Lifecycle: lifecycle,
 	}
 	typesConsumed := make(map[model.AbsoluteIdentifier]bool, 0)
@@ -324,7 +323,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 	if shape.Output != nil && shape.Output.Target != "smithy.api#Unit" {
 		op.Output = toOpOutput(schema, ast, shape.Output.Target)
 		//never happens: if op.Output != nil {
-			typesConsumed[op.Output.Id] = true
+		typesConsumed[op.Output.Id] = true
 		//}
 	} else {
 		op.Output = &model.OperationOutput{}
@@ -376,7 +375,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 				hasHeader = true
 			}
 		}
- 		if op.Output.HttpStatus == 204 { //note: Smithy cannot do a 304, but would have same constraint
+		if op.Output.HttpStatus == 204 { //note: Smithy cannot do a 304, but would have same constraint
 			if hasPayload {
 				return fmt.Errorf("Smithy operation output for a 204 response must have no payload: %s", model.Pretty(op))
 			}
@@ -393,7 +392,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		return nil
 	}
 	td := &model.TypeDef{
-		Id: toCanonicalAbsoluteId(shapeId),
+		Id:      toCanonicalAbsoluteId(shapeId),
 		Comment: shape.GetStringTrait("smithy.api#documentation"),
 	}
 	number := false
@@ -513,23 +512,23 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		return addResource(schema, ast, shapeId, shape)
 	case "apply":
 		/*
-		//apply to another shape. Do I handle forward references? The model keeps separate. Hmm.
-		shapeMember := strings.Split(shapeId, "$")
-		if len(shapeMember) != 2 {
-			panic("apply id has no member component")
-		} else {
-			targetId := model.AbsoluteIdentifier(shapeMember[0])
-			targetTd := schema.GetTypeDef(targetId)
-			fmt.Printf("targetId: %q, targetTd: %v\n", targetId, targetTd)
-			if targetTd == nil {
-				fmt.Print("Cannot find target shape for apply: " + shapeMember[0])
-				panic("whoa")
+			//apply to another shape. Do I handle forward references? The model keeps separate. Hmm.
+			shapeMember := strings.Split(shapeId, "$")
+			if len(shapeMember) != 2 {
+				panic("apply id has no member component")
 			} else {
-				fmt.Println("apply to", shapeMember, ", targetTd:", targetTd, ", these traits:", model.Pretty(shape))
-				panic("here")
+				targetId := model.AbsoluteIdentifier(shapeMember[0])
+				targetTd := schema.GetTypeDef(targetId)
+				fmt.Printf("targetId: %q, targetTd: %v\n", targetId, targetTd)
+				if targetTd == nil {
+					fmt.Print("Cannot find target shape for apply: " + shapeMember[0])
+					panic("whoa")
+				} else {
+					fmt.Println("apply to", shapeMember, ", targetTd:", targetTd, ", these traits:", model.Pretty(shape))
+					panic("here")
+				}
 			}
-		}
-		//		panic("implement 'apply': '" + shapeId + "' -> " + model.Pretty(shape))
+			//		panic("implement 'apply': '" + shapeId + "' -> " + model.Pretty(shape))
 		*/
 		return nil
 	default:
@@ -553,4 +552,3 @@ func nameFromId(id string) model.Identifier {
 	fmt.Println("WARNING: id is no absolute:", id)
 	return model.Identifier(id)
 }
-

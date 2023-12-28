@@ -14,10 +14,19 @@ test::
 proper::
 	go fmt github.com/boynton/api
 	go vet github.com/boynton/api
+	gofmt -s -w main.go assembly.go common model
+	go fmt github.com/boynton/api/golang
+	go vet github.com/boynton/api/golang
+	gofmt -s -w golang
+	go fmt github.com/boynton/api/smithy
+	go vet github.com/boynton/api/smithy
+	gofmt -s -w smithy
 	go fmt github.com/boynton/api/sadl
 	go vet github.com/boynton/api/sadl
+	gofmt -s -w sadl
 	go fmt github.com/boynton/api/openapi
 	go vet github.com/boynton/api/openapi
+	gofmt -s -w openapi
 
 clean::
 	rm -rf bin

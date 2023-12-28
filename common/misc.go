@@ -82,9 +82,9 @@ func FormatBlock(src, prefix, indent string, leadcol, maxcol int) string {
 		for _, line := range lines {
 			var splitlines []string
 			for len(line) > maxcol {
-				for i:=maxcol; i>=0; i-- {
-					if len(line) <= maxcol || i == 0{
-                        splitlines = append(splitlines, line)
+				for i := maxcol; i >= 0; i-- {
+					if len(line) <= maxcol || i == 0 {
+						splitlines = append(splitlines, line)
 						line = ""
 						break
 					}

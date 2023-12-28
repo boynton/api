@@ -19,18 +19,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/data"
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/smithy"
+	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
 
 type Generator struct {
 	common.BaseGenerator
-	ns string
-	name string
+	ns              string
+	name            string
 	detailGenerator string
 }
 
@@ -55,7 +55,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 func (gen *Generator) getDetailGenerator() common.Generator {
 	switch gen.detailGenerator {
 	case "smithy":
-		return new(smithy.IdlGenerator)		
+		return new(smithy.IdlGenerator)
 	}
 	return new(common.ApiGenerator)
 }
@@ -191,4 +191,3 @@ func (gen *Generator) GenerateTypes() {
 		gen.Emit("\n")
 	}
 }
-

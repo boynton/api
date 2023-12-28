@@ -92,7 +92,7 @@ func ValidateInfo(info *Info) error {
 }
 
 func ValidatePaths(paths map[string]*PathItem) error {
-	for k, _ := range paths {
+	for k := range paths {
 		if !strings.HasPrefix(k, "/") {
 			return OasError("Key in Paths object must start with '/': ", k)
 			//validate the PathItem?

@@ -201,14 +201,14 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 
 	//outputs
 	expectedStatus := ""
-	for status, _ := range pop.Responses {
+	for status := range pop.Responses {
 		if strings.HasPrefix(status, "2") {
 			expectedStatus = status
 			break
 		}
 	}
 	if expectedStatus == "" {
-		for status, _ := range pop.Responses {
+		for status := range pop.Responses {
 			if strings.HasPrefix(status, "3") {
 				expectedStatus = status
 				break

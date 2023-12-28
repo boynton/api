@@ -73,7 +73,6 @@ func (ast *AST) IDLForTypeShape(shapeId string) string {
 	return w.End()
 }
 
-
 // Generate Smithy IDL to describe the Smithy model for a specified namespace
 func (ast *AST) IDL(ns string) string {
 	w := &IdlWriter{
@@ -177,7 +176,7 @@ func (ast *AST) ExternalRefs(ns string) []string {
 		}
 	}
 	var res []string
-	for k, _ := range refs {
+	for k := range refs {
 		res = append(res, k)
 	}
 	return res
@@ -523,7 +522,7 @@ func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 				dval := data.AsInt(val)
 				eqval = fmt.Sprintf(" = %d", dval)
 			} else {
-				sval = fmt.Sprintf("%s", val)//data.AsString(val)
+				sval = fmt.Sprintf("%s", val) //data.AsString(val)
 				if sval != fname {
 					eqval = fmt.Sprintf(" = %q", sval)
 				}
@@ -766,7 +765,7 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 			if b := inputShape.Traits.Get("smithy.api#input"); b != nil {
 				inputTraits := "" //?
 				inputMixins := w.withMixins(inputShape.Mixins)
-				inputResource := ""//w.forResource(inputShape.Resource)
+				inputResource := "" //w.forResource(inputShape.Resource)
 				w.Emit("%sinput := %s%s%s{\n", IndentAmount, inputTraits, inputMixins, inputResource)
 				i2 := IndentAmount + IndentAmount
 				for i, k := range inputShape.Members.Keys() {

@@ -15,9 +15,9 @@ limitations under the License.
 */
 package model
 
-import(
-	"os"
+import (
 	"fmt"
+	"os"
 )
 
 var showWarnings = false
@@ -38,7 +38,7 @@ func (schema *Schema) ValidationError(context, msg string) error {
 
 func (schema *Schema) ValidationWarning(context, msg string) {
 	if showWarnings {
-		fmt.Fprintf(os.Stderr, "*** Validation warning: " + context + ": " + msg)
+		fmt.Fprintf(os.Stderr, "*** Validation warning: "+context+": "+msg)
 	}
 }
 

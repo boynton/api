@@ -18,15 +18,15 @@ package common
 import (
 	"strings"
 
-	"github.com/boynton/data"
 	"github.com/boynton/api/model"
+	"github.com/boynton/data"
 )
 
 type SummaryGenerator struct {
 	BaseGenerator
 	indent string
-	ns string
-	name string
+	ns     string
+	name   string
 }
 
 func (gen *SummaryGenerator) Generate(schema *model.Schema, config *data.Object) error {

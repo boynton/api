@@ -1,6 +1,6 @@
 package smithy
 
-import(
+import (
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -168,4 +168,3 @@ func (s *Map[V]) Length() int {
 	}
 	return len(s.keys)
 }
-
