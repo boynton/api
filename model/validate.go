@@ -89,6 +89,9 @@ func (schema *Schema) ValidateOperationInput(op *OperationDef) error {
 }
 
 func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOutput) error {
+	if out == nil {
+		panic("every operation must have an output")
+	}
 	for _, out := range out.Fields {
 		if out.HttpHeader != "" {
 			if !out.HttpPayload {

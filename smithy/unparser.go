@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/boynton/api/common"
 	"github.com/boynton/data"
 )
 
@@ -48,12 +49,13 @@ func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
 	return namespace, name, version
 }
 
-func (ast *AST) IDLForOperationShape(shapeId string) string {
+func (ast *AST) IDLForOperationShape(shapeId string, decorator *common.Decorator) string {
 	shape := ast.GetShape(shapeId)
 	w := &IdlWriter{
 		ast:       ast,
 		namespace: shapeIdNamespace(shapeId),
 		version:   ast.AssemblyVersion(),
+		decorator: decorator,
 	}
 	w.Begin()
 	emitted := make(map[string]bool, 0)
@@ -61,12 +63,13 @@ func (ast *AST) IDLForOperationShape(shapeId string) string {
 	return w.End()
 }
 
-func (ast *AST) IDLForTypeShape(shapeId string) string {
+func (ast *AST) IDLForTypeShape(shapeId string, decorator *common.Decorator) string {
 	shape := ast.GetShape(shapeId)
 	w := &IdlWriter{
 		ast:       ast,
 		namespace: shapeIdNamespace(shapeId),
 		version:   ast.AssemblyVersion(),
+		decorator: decorator,
 	}
 	w.Begin()
 	w.EmitShape(shapeId, shape)
@@ -234,6 +237,7 @@ type IdlWriter struct {
 	name      string
 	version   int
 	ast       *AST
+	decorator *common.Decorator
 }
 
 func (w *IdlWriter) Begin() {
@@ -436,22 +440,22 @@ func (w *IdlWriter) EmitHttpErrorTrait(rv interface{}, indent string) {
 }
 
 func (w *IdlWriter) EmitSimpleShape(shapeName, name string, shape *Shape) {
-	w.Emit("%s %s%s\n", shapeName, name, w.withMixins(shape.Mixins))
+	w.Emit("%s %s%s\n", shapeName, w.stripNamespace(name), w.withMixins(shape.Mixins))
 }
 
 func (w *IdlWriter) EmitBooleanShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.EmitSimpleShape("boolean", name, shape)
+	w.EmitSimpleShape("boolean", w.stripNamespace(name), shape)
 }
 
 func (w *IdlWriter) EmitNumericShape(shapeName, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.EmitSimpleShape(shapeName, name, shape)
+	w.EmitSimpleShape(shapeName, w.stripNamespace(name), shape)
 }
 
 func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.EmitSimpleShape(shape.Type, name, shape)
+	w.EmitSimpleShape(shape.Type, w.stripNamespace(name), shape)
 }
 
 func (w *IdlWriter) forResource(rezName string) string {
@@ -471,29 +475,29 @@ func (w *IdlWriter) withMixins(mixins []*ShapeRef) string {
 
 func (w *IdlWriter) EmitTimestampShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("timestamp %s%s\n", name, w.withMixins(shape.Mixins))
+	w.Emit("timestamp %s%s\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 }
 
 func (w *IdlWriter) EmitBlobShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("blob %s%s\n", name, w.withMixins(shape.Mixins))
+	w.Emit("blob %s%s\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 }
 
 func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("%s %s%s {\n", shapeName, name, w.withMixins(shape.Mixins))
+	w.Emit("%s %s%s {\n", shapeName, w.stripNamespace(name), w.withMixins(shape.Mixins))
 	w.Emit("    member: %s\n", w.stripNamespace(shape.Member.Target))
 	w.Emit("}\n")
 }
 
 func (w *IdlWriter) EmitMapShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("map %s%s {\n    key: %s,\n    value: %s\n}\n", name, w.withMixins(shape.Mixins), w.stripNamespace(shape.Key.Target), w.stripNamespace(shape.Value.Target))
+	w.Emit("map %s%s {\n    key: %s,\n    value: %s\n}\n", w.stripNamespace(name), w.withMixins(shape.Mixins), w.stripNamespace(shape.Key.Target), w.stripNamespace(shape.Value.Target))
 }
 
 func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("union %s%s {\n", name, w.withMixins(shape.Mixins))
+	w.Emit("union %s%s {\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 	count := shape.Members.Length()
 	for _, fname := range shape.Members.Keys() {
 		mem := shape.Members.Get(fname)
@@ -511,7 +515,7 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 
 func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("enum %s%s {\n", name, w.withMixins(shape.Mixins))
+	w.Emit("enum %s%s {\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 	count := shape.Members.Length()
 	for _, fname := range shape.Members.Keys() {
 		mem := shape.Members.Get(fname)
@@ -623,7 +627,7 @@ func (w *IdlWriter) EmitExamplesTrait(opname string, raw interface{}) {
 		if strings.HasSuffix(formatted, "\n") {
 			formatted = formatted[:len(formatted)-1]
 		}
-		w.Emit("apply "+target+" @examples(%s)\n", formatted)
+		w.Emit("apply "+w.stripNamespace(target)+" @examples(%s)\n", formatted)
 	default:
 		panic("FIX ME!")
 	}
@@ -635,14 +639,15 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 		comma = ","
 	}
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("structure %s%s {\n", name, w.withMixins(shape.Mixins))
+	w.Emit("structure %s%s {\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 	for i, k := range shape.Members.Keys() {
 		if i > 0 {
 			w.Emit("\n")
 		}
 		v := shape.Members.Get(k)
 		w.EmitTraits(v.Traits, IndentAmount)
-		w.Emit("%s%s: %s%s\n", IndentAmount, k, w.stripNamespace(v.Target), comma)
+		tname := w.decorate(w.stripNamespace(v.Target))
+		w.Emit("%s%s: %s%s\n", IndentAmount, k, tname, comma)
 	}
 	w.Emit("}\n")
 }
@@ -659,7 +664,8 @@ func (w *IdlWriter) listOfShapeRefs(label string, format string, lst []*ShapeRef
 			if !absolute {
 				target = w.stripNamespace(target)
 			}
-			s = s + fmt.Sprintf(format, target)
+			tname := w.decorate(target)
+			s = s + fmt.Sprintf(format, tname)
 		}
 		s = s + "]"
 	}
@@ -745,6 +751,18 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 	w.Emit("}\n")
 }
 
+func (w *IdlWriter) decorate(tname string) string {
+	if w.decorator != nil {
+		//user defined types:
+		switch tname {
+		case "Int32", "String", "Int16", "Int8", "Int64", "Float64", "Float32", "Decimal", "Integer":
+			return w.decorator.BaseType(tname)
+		}
+		return w.decorator.UserType(tname)
+	}
+	return tname
+}
+
 func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[string]bool) {
 	var inputShape, outputShape *Shape
 	var inputName, outputName string
@@ -758,7 +776,7 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 		outputShape = w.ast.GetShape(shape.Output.Target)
 	}
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("operation %s%s {\n", name, w.withMixins(shape.Mixins))
+	w.Emit("operation %s%s {\n", StripNamespace(name), w.withMixins(shape.Mixins))
 	if w.version == 2 {
 		if inputShape != nil {
 			if b := inputShape.Traits.Get("smithy.api#input"); b != nil {
@@ -773,15 +791,16 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 					}
 					v := inputShape.Members.Get(k)
 					w.EmitTraits(v.Traits, i2)
-					w.Emit("%s%s: %s\n", i2, k, w.stripNamespace(v.Target))
+					tname := w.decorate(w.stripNamespace(v.Target))
+					w.Emit("%s%s: %s\n", i2, k, tname)
 				}
 				w.Emit("%s}\n", IndentAmount)
 				inputEmitted = true
 			} else {
-				w.Emit("%sinput: %s,\n", IndentAmount, w.stripNamespace(inputName))
+				w.Emit("%sinput: %s,\n", IndentAmount, w.decorate(w.stripNamespace(inputName)))
 			}
 		}
-		if outputShape != nil { //probably should require the @output trait before inlining.
+		if outputShape != nil {
 			if b := outputShape.Traits.Get("smithy.api#output"); b != nil {
 				w.Emit("%soutput := {\n", IndentAmount)
 				i2 := IndentAmount + IndentAmount
@@ -791,12 +810,13 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 					}
 					v := outputShape.Members.Get(k)
 					w.EmitTraits(v.Traits, i2)
-					w.Emit("%s%s: %s\n", i2, k, w.stripNamespace(v.Target))
+					tname := w.decorate(w.stripNamespace(v.Target))
+					w.Emit("%s%s: %s\n", i2, k, tname)
 				}
 				w.Emit("%s}\n", IndentAmount)
 				outputEmitted = true
 			} else {
-				w.Emit("%soutput: %s,\n", IndentAmount, w.stripNamespace(outputName))
+				w.Emit("%soutput: %s,\n", IndentAmount, w.decorate(w.stripNamespace(outputName)))
 			}
 		}
 		if len(shape.Errors) > 0 {
@@ -827,6 +847,17 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 		}
 		emitted[outputName] = true
 	}
+	/* emit these with other types
+	if len(shape.Errors) > 0 {
+		for _, errId := range shape.Errors {
+			k := errId.Target
+			if !emitted[k] {
+				w.EmitShape(k, w.ast.GetShape(k))
+				emitted[k] = true
+			}
+		}
+	}
+	*/
 }
 
 func (w *IdlWriter) End() string {

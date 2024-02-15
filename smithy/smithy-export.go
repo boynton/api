@@ -10,7 +10,8 @@ import (
 
 type IdlGenerator struct {
 	common.BaseGenerator
-	ast *AST
+	Decorator *common.Decorator
+	ast       *AST
 }
 
 func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
@@ -21,7 +22,7 @@ func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 		}
 		gen.ast = ast
 	}
-	gen.Emit(gen.ast.IDLForOperationShape(string(op.Id)))
+	gen.Emit(gen.ast.IDLForOperationShape(string(op.Id), gen.Decorator))
 	return nil
 }
 
@@ -33,7 +34,19 @@ func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
 		}
 		gen.ast = ast
 	}
-	gen.Emit(gen.ast.IDLForTypeShape(string(op.Id)))
+	gen.Emit(gen.ast.IDLForTypeShape(string(op.Id), gen.Decorator))
+	return nil
+}
+
+func (gen *IdlGenerator) GenerateException(op *model.OperationOutput) error {
+	if gen.ast == nil {
+		ast, err := SmithyAST(gen.Schema)
+		if err != nil {
+			return err
+		}
+		gen.ast = ast
+	}
+	gen.Emit(gen.ast.IDLForTypeShape(string(op.Id), gen.Decorator))
 	return nil
 }
 

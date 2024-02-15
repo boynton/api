@@ -27,7 +27,7 @@ import (
 	"github.com/boynton/api/openapi"
 	//	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
-	//"github.com/boynton/api/swagger"
+	"github.com/boynton/api/swagger"
 )
 
 var ImportFileExtensions = map[string]string{
@@ -136,8 +136,8 @@ func AssembleModel(paths []string, tags []string, ns string) (*model.Schema, err
 		err = fmt.Errorf("sadl.Import NYI")
 	case "openapi":
 		schema, err = openapi.Import(flatPathList, tags, ns)
-		//	case "swagger":
-		//		schema, err = swagger.Import(flatPathList, tags, ns)
+	case "swagger":
+		schema, err = swagger.Import(flatPathList, tags, ns)
 	case "rdl":
 		err = fmt.Errorf("rdl.Import NYI")
 	default:

@@ -23,6 +23,7 @@ import (
 
 	"github.com/boynton/api/common"
 	"github.com/boynton/api/golang"
+	"github.com/boynton/api/html"
 	"github.com/boynton/api/markdown"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/openapi"
@@ -149,6 +150,8 @@ func Generator(genName string) (common.Generator, error) {
 		return new(common.ApiGenerator), nil
 	case "markdown":
 		return new(markdown.Generator), nil
+	case "html":
+		return new(html.Generator), nil
 	case "smithy-ast":
 		return new(smithy.AstGenerator), nil
 	case "smithy":
@@ -159,7 +162,7 @@ func Generator(genName string) (common.Generator, error) {
 		return new(openapi.Generator), nil
 	case "swagger":
 		return nil, fmt.Errorf("swagger.Generator NYI")
-		//return new(swagger.Generator), nil
+	//return new(swagger.Generator), nil
 	case "go", "golang":
 		return new(golang.Generator), nil
 	//case "ts":

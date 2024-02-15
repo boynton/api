@@ -346,3 +346,19 @@ func (schema *Schema) IsNumericType(id AbsoluteIdentifier) bool {
 func (schema *Schema) IsBaseType(id AbsoluteIdentifier) bool {
 	return strings.HasPrefix(string(id), "base#")
 }
+
+func IsSymbol(str string) bool {
+	slen := len(str)
+	s := []rune(str)
+	if slen > 0 {
+		if IsSymbolChar(s[0], true) {
+			for i := 1; i < slen; i++ {
+				if !IsSymbolChar(s[i], false) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
