@@ -960,23 +960,23 @@ func (p *Parser) parseTypeOptions(td *TypeDef, acceptable ...string) error {
 }
 
 type Options struct {
-	Required bool
-	Path     bool
-	Query    string
-	Payload  bool
-	Default  interface{}
-	Pattern  string
-	Value    string
-	Url      string
-	MinSize  int64
-	MaxSize  int64
-	MinValue *data.Decimal
-	MaxValue *data.Decimal
-	Action   string
-	Header   string
-	Name     string
-	Method   string
-	Resource string
+	Required  bool
+	Path      bool
+	Query     string
+	Payload   bool
+	Default   interface{}
+	Pattern   string
+	Value     string
+	Url       string
+	MinSize   int64
+	MaxSize   int64
+	MinValue  *data.Decimal
+	MaxValue  *data.Decimal
+	Action    string
+	Header    string
+	Name      string
+	Method    string
+	Resource  string
 	Lifecycle string
 	//Annotations map[string]string
 }
