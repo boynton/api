@@ -387,11 +387,11 @@ func (p *Parser) parseOperation(comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("operation", []string{"method", "url", "resource"})
+	options, err := p.ParseOptions("operation", []string{"method", "url", "resource", "lifecycle"})
 	if err != nil {
 		return err
 	}
-	return p.finishOperation(name, options.Method, options.Url, options.Resource, comment)
+	return p.finishOperation(name, options.Method, options.Url, options.Resource, options.Lifecycle, comment)
 }
 
 /*
@@ -431,11 +431,13 @@ func (p *Parser) parseHttp(comment string) error {
 }
 */
 
-func (p *Parser) finishOperation(name, method, pathTemplate, resource, comment string) error {
+func (p *Parser) finishOperation(name, method, pathTemplate, resource, lifecycle, comment string) error {
 	op := &OperationDef{
 		Id:         p.schema.Namespaced(name),
 		HttpMethod: method,
 		HttpUri:    pathTemplate,
+		Resource:   resource,
+		Lifecycle:  lifecycle,
 		//Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -975,6 +977,7 @@ type Options struct {
 	Name     string
 	Method   string
 	Resource string
+	Lifecycle string
 	//Annotations map[string]string
 }
 
@@ -1035,6 +1038,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Name, err = p.expectEqualsIdentifier()
 					case "resource":
 						options.Resource, err = p.expectEqualsCompoundIdentifier()
+					case "lifecycle":
+						options.Lifecycle, err = p.expectEqualsCompoundIdentifier()
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
