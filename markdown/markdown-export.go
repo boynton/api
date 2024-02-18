@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
@@ -28,10 +27,18 @@ import (
 const IndentAmount = "    "
 
 type Generator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	ns              string
 	name            string
 	detailGenerator string
+}
+
+func (gen *Generator) getDetailGenerator() model.Generator {
+	switch gen.detailGenerator {
+	case "smithy":
+		return new(smithy.IdlGenerator)
+	}
+	return new(model.ApiGenerator)
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -52,17 +59,9 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	return err
 }
 
-func (gen *Generator) getDetailGenerator() common.Generator {
-	switch gen.detailGenerator {
-	case "smithy":
-		return new(smithy.IdlGenerator)
-	}
-	return new(common.ApiGenerator)
-}
-
 func (gen *Generator) GenerateSummary() {
 	gen.Emitf("\n# %s\n\n", gen.name)
-	gen.Emit(common.FormatComment("", "", gen.Schema.Comment, 80, true))
+	gen.Emit(model.FormatComment("", "", gen.Schema.Comment, 80, true))
 	gen.Emit("\n")
 	if gen.name != "" {
 		gen.Emitf("- **service**: %q\n", gen.name)

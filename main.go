@@ -21,7 +21,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/golang"
 	"github.com/boynton/api/html"
 	"github.com/boynton/api/markdown"
@@ -44,6 +43,7 @@ func main() {
 	pGen := flag.String("g", "api", "The generator for output")
 	pNs := flag.String("ns", "example", "The namespace to force if none is present")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
+	pWarn := flag.String("w", "show", "Warnings. 'show' or 'supress' or 'error'. Default is 'show'")
 	var params Params
 	flag.Var(&params, "a", "Additional named arguments for a generator")
 	var tags Tags
@@ -56,6 +56,17 @@ func main() {
 		help()
 		os.Exit(0)
 	}
+	switch *pWarn {
+	case "error":
+		model.WarningsAreErrors = true
+		model.ShowWarnings = true
+	case "suppress":
+		model.WarningsAreErrors = false
+		model.ShowWarnings = false
+	default:
+		model.WarningsAreErrors = false
+		model.ShowWarnings = true
+	}
 	gen := *pGen
 	outdir := *pOutdir
 	files := flag.Args()
@@ -66,8 +77,7 @@ func main() {
 	}
 	schema, err := AssembleModel(files, tags, *pNs)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(2)
+		model.Error("%s\n", err)
 	}
 	if *pList {
 		if schema.Id != "" {
@@ -142,12 +152,12 @@ func (p *Tags) Set(value string) error {
 	return nil
 }
 
-func Generator(genName string) (common.Generator, error) {
+func Generator(genName string) (model.Generator, error) {
 	switch genName {
 	case "summary":
-		return new(common.SummaryGenerator), nil
+		return new(model.SummaryGenerator), nil
 	case "api":
-		return new(common.ApiGenerator), nil
+		return new(model.ApiGenerator), nil
 	case "markdown":
 		return new(markdown.Generator), nil
 	case "html":

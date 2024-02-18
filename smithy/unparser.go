@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/api/common"
+	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
@@ -49,7 +49,7 @@ func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
 	return namespace, name, version
 }
 
-func (ast *AST) IDLForOperationShape(shapeId string, decorator *common.Decorator) string {
+func (ast *AST) IDLForOperationShape(shapeId string, decorator *model.Decorator) string {
 	shape := ast.GetShape(shapeId)
 	w := &IdlWriter{
 		ast:       ast,
@@ -63,7 +63,7 @@ func (ast *AST) IDLForOperationShape(shapeId string, decorator *common.Decorator
 	return w.End()
 }
 
-func (ast *AST) IDLForTypeShape(shapeId string, decorator *common.Decorator) string {
+func (ast *AST) IDLForTypeShape(shapeId string, decorator *model.Decorator) string {
 	shape := ast.GetShape(shapeId)
 	w := &IdlWriter{
 		ast:       ast,
@@ -237,7 +237,7 @@ type IdlWriter struct {
 	name      string
 	version   int
 	ast       *AST
-	decorator *common.Decorator
+	decorator *model.Decorator
 }
 
 func (w *IdlWriter) Begin() {

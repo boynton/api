@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package common
+package model
 
 import (
 	"bufio"
@@ -24,21 +24,20 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
 type Generator interface {
-	Configure(schema *model.Schema, conf *data.Object) error
-	Generate(schema *model.Schema, config *data.Object) error
-	GenerateOperation(op *model.OperationDef) error
-	GenerateType(td *model.TypeDef) error
+	Configure(schema *Schema, conf *data.Object) error
+	Generate(schema *Schema, config *data.Object) error
+	GenerateOperation(op *OperationDef) error
+	GenerateType(td *TypeDef) error
 	Begin()
 	End() string
 }
 
 type BaseGenerator struct {
-	Schema         *model.Schema
+	Schema         *Schema
 	Config         *data.Object
 	OutDir         string
 	ForceOverwrite bool
@@ -46,12 +45,12 @@ type BaseGenerator struct {
 	writer         *bufio.Writer
 	Err            error
 	Sort           bool
-	typesEmitted   map[model.AbsoluteIdentifier]bool
+	typesEmitted   map[AbsoluteIdentifier]bool
 }
 
-func (gen *BaseGenerator) Configure(schema *model.Schema, conf *data.Object) error {
+func (gen *BaseGenerator) Configure(schema *Schema, conf *data.Object) error {
 	gen.Schema = schema
-	gen.typesEmitted = make(map[model.AbsoluteIdentifier]bool, 0)
+	gen.typesEmitted = make(map[AbsoluteIdentifier]bool, 0)
 	//validate the config
 	gen.Config = conf
 	gen.OutDir = conf.GetString("outdir")
@@ -60,15 +59,15 @@ func (gen *BaseGenerator) Configure(schema *model.Schema, conf *data.Object) err
 	return nil
 }
 
-func (gen *BaseGenerator) Operations() []*model.OperationDef {
+func (gen *BaseGenerator) Operations() []*OperationDef {
 	if gen.Sort {
 		return gen.SortedOperations()
 	}
 	return gen.Schema.Operations
 }
 
-func (gen *BaseGenerator) SortedOperations() []*model.OperationDef {
-	var r []*model.OperationDef
+func (gen *BaseGenerator) SortedOperations() []*OperationDef {
+	var r []*OperationDef
 	if len(gen.Schema.Operations) > 0 {
 		for _, i := range gen.Schema.Operations {
 			r = append(r, i)
@@ -80,15 +79,15 @@ func (gen *BaseGenerator) SortedOperations() []*model.OperationDef {
 	return r
 }
 
-func (gen *BaseGenerator) Types() []*model.TypeDef {
+func (gen *BaseGenerator) Types() []*TypeDef {
 	if gen.Sort {
 		return gen.SortedTypes()
 	}
 	return gen.Schema.Types
 }
 
-func (gen *BaseGenerator) SortedTypes() []*model.TypeDef {
-	var r []*model.TypeDef
+func (gen *BaseGenerator) SortedTypes() []*TypeDef {
+	var r []*TypeDef
 	if len(gen.Schema.Types) > 0 {
 		for _, i := range gen.Schema.Types {
 			r = append(r, i)
@@ -100,7 +99,7 @@ func (gen *BaseGenerator) SortedTypes() []*model.TypeDef {
 	return r
 }
 
-func (gen *BaseGenerator) HasEmitted(id model.AbsoluteIdentifier) bool {
+func (gen *BaseGenerator) HasEmitted(id AbsoluteIdentifier) bool {
 	if gen.typesEmitted != nil {
 		if b, ok := gen.typesEmitted[id]; ok && b {
 			return true
@@ -109,7 +108,7 @@ func (gen *BaseGenerator) HasEmitted(id model.AbsoluteIdentifier) bool {
 	return false
 }
 
-func (gen *BaseGenerator) Emitted(id model.AbsoluteIdentifier) {
+func (gen *BaseGenerator) Emitted(id AbsoluteIdentifier) {
 	gen.typesEmitted[id] = true
 }
 
@@ -190,7 +189,7 @@ func (gen *BaseGenerator) Write(text string, filename string, separator string) 
 	return nil
 }
 
-func (gen *BaseGenerator) accumulateDependenciesById(deps map[model.AbsoluteIdentifier]bool, id model.AbsoluteIdentifier) {
+func (gen *BaseGenerator) accumulateDependenciesById(deps map[AbsoluteIdentifier]bool, id AbsoluteIdentifier) {
 	switch id {
 	case "base#Bool", "base#Int8", "base#Int16", "base#Int32", "base#Int64", "base#Float32", "base#Float64", "base#Bytes", "base#String", "base#Enum":
 		return
@@ -204,7 +203,7 @@ func (gen *BaseGenerator) accumulateDependenciesById(deps map[model.AbsoluteIden
 	gen.accumulateDependencies(deps, td)
 }
 
-func (gen *BaseGenerator) accumulateDependencies(deps map[model.AbsoluteIdentifier]bool, td *model.TypeDef) {
+func (gen *BaseGenerator) accumulateDependencies(deps map[AbsoluteIdentifier]bool, td *TypeDef) {
 	if td == nil {
 		return
 	}
@@ -213,21 +212,21 @@ func (gen *BaseGenerator) accumulateDependencies(deps map[model.AbsoluteIdentifi
 	}
 	deps[td.Id] = true
 	switch td.Base {
-	case model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.Decimal, model.Blob, model.String, model.Timestamp, model.Enum:
+	case Bool, Int8, Int16, Int32, Int64, Float32, Float64, Decimal, Blob, String, Timestamp, Enum:
 		return
-	case model.List:
+	case List:
 		gen.accumulateDependenciesById(deps, td.Items)
-	case model.Map:
+	case Map:
 		gen.accumulateDependenciesById(deps, td.Keys)
 		gen.accumulateDependenciesById(deps, td.Items)
-	case model.Struct, model.Union:
+	case Struct, Union:
 		for _, f := range td.Fields {
 			gen.accumulateDependenciesById(deps, f.Type)
 		}
 	}
 }
 
-func (gen *BaseGenerator) accumulateOpDependencies(deps map[model.AbsoluteIdentifier]bool, op *model.OperationDef) {
+func (gen *BaseGenerator) accumulateOpDependencies(deps map[AbsoluteIdentifier]bool, op *OperationDef) {
 	if op.Input != nil {
 		for _, f := range op.Input.Fields {
 			gen.accumulateDependenciesById(deps, f.Type)
@@ -245,18 +244,18 @@ func (gen *BaseGenerator) accumulateOpDependencies(deps map[model.AbsoluteIdenti
 	}
 }
 
-func (gen *BaseGenerator) TypeDependencies(td *model.TypeDef) []model.AbsoluteIdentifier {
-	deps := make(map[model.AbsoluteIdentifier]bool, 0)
+func (gen *BaseGenerator) TypeDependencies(td *TypeDef) []AbsoluteIdentifier {
+	deps := make(map[AbsoluteIdentifier]bool, 0)
 	gen.accumulateDependencies(deps, td)
-	var result []model.AbsoluteIdentifier
+	var result []AbsoluteIdentifier
 	for k := range deps {
 		result = append(result, k)
 	}
 	return result
 }
 
-func (gen *BaseGenerator) AllTypeDependencies() []model.AbsoluteIdentifier {
-	deps := make(map[model.AbsoluteIdentifier]bool, 0)
+func (gen *BaseGenerator) AllTypeDependencies() []AbsoluteIdentifier {
+	deps := make(map[AbsoluteIdentifier]bool, 0)
 	for _, td := range gen.Schema.Types {
 		gen.accumulateDependencies(deps, td)
 	}
@@ -265,7 +264,7 @@ func (gen *BaseGenerator) AllTypeDependencies() []model.AbsoluteIdentifier {
 			gen.accumulateOpDependencies(deps, op)
 		}
 	}
-	var result []model.AbsoluteIdentifier
+	var result []AbsoluteIdentifier
 	for k := range deps {
 		result = append(result, k)
 	}

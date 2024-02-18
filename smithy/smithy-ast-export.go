@@ -1,15 +1,15 @@
 package smithy
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
 type AstGenerator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	ast *AST
 }
 
@@ -236,6 +236,8 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 		prev := ast.GetShape(errId)
 		if prev != nil {
 			if !model.Equivalent(prev, errShape) {
+				fmt.Println("prev:", model.Pretty(prev))
+				fmt.Println("errShape:", model.Pretty(errShape))
 				panic("reused operation error shape but different definition: " + errId)
 			}
 		} else {

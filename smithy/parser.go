@@ -482,7 +482,7 @@ func (p *Parser) SyntaxError() error {
 }
 
 func (p *Parser) Warning(msg string) {
-	fmt.Fprintf(os.Stderr, "[WARNING]: %s\n", FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, RED, 5))
+	Warning("[WARNING]: %s\n", FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, RED, 5))
 }
 
 func (p *Parser) EndOfFileError() error {
@@ -1051,6 +1051,18 @@ func (p *Parser) parseStructure(traits *NodeValue) error {
 	if err != nil {
 		return err
 	}
+	if body.Traits.Has("smithy.api#httpError") {
+		for _, fname := range body.Members.Keys() {
+			mem := body.Members.Get(fname)
+			query := mem.Traits.GetString("smithy.api#httpQuery")
+			header := mem.Traits.GetString("smithy.api#httpHeader")
+			path := mem.Traits.GetBool("smithy.api#httpLabel")
+			payload := mem.Traits.GetBool("smithy.api#httpPayload")
+			if !payload && !path && query == "" && header == "" {
+				p.Warning("Smithy error should have a payload specified: " + name)
+			}
+		}
+	}
 	return p.addShapeDefinition(name, body)
 }
 
@@ -1264,6 +1276,17 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 					if err != nil {
 						return err
 					}
+					for _, fname := range body.Members.Keys() {
+						mem := body.Members.Get(fname)
+						query := mem.Traits.GetString("smithy.api#httpQuery")
+						header := mem.Traits.GetString("smithy.api#httpHeader")
+						path := mem.Traits.GetBool("smithy.api#httpLabel")
+						payload := mem.Traits.GetBool("smithy.api#httpPayload")
+						if !payload && !path && query == "" && header == "" {
+							fmt.Println("WHOOPS2: unannotated inputs detected!")
+							p.SyntaxError()
+						}
+					}
 					inName := name + "Input"
 					shape.Input = &ShapeRef{Target: p.ensureNamespaced(inName)}
 					p.addShapeDefinition(inName, body)
@@ -1285,6 +1308,17 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 					body, err := p.parseStructureBody(traits)
 					if err != nil {
 						return err
+					}
+					for _, fname := range body.Members.Keys() {
+						mem := body.Members.Get(fname)
+						query := mem.Traits.GetString("smithy.api#httpQuery")
+						header := mem.Traits.GetString("smithy.api#httpHeader")
+						path := mem.Traits.GetBool("smithy.api#httpLabel")
+						payload := mem.Traits.GetBool("smithy.api#httpPayload")
+						if !payload && !path && query == "" && header == "" {
+							fmt.Println("WHOOPS3: unannotated inputs detected!")
+							p.SyntaxError()
+						}
 					}
 					outName := name + "Output"
 					shape.Output = &ShapeRef{Target: p.ensureNamespaced(outName)}
@@ -1665,7 +1699,9 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 		}
 		return withTrait(traits, "smithy.api#paginated", args), nil
 	case "enum":
-		p.Warning("Deprecated trait: enum")
+		if p.version > 1 {
+			p.Warning("Deprecated trait: enum")
+		}
 		_, lit, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err

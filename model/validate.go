@@ -17,10 +17,7 @@ package model
 
 import (
 	"fmt"
-	"os"
 )
-
-var showWarnings = false
 
 func (schema *Schema) Validate() error {
 	for _, op := range schema.Operations {
@@ -37,9 +34,7 @@ func (schema *Schema) ValidationError(context, msg string) error {
 }
 
 func (schema *Schema) ValidationWarning(context, msg string) {
-	if showWarnings {
-		fmt.Fprintf(os.Stderr, "*** Validation warning: "+context+": "+msg)
-	}
+	Warning(context + ": " + msg)
 }
 
 func (schema *Schema) ValidateOperation(op *OperationDef) error {
@@ -102,7 +97,7 @@ func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOu
 				continue
 			}
 		}
-		//errors with inlined fields as the payload are actually common in the wild.
+		//errors with inlined fields as the payload are actually used in the wild.
 		//it use to be: smithy openapi generation wopuld insert an XxxContent type to specify the
 		//payload.
 		context := StripNamespace(op.Id) + "$" + string(out.Name)

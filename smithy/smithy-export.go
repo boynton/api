@@ -3,14 +3,13 @@ package smithy
 import (
 	"fmt"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
 type IdlGenerator struct {
-	common.BaseGenerator
-	Decorator *common.Decorator
+	model.BaseGenerator
+	Decorator *model.Decorator
 	ast       *AST
 }
 

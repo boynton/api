@@ -19,13 +19,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
 type Generator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	name    string
 	openapi *OpenAPI
 }
@@ -53,7 +52,7 @@ func (gen *Generator) GenerateService() error {
 		version = "1"
 	}
 	gen.openapi.Info = &Info{
-		Title:       common.StripNamespace(gen.Schema.Id),
+		Title:       model.StripNamespace(gen.Schema.Id),
 		Version:     version,
 		Description: gen.Schema.Comment,
 	}
@@ -97,7 +96,7 @@ func (gen *Generator) SchemaFromTypeRef(tref model.AbsoluteIdentifier) *Schema {
 		}
 	} else {
 		schema := &Schema{
-			Ref: "#/components/schemas/" + common.StripNamespace(tref),
+			Ref: "#/components/schemas/" + model.StripNamespace(tref),
 		}
 		return schema
 	}
@@ -116,7 +115,7 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 		gen.openapi.Paths[path] = pi
 	}
 	operation := &Operation{
-		OperationId: common.StripNamespace(op.Id),
+		OperationId: model.StripNamespace(op.Id),
 		Description: op.Comment,
 	}
 	var inPayload *model.OperationInputField

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
@@ -36,7 +35,7 @@ func Uncapitalize(s string) string {
 }
 
 type Generator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	ns   string
 	name string
 }
@@ -139,7 +138,7 @@ func (gen *Generator) EmitType(td *model.TypeDef) {
 func (gen *Generator) EmitComment(comment string) {
 	gen.Emit("\n")
 	if comment != "" {
-		gen.Emit(common.FormatComment("", "// ", comment, 100, true))
+		gen.Emit(model.FormatComment("", "// ", comment, 100, true))
 	}
 }
 

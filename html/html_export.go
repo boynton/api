@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"strings"
 	
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
@@ -28,7 +27,7 @@ import (
 const IndentAmount = "    "
 
 type Generator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	ns              string
 	name            string
 	detailGenerator string
@@ -55,8 +54,8 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	return err
 }
 
-func (gen *Generator) getDetailGenerator() common.Generator {
-	dec := common.Decorator{
+func (gen *Generator) getDetailGenerator() model.Generator {
+	dec := model.Decorator{
 		BaseType: func(s string) string {
 			return fmt.Sprintf("<em><strong>%s</strong></em>", s)
 		},
@@ -70,7 +69,7 @@ func (gen *Generator) getDetailGenerator() common.Generator {
 		g.Decorator = &dec
 		return g
 	default:
-		g := new(common.ApiGenerator)
+		g := new(model.ApiGenerator)
 		g.Decorator = &dec
 		return g
 	}
@@ -95,7 +94,7 @@ func (gen *Generator) GenerateFooter() {
 
 func (gen *Generator) GenerateSummary() {
 	gen.Emitf("<h1 id=%q>TestService</h1>\n", gen.name)
-	gen.Emitf("<p>%s</p>\n", gen.Schema.Comment) //common.FormatComment("", "", gen.Schema.Comment, 80, true)
+	gen.Emitf("<p>%s</p>\n", gen.Schema.Comment) //model.FormatComment("", "", gen.Schema.Comment, 80, true)
 	gen.Emitf("<ul>\n")
 	if gen.name != "" {
 		gen.Emitf("  <li><strong>Service</strong>: &ldquo;%s&rdquo;</li>\n", gen.name)

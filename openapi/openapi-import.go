@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 )
 
@@ -156,7 +155,7 @@ func (mb *ModelBuilder) opComment(pop *Operation) string {
 }
 
 func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operation) error {
-	opId := mb.toCanonicalAbsoluteId(common.Capitalize(pop.OperationId))
+	opId := mb.toCanonicalAbsoluteId(model.Capitalize(pop.OperationId))
 	op := &model.OperationDef{
 		Id:         opId,
 		HttpMethod: method,
@@ -284,7 +283,7 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 }
 
 func (mb *ModelBuilder) toIdentifier(n model.AbsoluteIdentifier) model.Identifier {
-	return model.Identifier(common.Uncapitalize(mb.toSimpleTypeName(n)))
+	return model.Identifier(model.Uncapitalize(mb.toSimpleTypeName(n)))
 }
 
 func (mb *ModelBuilder) toCanonicalAbsoluteId(name string) model.AbsoluteIdentifier {

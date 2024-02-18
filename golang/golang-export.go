@@ -22,7 +22,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/boynton/api/common"
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
@@ -30,7 +29,7 @@ import (
 const IndentAmount = "    "
 
 type Generator struct {
-	common.BaseGenerator
+	model.BaseGenerator
 	ns                  model.Namespace
 	pkg                 string
 	inlineSlicesAndMaps bool   //more idiomatic, but prevents validating constraints (i.e. list.maxLength)
@@ -369,7 +368,7 @@ func (w *GolangWriter) xgolangTypeRef(typeRef model.AbsoluteIdentifier, required
 func (gen *Generator) generateTypeComment(td *model.TypeDef, w *GolangWriter) {
 	if td.Comment != "" {
 		w.Emit("//\n")
-		w.Emit(common.FormatComment("", "// ", td.Comment, 80, true))
+		w.Emit(model.FormatComment("", "// ", td.Comment, 80, true))
 		w.Emit("//\n")
 	}
 }
@@ -386,7 +385,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 				opt = ",omitempty"
 			}
 			name := string(f.Name)
-			w.Emitf("    %s %s `json:\"%s%s\"`\n", common.Capitalize(name), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name), opt)
+			w.Emitf("    %s %s `json:\"%s%s\"`\n", model.Capitalize(name), w.gen.golangTypeRef(f.Type), model.Uncapitalize(name), opt)
 		}
 		w.Emitf("}\n")
 	case model.Union:
@@ -396,7 +395,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("const (\n")
 		w.Emitf("    _ %sVariantTag = iota\n", tname)
 		for _, f := range td.Fields {
-			w.Emitf("    %sVariantTag%s\n", tname, common.Capitalize(string(f.Name)))
+			w.Emitf("    %sVariantTag%s\n", tname, model.Capitalize(string(f.Name)))
 		}
 		w.Emitf(")\n")
 		w.Emitf("type %s struct {\n", tname)
@@ -404,13 +403,13 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		for _, f := range td.Fields {
 			opt := ",omitempty"
 			name := string(f.Name)
-			w.Emitf("    %s %s `json:\"%s%s\"`\n", common.Capitalize(name), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name), opt)
+			w.Emitf("    %s %s `json:\"%s%s\"`\n", model.Capitalize(name), w.gen.golangTypeRef(f.Type), model.Uncapitalize(name), opt)
 		}
 		w.Emitf("}\n")
 		w.Emitf("type raw%s struct {\n", tname)
 		for _, f := range td.Fields {
 			name := string(f.Name)
-			w.Emitf("    %s %s%s `json:\"%s,omitempty\"`\n", common.Capitalize(name), gen.indirectOp(f.Type), w.gen.golangTypeRef(f.Type), common.Uncapitalize(name))
+			w.Emitf("    %s %s%s `json:\"%s,omitempty\"`\n", model.Capitalize(name), gen.indirectOp(f.Type), w.gen.golangTypeRef(f.Type), model.Uncapitalize(name))
 		}
 		w.Emitf("}\n")
 		w.Emitf("func (u *%s) UnmarshalJSON(b []byte) error {\n", tname)
@@ -420,7 +419,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("    }\n")
 		p := "if "
 		for _, f := range td.Fields {
-			fname := common.Capitalize(string(f.Name))
+			fname := model.Capitalize(string(f.Name))
 			w.Emitf("    %s tmp.%s != nil {\n", p, fname)
 			w.Emitf("        u.Variant = %s%s\n", tname, fname)
 			w.Emitf("        u.%s = %stmp.%s\n", fname, gen.indirectOp(f.Type), fname)
@@ -588,7 +587,7 @@ func (gen *Generator) GenerateServer() string {
 	}
 
 	w.Emit("var _ = data.ParseTimestamp\n\n")
-	adaptorName := common.Uncapitalize(serviceName) + "Adaptor"
+	adaptorName := model.Uncapitalize(serviceName) + "Adaptor"
 	w.Emitf("type %s struct {\n", adaptorName)
 	w.Emitf("    impl %s\n", serviceName)
 	w.Emit("}\n")
@@ -616,9 +615,9 @@ func (gen *Generator) GenerateServer() string {
 					q = true
 				} else if f.HttpPath {
 					body := fmt.Sprintf("mux.Vars(r)[%q]", f.Name)
-					w.Emitf("    req.%s = %s\n", common.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
+					w.Emitf("    req.%s = %s\n", model.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
 				} else if f.HttpPayload {
-					w.Emitf("    err := json.NewDecoder(r.Body).Decode(&req.%s)\n", common.Capitalize(string(f.Name)))
+					w.Emitf("    err := json.NewDecoder(r.Body).Decode(&req.%s)\n", model.Capitalize(string(f.Name)))
 					w.Emitf("    if err != nil {\n")
 					w.Emitf("        errorResponse(w, 400, fmt.Sprint(err))\n")
 					w.Emitf("        return\n")
@@ -636,7 +635,7 @@ func (gen *Generator) GenerateServer() string {
 				for _, f := range op.Input.Fields {
 					if f.HttpQuery != "" {
 						body := fmt.Sprintf("r.Form.Get(%q)", f.Name)
-						w.Emitf("    req.%s = %s\n", common.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
+						w.Emitf("    req.%s = %s\n", model.Capitalize(string(f.Name)), gen.baseConverter(f.Type, f.Default, body))
 					}
 				}
 				w.Emitf("    // emit the query params here\n")
@@ -648,7 +647,7 @@ func (gen *Generator) GenerateServer() string {
 		result := ""
 		resPayload := "nil"
 		if opOutput != "" {
-			resPayload = "res." + common.Capitalize(op.OutputHttpPayloadName())
+			resPayload = "res." + model.Capitalize(op.OutputHttpPayloadName())
 			result = "res, "
 		}
 		w.Emitf("    %serr := handler.impl.%s(%s)\n", result, opName, arg)
@@ -695,7 +694,7 @@ func (gen *Generator) GenerateServer() string {
 func (gen *Generator) entityPayload(out *model.OperationOutput) string {
 	for _, field := range out.Fields {
 		if field.HttpPayload {
-			return "." + common.Capitalize(string(field.Name))
+			return "." + model.Capitalize(string(field.Name))
 		}
 	}
 	return ""
@@ -742,7 +741,7 @@ func (w *GolangWriter) EmitServiceInterface() error {
 		w.Emit("\n")
 		if schema.Comment != "" {
 			w.Emit("//\n")
-			w.Emit(common.FormatComment("", "// ", schema.Comment, 80, true))
+			w.Emit(model.FormatComment("", "// ", schema.Comment, 80, true))
 			w.Emit("//\n")
 		}
 		w.Emitf("type %s interface {\n", gen.golangTypeName(schema.Id)) //!
@@ -801,7 +800,7 @@ func (w *GolangWriter) EmitServiceInterface() error {
 						for _, f := range e.Fields {
 							isRequired := true                   //Should I support f.Required?
 							if string(f.Type) == "base#String" { //fix: isStringBase(e.Type)
-								msg = common.Capitalize(string(f.Name))
+								msg = model.Capitalize(string(f.Name))
 							}
 							opt := ""
 							if !isRequired {

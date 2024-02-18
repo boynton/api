@@ -13,12 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package common
+package model
 
 import (
 	"strings"
 
-	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
@@ -29,7 +28,7 @@ type SummaryGenerator struct {
 	name   string
 }
 
-func (gen *SummaryGenerator) Generate(schema *model.Schema, config *data.Object) error {
+func (gen *SummaryGenerator) Generate(schema *Schema, config *data.Object) error {
 	err := gen.Configure(schema, config)
 	if err != nil {
 		return err
@@ -71,7 +70,8 @@ func (gen *SummaryGenerator) GenerateSummary() {
 	}
 }
 
-func StripNamespace(target model.AbsoluteIdentifier) string {
+/*
+func StripNamespace(target AbsoluteIdentifier) string {
 	t := string(target)
 	n := strings.Index(t, "#")
 	if n < 0 {
@@ -79,8 +79,9 @@ func StripNamespace(target model.AbsoluteIdentifier) string {
 	}
 	return t[n+1:]
 }
+*/
 
-func ExplodeInputs(in *model.OperationInput) string {
+func ExplodeInputs(in *OperationInput) string {
 	if in == nil {
 		return ""
 	}
@@ -92,7 +93,7 @@ func ExplodeInputs(in *model.OperationInput) string {
 	return strings.Join(types, ", ")
 }
 
-func ExplodeOutputs(out *model.OperationOutput) string {
+func ExplodeOutputs(out *OperationOutput) string {
 	var types []string
 	for _, f := range out.Fields {
 		//types = append(types, string(f.Name) + " " + StripNamespace(f.Type))
@@ -101,7 +102,7 @@ func ExplodeOutputs(out *model.OperationOutput) string {
 	return strings.Join(types, ", ")
 }
 
-func (gen *SummaryGenerator) GenerateOperation(op *model.OperationDef) error {
+func (gen *SummaryGenerator) GenerateOperation(op *OperationDef) error {
 	in := ExplodeInputs(op.Input)
 	out := ExplodeOutputs(op.Output)
 	errs := ""
@@ -120,9 +121,9 @@ func (gen *SummaryGenerator) GenerateOperations() {
 	}
 }
 
-func (gen *SummaryGenerator) GenerateType(td *model.TypeDef) error {
+func (gen *SummaryGenerator) GenerateType(td *TypeDef) error {
 	switch td.Base {
-	case model.Struct, model.Union:
+	case Struct, Union:
 		var lst []string
 		for _, fd := range td.Fields {
 			lst = append(lst, string(fd.Name))
@@ -132,9 +133,9 @@ func (gen *SummaryGenerator) GenerateType(td *model.TypeDef) error {
 			s = "{" + strings.Join(lst, ", ") + "}"
 		}
 		gen.Emitf("type %s %s %s\n", StripNamespace(td.Id), td.Base, s)
-	case model.List:
+	case List:
 		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), StripNamespace(td.Items))
-	case model.Map:
+	case Map:
 		gen.Emitf("type %s Map[%s → %s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
 	default:
 		gen.Emitf("type %s %s\n", StripNamespace(td.Id), td.Base)

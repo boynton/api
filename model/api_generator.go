@@ -13,13 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package common
+package model
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/api/model"
 	"github.com/boynton/data"
 )
 
@@ -41,7 +40,7 @@ type ApiGenerator struct {
 	name      string
 }
 
-func (gen *ApiGenerator) Generate(schema *model.Schema, config *data.Object) error {
+func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 	err := gen.Configure(schema, config)
 	if err != nil {
 		return err
@@ -88,7 +87,7 @@ func (gen *ApiGenerator) GenerateOperations() {
 	}
 }
 
-func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) error {
+func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 	gen.GenerateBlockComment(op.Comment, "")
 	rez := ""
 	if op.Resource != "" {
@@ -105,7 +104,7 @@ func (gen *ApiGenerator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
 
-func (gen *ApiGenerator) GenerateOperationInput(op *model.OperationDef) {
+func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 	in := op.Input
 	if in != nil {
 		inname := ""
@@ -154,7 +153,7 @@ func (gen *ApiGenerator) decorateType(tname string) string {
 	return tname
 }
 
-func (gen *ApiGenerator) GenerateOperationOutputFields(out *model.OperationOutput, indent string) {
+func (gen *ApiGenerator) GenerateOperationOutputFields(out *OperationOutput, indent string) {
 	for _, f := range out.Fields {
 		var opts []string
 		if f.HttpPayload {
@@ -176,7 +175,7 @@ func (gen *ApiGenerator) GenerateOperationOutputFields(out *model.OperationOutpu
 	}
 }
 
-func (gen *ApiGenerator) GenerateOperationOutput(op *model.OperationDef) {
+func (gen *ApiGenerator) GenerateOperationOutput(op *OperationDef) {
 	if op.Output != nil {
 		outname := ""
 		if op.Output.Id != "" && op.Output.Id != (op.Id+"Output") {
@@ -188,10 +187,10 @@ func (gen *ApiGenerator) GenerateOperationOutput(op *model.OperationDef) {
 	}
 }
 
-func (gen *ApiGenerator) GenerateOperationExceptions(op *model.OperationDef) {
+func (gen *ApiGenerator) GenerateOperationExceptions(op *OperationDef) {
 	if len(op.Exceptions) > 0 {
 		for _, errdef := range op.Exceptions {
-			defaultId := model.AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, errdef.HttpStatus))
+			defaultId := AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, errdef.HttpStatus))
 			errname := ""
 			if errdef.Id != "" && errdef.Id != defaultId {
 				errname = "(name=" + gen.decorateType(StripNamespace(errdef.Id)) + ") "
@@ -203,7 +202,7 @@ func (gen *ApiGenerator) GenerateOperationExceptions(op *model.OperationDef) {
 	}
 }
 
-func (gen *ApiGenerator) GenerateFields(fields []*model.FieldDef, indent string) {
+func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 	forceCommentHeaders := false
 	for _, f := range fields {
 		if f.Comment != "" {
@@ -248,10 +247,10 @@ func (gen *ApiGenerator) GenerateTypes() {
 	}
 }
 
-func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
+func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 	gen.GenerateBlockComment(td.Comment, "")
 	switch td.Base {
-	case model.String:
+	case String:
 		sopts := ""
 		var opts []string
 		if td.Pattern != "" {
@@ -261,19 +260,19 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
 		gen.Emitf("type %s String%s\n", StripNamespace(td.Id), sopts)
-	case model.Struct:
+	case Struct:
 		gen.Emitf("type %s Struct {\n", StripNamespace(td.Id))
 		gen.GenerateFields(td.Fields, "    ")
 		gen.Emitf("}\n")
-	case model.Union:
+	case Union:
 		gen.Emitf("type %s Union {\n", StripNamespace(td.Id))
 		gen.GenerateFields(td.Fields, "    ")
 		gen.Emitf("}\n")
-	case model.List:
+	case List:
 		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Items)))
-	case model.Map:
+	case Map:
 		gen.Emitf("type %s Map[%s,%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Keys)), gen.decorateType(StripNamespace(td.Items)))
-	case model.Enum:
+	case Enum:
 		sopt := ""
 		//for _, el := range td.Elements {
 		//if el.Type != "" {
@@ -293,10 +292,10 @@ func (gen *ApiGenerator) GenerateType(td *model.TypeDef) error {
 			gen.Emitf("    %s%s\n", el.Symbol, sopts)
 		}
 		gen.Emitf("}\n")
-	case model.Timestamp:
+	case Timestamp:
 		sopts := ""
 		gen.Emitf("type %s Timestamp%s\n", StripNamespace(td.Id), sopts)
-	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.Integer, model.Decimal:
+	case Int8, Int16, Int32, Int64, Float32, Float64, Integer, Decimal:
 		sopts := ""
 		gen.Emitf("type %s %s%s\n", StripNamespace(td.Id), td.Base.String(), sopts)
 	default:

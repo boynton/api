@@ -14,7 +14,7 @@ test::
 proper::
 	go fmt github.com/boynton/api
 	go vet github.com/boynton/api
-	gofmt -s -w main.go assembly.go common model
+	gofmt -s -w main.go assembly.go model
 	go fmt github.com/boynton/api/golang
 	go vet github.com/boynton/api/golang
 	gofmt -s -w golang

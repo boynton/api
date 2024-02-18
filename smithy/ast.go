@@ -95,10 +95,12 @@ func (node *NodeValue) Keys() []string {
 }
 
 func (node *NodeValue) Has(key string) bool {
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		if _, ok := m[key]; ok {
-			return true
+	if node != nil && node.value != nil {
+		switch m := node.value.(type) {
+		case map[string]interface{}:
+			if _, ok := m[key]; ok {
+				return true
+			}
 		}
 	}
 	return false
