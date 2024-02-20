@@ -482,7 +482,7 @@ func (p *Parser) SyntaxError() error {
 }
 
 func (p *Parser) Warning(msg string) {
-	Warning("[WARNING]: %s\n", FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, RED, 5))
+	Warning("%s\n", FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, YELLOW, 5))
 }
 
 func (p *Parser) EndOfFileError() error {
@@ -1059,7 +1059,7 @@ func (p *Parser) parseStructure(traits *NodeValue) error {
 			path := mem.Traits.GetBool("smithy.api#httpLabel")
 			payload := mem.Traits.GetBool("smithy.api#httpPayload")
 			if !payload && !path && query == "" && header == "" {
-				p.Warning("Smithy error should have a payload specified: " + name)
+				p.Warning("smithy Structure tagged with @httpError should have a payload specified: " + name)
 			}
 		}
 	}

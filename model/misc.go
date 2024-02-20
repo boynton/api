@@ -23,6 +23,7 @@ import (
 	"strings"
 )
 
+var MinimizeOutput bool = false
 var WarningsAreErrors bool = false
 var ShowWarnings bool = true
 
@@ -31,14 +32,20 @@ func Warning(format string, a ...any) {
 		if WarningsAreErrors {
 			Error(format, a...)
 		} else {
-			leader := fmt.Sprintf("*** %sWarning%s: ", YELLOW, BLACK)
+			leader := "*** WARNING: "
+			if !MinimizeOutput {
+				leader = fmt.Sprintf("*** %sWARNING%s: ", YELLOW, BLACK)
+			}
 			fmt.Fprintf(os.Stderr, leader+format, a...)
 		}
 	}
 }
 
 func Error(format string, a ...any) {
-	leader := fmt.Sprintf("*** %sFatal%s: ", RED, BLACK)
+	leader := "*** FATAL: "
+	if !MinimizeOutput {
+		leader = fmt.Sprintf("*** %sFATAL%s: ", RED, BLACK)
+	}
 	fmt.Fprintf(os.Stderr, leader+format, a...)
 	os.Exit(1)
 }

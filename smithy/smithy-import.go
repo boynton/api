@@ -345,8 +345,7 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 		if hasPayload {
 			model.Warning("Smithy operation output should have header/payload specified: %s\n", to.Id)
 		} else {
-			//Maybe I should do this at parse time, to show where in which file the change needs to be made.
-			model.Warning("Smithy operation output should have a payload specified: %s\n", to.Id)
+			//A warning is emitted in the parser, this code is to work around the problem
 			contentType := model.AbsoluteIdentifier(shapeId + "Content")
 			payloadField := &model.OperationOutputField{
 				Name:        model.Identifier("payload"),
