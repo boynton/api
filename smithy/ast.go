@@ -476,35 +476,35 @@ func (ast *AST) Namespaces() []string {
 }
 
 func (ast *AST) RequiresDocumentType() bool {
-	included := make(map[string]bool, 0)
+	included := NewMap[bool]()
 	for _, k := range ast.Shapes.Keys() {
 		ast.noteDependencies(included, k)
 	}
-	if _, ok := included["smithy.api#Document"]; ok {
+	if included.Has("smithy.api#Document") {
 		return true
 	}
 	return false
 }
 
-func (ast *AST) noteDependenciesFromRef(included map[string]bool, ref *ShapeRef) {
+func (ast *AST) noteDependenciesFromRef(included *Map[bool], ref *ShapeRef) {
 	if ref != nil {
 		ast.noteDependencies(included, ref.Target)
 	}
 }
 
-func (ast *AST) noteDependencies(included map[string]bool, name string) {
+func (ast *AST) noteDependencies(included *Map[bool], name string) {
 	//note traits
 	if name == "smithy.api#Document" {
-		included[name] = true
+		included.Put(name, true)
 		return
 	}
 	if name == "" || strings.HasPrefix(name, "smithy.api#") {
 		return
 	}
-	if _, ok := included[name]; ok {
+	if included.Has(name) {
 		return
 	}
-	included[name] = true
+	included.Put(name, true)
 	shape := ast.GetShape(name)
 	if shape == nil {
 		return
@@ -763,14 +763,14 @@ func (ast *AST) ExpandMixins() error {
 }
 
 func (ast *AST) FilterDependencies(root []string) {
-	included := make(map[string]bool, 0)
+	included := NewMap[bool]()
 	for _, k := range root {
-		if _, ok := included[k]; !ok {
+		if !included.Has(k) {
 			ast.noteDependencies(included, k)
 		}
 	}
 	filtered := NewMap[*Shape]()
-	for name := range included {
+	for _, name := range included.Keys() {
 		if !strings.HasPrefix(name, "smithy.api#") {
 			filtered.Put(name, ast.GetShape(name))
 		}

@@ -81,9 +81,13 @@ operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=
 }
 
 // 
-// A list of Items
+// The Item resource itself
 // 
-type ItemList List[Item]
+type Item Struct {
+    id String (required) // the id of the item
+    modified Timestamp // when the item ast last modified
+    data String // arbitrary data
+}
 
 // 
 // A generic Error entity, what is encoded on the wire in error responses
@@ -102,11 +106,7 @@ type ItemListing Struct {
 }
 
 // 
-// The Item resource itself
+// A list of Items
 // 
-type Item Struct {
-    id String (required) // the id of the item
-    modified Timestamp // when the item ast last modified
-    data String // arbitrary data
-}
+type ItemList List[Item]
 
