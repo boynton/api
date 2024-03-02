@@ -66,15 +66,16 @@ func (gen *ApiGenerator) GenerateBlockComment(comment string, indent string) {
 
 func (gen *ApiGenerator) GenerateSummary() {
 	title := gen.name
-	if gen.Schema.Version != "" {
-		title = title + " v" + gen.Schema.Version
-	}
+	version := gen.Schema.Version
 	gen.GenerateBlockComment(gen.Schema.Comment, "")
 	if gen.ns != "" {
 		gen.Emitf("namespace %s\n", gen.ns)
 	}
 	if gen.name != "" {
 		gen.Emitf("service %s\n", title)
+	}
+	if version != "" {
+		gen.Emitf("version %q\n", version)
 	}
 	//other metadata?
 	gen.Emit("\n")
@@ -107,11 +108,21 @@ func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 	in := op.Input
 	if in != nil {
+		indent := "        "
+		commentHeaders := false
+		for _, f := range in.Fields {
+			if f.Comment != "" {
+				if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+					commentHeaders = true
+				}
+			}
+		}
 		inname := ""
 		if op.Input.Id != (op.Id+"Input") && op.Input.Id != "" {
 			inname = "(name=" + StripNamespace(op.Input.Id) + ") "
 		}
 		gen.Emitf("    input %s{\n", inname)
+		firstPad := ""
 		for _, f := range in.Fields {
 			var opts []string
 			if f.Required {
@@ -131,11 +142,23 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 				sopts = " (" + strings.Join(opts, ", ") + ")"
 			}
 			comm := ""
+			pcomm := ""
 			if f.Comment != "" {
-				//format it?
-				comm = " // " + f.Comment
+				if commentHeaders {
+					//if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+					pcomm = FormatComment(indent, "// ", f.Comment, 72, false)
+				} else {
+					comm = " // " + f.Comment
+				}
 			}
-			gen.Emitf("        %s %s%s%s\n", f.Name, gen.decorateType(StripNamespace(f.Type)), sopts, comm)
+			tname := gen.decorateType(StripNamespace(f.Type))
+			if commentHeaders {
+
+				gen.Emitf("%s%s%s%s %s%s%s\n", firstPad, pcomm, indent, f.Name, tname, sopts, comm)
+			} else {
+				gen.Emitf("%s%s %s%s%s\n", indent, f.Name, tname, sopts, comm)
+			}
+			firstPad = "\n"
 		}
 		gen.Emit("    }\n")
 	}
@@ -154,6 +177,15 @@ func (gen *ApiGenerator) decorateType(tname string) string {
 }
 
 func (gen *ApiGenerator) GenerateOperationOutputFields(out *OperationOutput, indent string) {
+	commentHeaders := false
+	for _, f := range out.Fields {
+		if f.Comment != "" {
+			if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+				commentHeaders = true
+			}
+		}
+	}
+	firstPad := ""
 	for _, f := range out.Fields {
 		var opts []string
 		if f.HttpPayload {
@@ -167,11 +199,22 @@ func (gen *ApiGenerator) GenerateOperationOutputFields(out *OperationOutput, ind
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
 		comm := ""
+		pcomm := ""
 		if f.Comment != "" {
-			//format it?
-			comm = " // " + f.Comment
+			if commentHeaders {
+				//if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
+				pcomm = FormatComment(indent, "// ", f.Comment, 72, false)
+			} else {
+				comm = " // " + f.Comment
+			}
 		}
-		gen.Emitf("    %s%s %s%s%s\n", indent, f.Name, gen.decorateType(StripNamespace(f.Type)), sopts, comm)
+		tname := gen.decorateType(StripNamespace(f.Type))
+		if commentHeaders {
+			gen.Emitf("%s%s%s%s %s%s%s\n", firstPad, pcomm, indent, f.Name, tname, sopts, comm)
+		} else {
+			gen.Emitf("%s%s %s%s%s\n", indent, f.Name, tname, sopts, comm)
+		}
+		firstPad = "\n"
 	}
 }
 
@@ -182,7 +225,7 @@ func (gen *ApiGenerator) GenerateOperationOutput(op *OperationDef) {
 			outname = "(name=" + gen.decorateType(StripNamespace(op.Output.Id)) + ") "
 		}
 		gen.Emitf("    output %d %s{\n", op.Output.HttpStatus, outname)
-		gen.GenerateOperationOutputFields(op.Output, "    ")
+		gen.GenerateOperationOutputFields(op.Output, "        ")
 		gen.Emit("    }\n")
 	}
 }
@@ -196,18 +239,18 @@ func (gen *ApiGenerator) GenerateOperationExceptions(op *OperationDef) {
 				errname = "(name=" + gen.decorateType(StripNamespace(errdef.Id)) + ") "
 			}
 			gen.Emitf("    exception %d %s{\n", errdef.HttpStatus, errname)
-			gen.GenerateOperationOutputFields(errdef, "    ")
+			gen.GenerateOperationOutputFields(errdef, "        ")
 			gen.Emit("    }\n")
 		}
 	}
 }
 
 func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
-	forceCommentHeaders := false
+	commentHeaders := false
 	for _, f := range fields {
 		if f.Comment != "" {
 			if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
-				forceCommentHeaders = true
+				commentHeaders = true
 			}
 		}
 	}
@@ -223,7 +266,7 @@ func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 		comm := ""
 		pcomm := ""
 		if f.Comment != "" {
-			if forceCommentHeaders {
+			if commentHeaders {
 				//if len(f.Comment) > 60 || strings.Index(f.Comment, "\n") >= 0 {
 				pcomm = FormatComment(indent, "// ", f.Comment, 72, false)
 			} else {
@@ -231,8 +274,7 @@ func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 			}
 		}
 		tname := gen.decorateType(StripNamespace(f.Type))
-		//if pcomm != "" {
-		if forceCommentHeaders {
+		if commentHeaders {
 			gen.Emitf("\n%s%s%s %s%s%s\n", pcomm, indent, f.Name, tname, sopts, comm)
 		} else {
 			gen.Emitf("%s%s %s%s%s\n", indent, f.Name, tname, sopts, comm)
