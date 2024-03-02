@@ -59,10 +59,10 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 		return nil, err
 	}
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
-		if shape == nil {
-			fmt.Println("WHoops, nil shape in list:", shapeId)
-		} else if shape.Type == "resource" {
-			return addResource(schema, ast, shapeId, shape)
+		if shape != nil {
+			if shape.Type == "resource" {
+				return addResource(schema, ast, shapeId, shape)
+			}
 		}
 		return nil
 	})
