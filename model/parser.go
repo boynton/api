@@ -248,19 +248,31 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 		return nil, p.SyntaxError()
 	}
 	tok = p.GetToken()
+	var prevIn *OperationInputField
 	for tok != nil {
 		if tok.Type == CLOSE_BRACE {
 			return input, nil
 		} else if tok.Type == NEWLINE {
+			if prevIn != nil {
+				prevIn = nil
+				comment = ""
+			}
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
 			continue
+		} else if tok.Type == LINE_COMMENT {
+			if prevIn != nil {
+				prevIn.Comment = p.MergeComment(prevIn.Comment, tok.Text)
+			} else {
+				comment = p.MergeComment(comment, tok.Text)
+			}
 		} else {
 			in := &OperationInputField{
 				Comment: comment,
 			}
+			prevIn = in
 			if tok.Type != SYMBOL {
 				return nil, p.SyntaxError()
 			}
@@ -322,6 +334,7 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 		return nil, p.SyntaxError()
 	}
 	tok = p.GetToken()
+	var prevOut *OperationOutputField
 	for tok != nil {
 		if tok.Type == CLOSE_BRACE {
 			if len(output.Fields) == 0 {
@@ -329,15 +342,23 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 			}
 			return output, nil
 		} else if tok.Type == NEWLINE {
+			prevOut = nil
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
 			continue
+		} else if tok.Type == LINE_COMMENT {
+			if prevOut != nil {
+				prevOut.Comment = p.MergeComment(prevOut.Comment, tok.Text)
+			} else {
+				comment = p.MergeComment(comment, tok.Text)
+			}
 		} else {
 			out := &OperationOutputField{
 				Comment: comment,
 			}
+			prevOut = out
 			comment = ""
 			if tok.Type != SYMBOL {
 				return nil, p.SyntaxError()
