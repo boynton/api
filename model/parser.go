@@ -342,7 +342,10 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 			}
 			return output, nil
 		} else if tok.Type == NEWLINE {
-			prevOut = nil
+			if prevOut != nil {
+				prevOut = nil
+				comment = ""
+			}
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
@@ -1313,21 +1316,31 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 	//already parsed the open brace
 	comment := ""
 	tok := p.GetToken()
+	var prev *FieldDef
 	for tok != nil {
 		if tok.Type == CLOSE_BRACE {
 			return nil
 		} else if tok.Type == NEWLINE {
+			if prev != nil {
+				prev = nil
+				comment = ""
+			}
 			tok = p.GetToken()
 			if tok == nil {
 				return p.EndOfFileError()
 			}
 			continue
 		} else if tok.Type == LINE_COMMENT {
-			comment = p.MergeComment(comment, tok.Text)
+			if prev != nil {
+				prev.Comment = p.MergeComment(prev.Comment, tok.Text)
+			} else {
+				comment = p.MergeComment(comment, tok.Text)
+			}
 		} else {
 			fd := &FieldDef{
 				Comment: comment,
 			}
+			prev = fd
 			if tok.Type != SYMBOL {
 				return p.SyntaxError()
 			}
