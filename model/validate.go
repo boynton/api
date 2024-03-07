@@ -92,9 +92,11 @@ func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOu
 		panic("every operation must have an output")
 	}
 	for _, out := range out.Fields {
-		td := schema.GetTypeDef(out.Type)
-		if td == nil {
-			return fmt.Errorf("Type not defined: %q in field %q of %q", out.Type, out.Name, op.Id)
+		if !schema.IsBaseType(out.Type) {
+			td := schema.GetTypeDef(out.Type)
+			if td == nil {
+				return fmt.Errorf("Type not defined: %q in field %q of %q", out.Type, out.Name, op.Id)
+			}
 		}
 		if out.HttpHeader != "" {
 			if !out.HttpPayload {
