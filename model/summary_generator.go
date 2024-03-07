@@ -39,6 +39,7 @@ func (gen *SummaryGenerator) Generate(schema *Schema, config *data.Object) error
 	gen.Begin()
 	gen.GenerateSummary()
 	gen.GenerateOperations()
+	gen.GenerateExceptions()
 	gen.GenerateTypes()
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".txt")
@@ -110,6 +111,19 @@ func (gen *SummaryGenerator) GenerateOperation(op *OperationDef) error {
 	return nil
 }
 
+func (gen *SummaryGenerator) GenerateException(exc *OperationOutput) error {
+	var lst []string
+	for _, fd := range exc.Fields {
+		lst = append(lst, string(fd.Name))
+	}
+	s := ""
+	if len(lst) > 0 {
+		s = "{" + strings.Join(lst, ", ") + "}"
+	}
+	gen.Emitf("exception %s %s\n", StripNamespace(exc.Id), s)
+	return nil
+}
+
 func (gen *SummaryGenerator) GenerateOperations() {
 	//this is a high level signature without types or exceptions
 	ops := gen.Operations()
@@ -119,6 +133,17 @@ func (gen *SummaryGenerator) GenerateOperations() {
 		}
 		gen.Emit("\n")
 	}
+}
+
+func (gen *SummaryGenerator) GenerateExceptions() error {
+	ops := gen.Exceptions()
+	if len(ops) > 0 {
+		for _, op := range ops {
+			gen.GenerateException(op)
+		}
+		gen.Emit("\n")
+	}
+	return nil
 }
 
 func (gen *SummaryGenerator) GenerateType(td *TypeDef) error {

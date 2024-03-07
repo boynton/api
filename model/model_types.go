@@ -95,6 +95,8 @@ type GenericTraits struct {
 
 type StringList []string
 
+type AbsoluteIdentifierList []AbsoluteIdentifier
+
 type TypeTraits struct {
 	Comment  string             `json:"comment,omitempty"`
 	Tags     StringList         `json:"tags,omitempty"`
@@ -163,16 +165,16 @@ type EnumElement struct {
 
 // OperationDef - describes an operation, including its HTTP bindings
 type OperationDef struct {
-	Comment    string              `json:"comment,omitempty"`
-	Tags       StringList          `json:"tags,omitempty"`
-	Id         AbsoluteIdentifier  `json:"id"`
-	HttpMethod string              `json:"httpMethod,omitempty"`
-	HttpUri    string              `json:"httpUri,omitempty"`
-	Input      *OperationInput     `json:"input,omitempty"`
-	Output     *OperationOutput    `json:"output,omitempty"`
-	Exceptions OperationOutputList `json:"exceptions,omitempty"`
-	Resource   string              `json:"resource,omitempty"`
-	Lifecycle  string              `json:"lifecycle,omitempty"`
+	Comment    string                 `json:"comment,omitempty"`
+	Tags       StringList             `json:"tags,omitempty"`
+	Id         AbsoluteIdentifier     `json:"id"`
+	HttpMethod string                 `json:"httpMethod,omitempty"`
+	HttpUri    string                 `json:"httpUri,omitempty"`
+	Input      *OperationInput        `json:"input,omitempty"`
+	Output     *OperationOutput       `json:"output,omitempty"`
+	Exceptions AbsoluteIdentifierList `json:"exceptions,omitempty"`
+	Resource   string                 `json:"resource,omitempty"`
+	Lifecycle  string                 `json:"lifecycle,omitempty"`
 }
 
 type OperationOutputList []*OperationOutput
@@ -249,11 +251,12 @@ type OperationDefList []*OperationDef
 
 // ServiceDef - the definition of a service, consisting of Types and Operations
 type ServiceDef struct {
-	Comment    string             `json:"comment,omitempty"`
-	Tags       StringList         `json:"tags,omitempty"`
-	Id         AbsoluteIdentifier `json:"id"`
-	Version    string             `json:"version,omitempty"`
-	Base       string             `json:"base,omitempty"`
-	Types      TypeDefList        `json:"types,omitempty"`
-	Operations OperationDefList   `json:"operations,omitempty"`
+	Comment    string              `json:"comment,omitempty"`
+	Tags       StringList          `json:"tags,omitempty"`
+	Id         AbsoluteIdentifier  `json:"id"`
+	Version    string              `json:"version,omitempty"`
+	Base       string              `json:"base,omitempty"`
+	Types      TypeDefList         `json:"types,omitempty"`
+	Operations OperationDefList    `json:"operations,omitempty"`
+	Exceptions OperationOutputList `json:"exceptions,omitempty"`
 }

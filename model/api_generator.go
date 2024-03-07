@@ -51,6 +51,7 @@ func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 	gen.Begin()
 	gen.GenerateSummary()
 	gen.GenerateOperations()
+	gen.GenerateExceptions()
 	gen.GenerateTypes()
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".api")
@@ -88,6 +89,21 @@ func (gen *ApiGenerator) GenerateOperations() {
 	}
 }
 
+func (gen *ApiGenerator) GenerateExceptions() {
+	for _, exc := range gen.Schema.Exceptions {
+		gen.GenerateException(exc)
+	}
+}
+
+func (gen *ApiGenerator) GenerateException(edef *OperationOutput) error {
+	gen.GenerateBlockComment(edef.Comment, "")
+	ename := gen.decorateType(StripNamespace(edef.Id))
+	gen.Emitf("exception %s (status=%d) {\n", ename, edef.HttpStatus)
+	gen.GenerateOperationOutputFields(edef, "    ")
+	gen.Emitf("}\n\n")
+	return nil
+}
+
 func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 	gen.GenerateBlockComment(op.Comment, "")
 	rez := ""
@@ -100,7 +116,7 @@ func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 	gen.Emitf("operation %s (method=%s, url=%q%s) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri, rez)
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
-	gen.GenerateOperationExceptions(op)
+	gen.GenerateOperationExceptionRefs(op)
 	gen.Emit("}\n")
 	return nil
 }
@@ -170,6 +186,8 @@ func (gen *ApiGenerator) decorateType(tname string) string {
 		switch tname {
 		case "Int32", "String", "Int16", "Int8", "Int64", "Float64", "Float32", "Decimal", "Integer":
 			return gen.Decorator.BaseType(tname)
+		case "Timestamp":
+			return gen.Decorator.BaseType(tname)
 		}
 		return gen.Decorator.UserType(tname)
 	}
@@ -220,28 +238,25 @@ func (gen *ApiGenerator) GenerateOperationOutputFields(out *OperationOutput, ind
 
 func (gen *ApiGenerator) GenerateOperationOutput(op *OperationDef) {
 	if op.Output != nil {
-		outname := ""
+		opts := fmt.Sprintf("(status=%d", op.Output.HttpStatus)
 		if op.Output.Id != "" && op.Output.Id != (op.Id+"Output") {
-			outname = "(name=" + gen.decorateType(StripNamespace(op.Output.Id)) + ") "
+			opts = opts + ", name=" + gen.decorateType(StripNamespace(op.Output.Id))
 		}
-		gen.Emitf("    output %d %s{\n", op.Output.HttpStatus, outname)
+		opts = opts + ") "
+		gen.Emitf("    output %s{\n", opts)
 		gen.GenerateOperationOutputFields(op.Output, "        ")
 		gen.Emit("    }\n")
 	}
 }
 
-func (gen *ApiGenerator) GenerateOperationExceptions(op *OperationDef) {
+func (gen *ApiGenerator) GenerateOperationExceptionRefs(op *OperationDef) {
 	if len(op.Exceptions) > 0 {
-		for _, errdef := range op.Exceptions {
-			defaultId := AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, errdef.HttpStatus))
-			errname := ""
-			if errdef.Id != "" && errdef.Id != defaultId {
-				errname = "(name=" + gen.decorateType(StripNamespace(errdef.Id)) + ") "
-			}
-			gen.Emitf("    exception %d %s{\n", errdef.HttpStatus, errname)
-			gen.GenerateOperationOutputFields(errdef, "        ")
-			gen.Emit("    }\n")
+		exceptions := make([]string, 0)
+		for _, errid := range op.Exceptions {
+			errname := gen.decorateType(StripNamespace(errid))
+			exceptions = append(exceptions, errname)
 		}
+		gen.Emitf("    exceptions [%s] {\n", strings.Join(exceptions, ", "))
 	}
 }
 

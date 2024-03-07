@@ -29,6 +29,10 @@ func (gen *AstGenerator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
 
+func (gen *AstGenerator) GenerateException(op *model.OperationOutput) error {
+	return nil
+}
+
 func (gen *AstGenerator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
@@ -109,7 +113,7 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 		return nil, err
 	}
 	if gen.Schema.Id != "" {
-		//the service we create needs of include resources
+		//the service we create needs to include resources
 		shape := &Shape{
 			Type:    "service",
 			Version: gen.Schema.Version,
@@ -145,6 +149,16 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 			return nil, err
 		}
 	}
+	for _, edef := range gen.Schema.Exceptions {
+		shapeId := string(edef.Id)
+		shape, err := gen.shapeFromOpOutput(edef, true)
+		if err != nil {
+			return nil, err
+		}
+		if ast.GetShape(shapeId) == nil {
+			ast.PutShape(shapeId, shape)
+		}
+	}
 	for _, td := range gen.Schema.Types {
 		shapeId, shape, err := gen.ShapeFromType(td)
 		if err != nil {
@@ -178,7 +192,7 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 	switch op.HttpMethod {
 	case "GET":
 		ensureShapeTraits(shape).Put("smithy.api#readonly", NewNodeValue())
-	case "DELETE":
+	case "DELETE", "PUT":
 		ensureShapeTraits(shape).Put("smithy.api#idempotent", NewNodeValue())
 	}
 
@@ -213,15 +227,8 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 		}
 	}
 	if op.Exceptions != nil {
-		for _, ed := range op.Exceptions {
-			errId := string(ed.Id)
-			shape.Errors = append(shape.Errors, &ShapeRef{Target: errId})
-			errShape, err := gen.shapeFromOpOutput(ed, true)
-			if err != nil {
-				return err
-			}
-			errShapeIds = append(errShapeIds, errId)
-			errShapes[errId] = errShape
+		for _, errId := range op.Exceptions {
+			shape.Errors = append(shape.Errors, &ShapeRef{Target: string(errId)})
 		}
 	}
 	ast.PutShape(string(op.Id), shape)

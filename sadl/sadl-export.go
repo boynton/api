@@ -56,6 +56,10 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
 
+func (gen *Generator) GenerateException(op *model.OperationOutput) error {
+	return nil
+}
+
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
@@ -85,10 +89,12 @@ func (gen *Generator) ToSadl() string {
 				}
 			}
 			if len(op.Exceptions) > 0 {
-				for _, e := range op.Exceptions {
-					if _, ok := emitted[e.Name()]; !ok {
+				for _, eid := range op.Exceptions {
+					ename := model.StripNamespace(eid)
+					if _, ok := emitted[ename]; !ok {
+						e := gen.Schema.GetExceptionDef(eid)
 						gen.EmitException(e)
-						emitted[e.Name()] = true
+						emitted[ename] = true
 					}
 				}
 			}
@@ -276,7 +282,8 @@ func (gen *Generator) EmitOperation(op *model.OperationDef, opts []string) {
 	//except: we have to iterate through the "errors" of the operation, and check each one for httpError
 	//Note that there is in that case not much opportunity to do headers.
 	if len(op.Exceptions) > 0 {
-		for _, e := range op.Exceptions {
+		for _, eid := range op.Exceptions {
+			e := gen.Schema.GetExceptionDef(eid)
 			errCode := e.HttpStatus
 			if errCode != 0 {
 				gen.Emitf("    except %d %s\n", errCode, e.Name())

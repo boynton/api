@@ -4,25 +4,25 @@ namespace model
 
 /// BaseType - All other types are derived from these.
 enum BaseType {
-    Bool,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    Float32,
-    Float64,
-	Integer,
-    Decimal,
-    Blob,
-    String,
-    Timestamp,
-	Value,
-    List,
-    Map,
-    Struct,
-    Enum,
-    Union,
-	Any,
+    Bool
+    Int8
+    Int16
+    Int32
+    Int64
+    Float32
+    Float64
+    Integer
+    Decimal
+    Blob
+    String
+    Timestamp
+    Value
+    List
+    Map
+    Struct
+    Enum
+    Union
+    Any
 }
 
 /// Identifier - a simple symbolic name that most programming languages can use, i.e. "Blah"
@@ -45,6 +45,10 @@ structure GenericTraits {
 
 list StringList {
     member: String
+}
+
+list AbsoluteIdentifierList {
+    member: AbsoluteIdentifier
 }
 
 @mixin
@@ -74,38 +78,54 @@ list EnumElementList {
 /// could more properly be defined as a Union of various types, but this structure is more
 /// convenient.
 structure TypeDef with [TypeTraits] {
-    @required id: AbsoluteIdentifier
-    @required base: BaseType
+    @required
+    id: AbsoluteIdentifier
+
+    @required
+    base: BaseType
 }
 
 /// Field - describes each field in a structure or union.
 structure FieldDef with [TypeTraits] {
-    @required name: Identifier
-    @required type: AbsoluteIdentifier
+    @required
+    name: Identifier
+
+    @required
+    type: AbsoluteIdentifier
 }
 
 /// Element - describes each element of an Enum type
 structure EnumElement with [GenericTraits] {
-    @required symbol: Identifier
+    @required
+    symbol: Identifier
+
     value: String
-//    type: AbsoluteIdentifier //defaults to String. This is to accomodate IntEnums in Smithy?
+
+    // type: AbsoluteIdentifier //defaults to String. This is to accomodate IntEnums in Smithy?
 }
 
 /// OperationDef - describes an operation, including its HTTP bindings
 structure OperationDef with [GenericTraits] {
     @required
     id: AbsoluteIdentifier
+
     httpMethod: String
+
     httpUri: String
+
     input: OperationInput
+
     output: OperationOutput
-    exceptions: OperationOutputList
+
+    exceptions: AbsoluteIdentifierList
+
     resource: String
+
     lifecycle: String
 }
 
 list OperationOutputList {
-  member: OperationOutput
+    member: OperationOutput
 }
 
 /// OperationInput - the description of an operation input. It is similar to a Struct definition,
@@ -116,23 +136,26 @@ structure OperationInput with [GenericTraits] {
 }
 
 list OperationInputFieldList {
-  member: OperationInputField
+    member: OperationInputField
 }
 
 /// OperationInputField - the description of an operation input field
 structure OperationInputField with [TypeTraits] {
-  @required
-  name: Identifier
-		  
-  @required
-  type: AbsoluteIdentifier
+    @required
+    name: Identifier
 
-  default: Document
+    @required
+    type: AbsoluteIdentifier
 
-  httpHeader: String
-  httpQuery: Identifier
-  httpPath: Boolean
-  httpPayload: Boolean
+    default: Document
+
+    httpHeader: String
+
+    httpQuery: Identifier
+
+    httpPath: Boolean
+
+    httpPayload: Boolean
 }
 
 /// OperationOutput - the description of an operation output. Similar to a Struct definition, but
@@ -144,30 +167,42 @@ structure OperationOutput with [GenericTraits] {
 }
 
 list OperationOutputFieldList {
-  member: OperationOutputField
+    member: OperationOutputField
 }
 
 /// OperationOutputField
 structure OperationOutputField with [TypeTraits] {
-    @required name: Identifier
-    @required type: AbsoluteIdentifier
+    @required
+    name: Identifier
+
+    @required
+    type: AbsoluteIdentifier
+
     httpHeader: String
+
     httpPayload: Boolean
 }
 
 list TypeDefList {
-  member: TypeDef
+    member: TypeDef
 }
 
 list OperationDefList {
-  member: OperationDef
+    member: OperationDef
 }
 
 /// ServiceDef - the definition of a service, consisting of Types and Operations
 structure ServiceDef with [GenericTraits] {
-    @required id: AbsoluteIdentifier
+    @required
+    id: AbsoluteIdentifier
+
     version: String
-	base: String
-	types: TypeDefList
+
+    base: String
+
+    types: TypeDefList
+
     operations: OperationDefList
+
+    exceptions: OperationOutputList
 }

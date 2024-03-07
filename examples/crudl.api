@@ -11,12 +11,10 @@ operation CreateItem (method=POST, url="/items", resource=ItemResource, lifecycl
     input {
         item Item (required, payload)
     }
-    output 201 {
+    output (status=201) {
         item Item (payload)
     }
-    exception 400 (name=BadRequest) {
-        error Error (payload)
-    }
+    exceptions [BadRequest]
 }
 
 // 
@@ -26,12 +24,10 @@ operation GetItem (method=GET, url="/items/{itemId}", resource=ItemResource, lif
     input {
         itemId String (required, path)
     }
-    output 200 {
+    output (status=200) {
         item Item (payload)
     }
-    exception 404 (name=NotFound) {
-        error Error (payload)
-    }
+    exceptions [NotFound]
 }
 
 // 
@@ -42,15 +38,10 @@ operation UpdateItem (method=PUT, url="/items/{itemId}", resource=ItemResource, 
         itemId String (required, path)
         item Item (required, payload)
     }
-    output 200 {
+    output (status=200) {
         item Item (payload)
     }
-    exception 404 (name=NotFound) {
-        error Error (payload)
-    }
-    exception 400 (name=BadRequest) {
-        error Error (payload)
-    }
+    exceptions [NotFound, BadRequest]
 }
 
 // 
@@ -60,11 +51,9 @@ operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResourc
     input {
         itemId String (required, path)
     }
-    output 204 {
+    output (status=204) {
     }
-    exception 404 (name=NotFound) {
-        error Error (payload)
-    }
+    exceptions [NotFound]
 }
 
 // 
@@ -75,9 +64,23 @@ operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=
         limit Int32 (query="limit")
         skip String (query="skip")
     }
-    output 200 {
+    output (status=200) {
         listing ItemListing (payload)
     }
+}
+
+// 
+// An operation exception representing bad client input to a request
+// 
+exception BadRequest (status=400) {
+    info ExceptionInfo (payload)
+}
+
+// 
+// An operation exception representing that a resource was not found
+// 
+exception NotFound (status=404) {
+    info ExceptionInfo (payload)
 }
 
 // 
@@ -90,9 +93,10 @@ type Item Struct {
 }
 
 // 
-// A generic Error entity, what is encoded on the wire in error responses
+// Info for the body of an exception, what is encoded on the wire in exception
+// responses
 // 
-type Error Struct {
+type ExceptionInfo Struct {
     message String
 }
 

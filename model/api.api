@@ -48,6 +48,8 @@ type GenericTraits Struct {
 
 type StringList List[String]
 
+type AbsoluteIdentifierList List[AbsoluteIdentifier]
+
 type TypeTraits Struct {
     comment String
     tags StringList
@@ -131,7 +133,7 @@ type OperationDef Struct {
     httpUri String
     input OperationInput
     output OperationOutput
-    exceptions OperationOutputList
+    exceptions AbsoluteIdentifierList
     resource String
     lifecycle String
 }
@@ -227,5 +229,6 @@ type ServiceDef Struct {
     base String
     types TypeDefList
     operations OperationDefList
+    exceptions OperationOutputList
 }
 

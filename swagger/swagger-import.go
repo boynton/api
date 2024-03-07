@@ -99,21 +99,11 @@ func (swagger *Swagger) ImportInfo(ns, name string) error {
 }
 
 func (swagger *Swagger) ImportService() error {
-	paths := swagger.raw.GetObject("paths")
-	for _, path := range paths.Keys() {
-		def := paths.GetObject(path)
-		for _, method := range def.Keys() {
-			switch method {
-			case "post", "put", "get", "delete":
-				swagger.ImportOperation(method, path, def.GetObject(method))
-			}
-		}
-	}
 	defs := swagger.raw.GetObject("definitions")
 	for _, k := range defs.Keys() {
 		def := defs.GetObject(k)
 		otype := def.GetString("type")
-		switch otype {
+		switch strings.ToLower(otype) {
 		case "integer", "number":
 			return swagger.ImportNumber(k, def)
 		case "string":
@@ -141,6 +131,16 @@ func (swagger *Swagger) ImportService() error {
 		default:
 			fmt.Println("whoops:", k, "->", model.Pretty(def))
 			panic("here")
+		}
+	}
+	paths := swagger.raw.GetObject("paths")
+	for _, path := range paths.Keys() {
+		def := paths.GetObject(path)
+		for _, method := range def.Keys() {
+			switch method {
+			case "post", "put", "get", "delete":
+				swagger.ImportOperation(method, path, def.GetObject(method))
+			}
 		}
 	}
 	return nil
@@ -176,7 +176,38 @@ func (swagger *Swagger) toCanonicalTypeName(prop *data.Object) model.AbsoluteIde
 	case "boolean":
 		name = "base#Bool"
 	case "array":
-		name = "base#Array"
+		itemsType := swagger.toCanonicalTypeName(prop.GetObject("items"))
+		genTypeId := itemsType + "List"
+		genTypeName := model.StripNamespace(genTypeId)
+		com := prop.GetString("description")
+		if swagger.schema.GetTypeDef(genTypeId) == nil {
+			/*
+			if genTypeName == "ErrorList" {
+				if com != "A list of errors describing the failures." {
+					fmt.Println("fake def!")
+					//panic("whoops")
+				} else {
+					fmt.Println("ok, this is the real definition")
+					//panic("darn!")
+				}
+			} else {
+			*/
+			fmt.Println("======== generate type:", genTypeName, com)
+				swagger.ImportList(genTypeName, prop)
+			//}
+		} else {
+			/*
+			if genTypeName == "ErrorList" {
+				if com != "A list of errors describing the failures." {
+					fmt.Println("2: fake def!")
+				} else {
+					fmt.Println("2: ok, this is the real definition")
+					//panic("darn!")
+				}
+			}
+			*/
+		}
+		name = genTypeName
 	default:
 		sch := prop.GetObject("schema")
 		if sch != nil {
@@ -282,6 +313,7 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 	responses := def.GetObject("responses")
 	var output *model.OperationOutput
 	var exceptions []*model.OperationOutput
+	var exceptionRefs []model.AbsoluteIdentifier
 
 	for _, sStatus := range responses.Keys() {
 		outdef, err := swagger.ImportOperationOutput(sStatus, responses.GetObject(sStatus))
@@ -291,11 +323,40 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 		if output == nil && strings.HasPrefix(sStatus, "2") {
 			output = outdef
 		} else {
+			if outdef.Id == "" {
+				ename := ""
+				switch sStatus {
+				case "400":
+					ename = "BadRequestException"
+				case "403":
+					ename = "ForbiddenException"
+				case "404":
+					ename = "NotFoundException"
+				case "409":
+					ename = "ConflictException"
+				case "415":
+					ename = "UnsupportedFormatException"
+				case "500":
+					ename = "InternalServiceException"
+				default:
+					fmt.Printf("--------- exception (%s) %q: %s\n%s\n", sStatus, outdef.Id, data.Pretty(outdef), data.Pretty(responses.GetObject(sStatus)))
+					panic("fix me: " + sStatus)
+				}
+
+				outdef.Id = swagger.toCanonicalAbsoluteId(ename)
+			}
 			exceptions = append(exceptions, outdef)
+			exceptionRefs = append(exceptionRefs, outdef.Id)
 		}
 	}
 	if name == "" {
 		return fmt.Errorf("Cannot determine operation id: %s", model.Pretty(def))
+	}
+	for _, e := range exceptions {
+		err := swagger.schema.EnsureExceptionDef(e)
+		if err != nil {
+			return err
+		}
 	}
 	op := &model.OperationDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
@@ -304,7 +365,7 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 		HttpUri: path,
 		Input: input,
 		Output: output,
-		Exceptions: exceptions,
+		Exceptions: exceptionRefs,
 	}
 	return swagger.schema.AddOperationDef(op)
 }
@@ -384,9 +445,12 @@ func (swagger *Swagger) ImportList(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
 		Base: model.List,
-		Comment: def.GetString("description"),
 	}
+	td.Comment = def.GetString("description")
     items := def.GetObject("items")
+	if def.Has("minItems") {
+		td.MinSize = def.GetInt64("minItems")
+	}
 	td.Items = swagger.toCanonicalTypeName(items)
 	return swagger.schema.AddTypeDef(td)
 }

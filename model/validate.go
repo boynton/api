@@ -46,7 +46,11 @@ func (schema *Schema) ValidateOperation(op *OperationDef) error {
 	if err != nil {
 		return err
 	}
-	for _, e := range op.Exceptions {
+	for _, eid := range op.Exceptions {
+		e := schema.GetExceptionDef(eid)
+		if e == nil {
+			return fmt.Errorf("Exception not defined: %s", eid)
+		}
 		err = schema.ValidateOperationOutput(op, e)
 		if err != nil {
 			return err
@@ -88,6 +92,10 @@ func (schema *Schema) ValidateOperationOutput(op *OperationDef, out *OperationOu
 		panic("every operation must have an output")
 	}
 	for _, out := range out.Fields {
+		td := schema.GetTypeDef(out.Type)
+		if td == nil {
+			return fmt.Errorf("Type not defined: %q in field %q of %q", out.Type, out.Name, op.Id)
+		}
 		if out.HttpHeader != "" {
 			if !out.HttpPayload {
 				continue

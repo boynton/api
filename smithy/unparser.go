@@ -306,7 +306,7 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 
 func (w *IdlWriter) EmitDocumentation(doc, indent string) {
 	if doc != "" {
-		s := FormatComment(indent, "/// ", doc, 100, false)
+		s := FormatComment(indent, "/// ", doc, 128, false)
 		w.Emit(s)
 		//		w.Emit("%s@documentation(%q)\n", indent, doc)
 	}
@@ -486,7 +486,8 @@ func (w *IdlWriter) EmitBlobShape(name string, shape *Shape) {
 func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("%s %s%s {\n", shapeName, w.stripNamespace(name), w.withMixins(shape.Mixins))
-	w.Emit("    member: %s\n", w.stripNamespace(shape.Member.Target))
+	tname := w.decorate(w.stripNamespace(shape.Member.Target))
+	w.Emit("    member: %s\n", tname)
 	w.Emit("}\n")
 }
 
@@ -496,19 +497,20 @@ func (w *IdlWriter) EmitMapShape(name string, shape *Shape) {
 }
 
 func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
+	comma := ""
+	if w.version < 2 {
+		comma = ","
+	}
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("union %s%s {\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
-	count := shape.Members.Length()
-	for _, fname := range shape.Members.Keys() {
-		mem := shape.Members.Get(fname)
-		w.EmitTraits(mem.Traits, IndentAmount)
-		w.Emit("%s%s: %s", IndentAmount, fname, w.stripNamespace(mem.Target))
-		count--
-		if count > 0 {
-			w.Emit(",\n")
-		} else {
+	for i, k := range shape.Members.Keys() {
+		if i > 0 {
 			w.Emit("\n")
 		}
+		v := shape.Members.Get(k)
+		w.EmitTraits(v.Traits, IndentAmount)
+		tname := w.decorate(w.stripNamespace(v.Target))
+		w.Emit("%s%s: %s%s\n", IndentAmount, k, tname, comma)
 	}
 	w.Emit("}\n")
 }
@@ -568,10 +570,8 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 			w.EmitStringTrait(v.AsString(), w.stripNamespace(k), indent)
 		case "smithy.api#deprecated":
 			w.EmitDeprecatedTrait(v, indent)
-		case "smithy.api#http":
-			w.EmitHttpTrait(v, indent)
-		case "smithy.api#httpError":
-			w.EmitHttpErrorTrait(v, indent)
+		case "smithy.api#http", "smithy.api#httpError":
+			/* emit nothing here, handled in subsequent pass */
 		case "smithy.api#length":
 			w.EmitLengthTrait(v, indent)
 		case "smithy.api#range":
@@ -588,6 +588,15 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 			w.EmitTraitTrait(v)
 		default:
 			w.EmitCustomTrait(k, v, indent)
+		}
+	}
+	for _, k := range traits.Keys() {
+		v := traits.Get(k)
+		switch k {
+		case "smithy.api#http":
+			w.EmitHttpTrait(v, indent)
+		case "smithy.api#httpError":
+			w.EmitHttpErrorTrait(v, indent)
 		}
 	}
 }
@@ -653,12 +662,22 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 }
 
 func (w *IdlWriter) listOfShapeRefs(label string, format string, lst []*ShapeRef, absolute bool) string {
+	multiline := true
+	indent := "    "
+	indentAmount := "    "
 	s := ""
 	if len(lst) > 0 {
 		s = label + ": ["
+		if multiline {
+			s = s + "\n" + indent + indentAmount
+		}
 		for n, a := range lst {
 			if n > 0 {
-				s = s + ", "
+				if multiline {
+					s = s + "\n" + indent + indentAmount
+				} else {
+					s = s + ", "
+				}
 			}
 			target := a.Target
 			if !absolute {
@@ -666,6 +685,9 @@ func (w *IdlWriter) listOfShapeRefs(label string, format string, lst []*ShapeRef
 			}
 			tname := w.decorate(target)
 			s = s + fmt.Sprintf(format, tname)
+		}
+		if multiline {
+			s = s + "\n" + indentAmount
 		}
 		s = s + "]"
 	}
@@ -713,12 +735,16 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("resource %s%s {\n", name, w.withMixins(shape.Mixins))
 	if shape.Identifiers.Length() > 0 {
-		w.Emit("    identifiers: {\n")
-		for _, k := range shape.Identifiers.Keys() {
+		w.Emit("    identifiers: { ")
+		for i, k := range shape.Identifiers.Keys() {
 			v := shape.Identifiers.Get(k)
-			w.Emit("        %s: %s,\n", k, w.stripNamespace(v.Target))
+			s := ""
+			if i > 0 {
+				s = ", "
+			}
+			w.Emit("%s%s: %s", s, k, w.stripNamespace(v.Target))
 		}
-		w.Emit("    }\n")
+		w.Emit(" }\n")
 		if shape.Create != nil {
 			w.Emit("    create: %v\n", w.stripNamespace(shape.Create.Target))
 		}
@@ -802,7 +828,7 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 		}
 		if outputShape != nil {
 			if b := outputShape.Traits.Get("smithy.api#output"); b != nil {
-				w.Emit("%soutput := {\n", IndentAmount)
+				w.Emit("\n%soutput := {\n", IndentAmount)
 				i2 := IndentAmount + IndentAmount
 				for i, k := range outputShape.Members.Keys() {
 					if i > 0 {
@@ -820,7 +846,7 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 			}
 		}
 		if len(shape.Errors) > 0 {
-			w.Emit("    %s\n", w.listOfShapeRefs("errors", "%s", shape.Errors, false))
+			w.Emit("\n%s%s\n", IndentAmount, w.listOfShapeRefs("errors", "%s", shape.Errors, false))
 		}
 	} else {
 		if shape.Input != nil {

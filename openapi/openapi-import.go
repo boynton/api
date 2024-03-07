@@ -222,6 +222,7 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 		}
 		expected = code
 	}
+	edefs := make([]*model.OperationOutput, 0)
 	for status, eparam := range pop.Responses {
 		//eparam := pop.Responses[status]
 		if eparam == nil {
@@ -275,10 +276,14 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 			op.Output = output
 		} else {
 			output.Id = model.AbsoluteIdentifier(fmt.Sprintf("%sException%d", opId, output.HttpStatus))
-			op.Exceptions = append(op.Exceptions, output)
+			edefs = append(edefs, output)
+			op.Exceptions = append(op.Exceptions, output.Id)
 		}
 	}
 	mb.schema.Operations = append(mb.schema.Operations, op)
+	if len(edefs) > 0 {
+		panic("fix me: emit exception defs in new format")
+	}
 	return nil
 }
 

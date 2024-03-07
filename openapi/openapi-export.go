@@ -156,7 +156,8 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	if op.Output != nil {
 		gen.GenerateOperationOutput(operation, op, op.Output, false)
 	}
-	for _, exc := range op.Exceptions {
+	for _, eid := range op.Exceptions {
+		exc := gen.Schema.GetExceptionDef(eid)
 		gen.GenerateOperationOutput(operation, op, exc, true)
 	}
 	switch op.HttpMethod {
@@ -223,6 +224,10 @@ func (gen *Generator) GenerateOperationOutput(operation *Operation, op *model.Op
 		}
 		r.Content = content
 	}
+	return nil
+}
+
+func (gen *Generator) GenerateException(op *model.OperationOutput) error {
 	return nil
 }
 

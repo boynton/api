@@ -419,13 +419,11 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 		op.Output = &model.OperationOutput{}
 	}
 	if shape.Errors != nil {
-		var excs []*model.OperationOutput
+		var eids []model.AbsoluteIdentifier
 		for _, e := range shape.Errors {
-			out := toOpOutput(schema, ast, e.Target)
-			typesConsumed[out.Id] = true
-			excs = append(excs, out)
+			eids = append(eids, model.AbsoluteIdentifier(e.Target))
 		}
-		op.Exceptions = excs
+		op.Exceptions = eids
 	}
 	httpTrait := shape.Traits.Get("smithy.api#http")
 	if httpTrait != nil {
@@ -526,8 +524,9 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			//the operation using it handles this
 			return nil
 		} else if shape.Traits.Get("smithy.api#error") != nil {
-			//the operation using it handles this
-			return nil
+			out := toOpOutput(schema, ast, shapeId)
+			out.Comment = shape.GetStringTrait("smithy.api#documentation")
+			return schema.EnsureExceptionDef(out)
 		} else {
 			td.Base = model.Struct
 			for _, name := range shape.Members.Keys() {

@@ -29,6 +29,7 @@ type Schema struct {
 	Namespace Namespace `json:"-"`
 	typeIndex map[AbsoluteIdentifier]*TypeDef
 	opIndex   map[AbsoluteIdentifier]*OperationDef
+	excIndex  map[AbsoluteIdentifier]*OperationOutput
 	//Metadata *data.Object `json:"metadata,omitempty"`
 }
 
@@ -126,6 +127,25 @@ func (schema *Schema) GetTypeDef(id AbsoluteIdentifier) *TypeDef {
 	return schema.typeIndex[id]
 }
 
+func (schema *Schema) GetExceptionDef(id AbsoluteIdentifier) *OperationOutput {
+	if schema.excIndex == nil {
+		schema.excIndex = make(map[AbsoluteIdentifier]*OperationOutput, 0)
+		for _, edef := range schema.Exceptions {
+			schema.excIndex[edef.Id] = edef
+		}
+	}
+	return schema.excIndex[id]
+}
+
+func (schema *Schema) EnsureExceptionDef(e *OperationOutput) error {
+	if schema.GetExceptionDef(e.Id) != nil {
+		return nil
+	}
+	schema.Exceptions = append(schema.Exceptions, e)
+	schema.excIndex[e.Id] = e
+	return nil
+}
+
 func (td *TypeDef) String() string {
 	return Pretty(td)
 }
@@ -180,6 +200,22 @@ func (schema *Schema) BaseType(id AbsoluteIdentifier) BaseType {
 
 func (schema *Schema) ShapeNames() []string {
 	return nil //fixme
+}
+
+func (schema *Schema) ReplaceTypeDef(prev *TypeDef, next *TypeDef) error {
+	ok := false
+	for i, td := range schema.Types {
+		if td == prev {
+			schema.Types[i] = next
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("Schema.ReplaceTypeDef: no such type (%s)", prev.Id)
+	}
+	schema.typeIndex[next.Id] = next
+	return nil
 }
 
 func (schema *Schema) AddTypeDef(td *TypeDef) error {

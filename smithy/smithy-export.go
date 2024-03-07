@@ -61,9 +61,13 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 	}
 
 	//fixme: preserve smithy metadata.
+	needsSep := len(ast.Namespaces()) != 1
 	for _, ns := range ast.Namespaces() {
 		fname := gen.FileName(ns, ".smithy")
-		sep := fmt.Sprintf("\n// ===== File(%q)\n\n", fname)
+		sep := ""
+		if needsSep {
+			sep = fmt.Sprintf("\n// ===== File(%q)\n\n", fname)
+		}
 		s := ast.IDL(ns)
 		err := gen.Write(s, fname, sep)
 		if err != nil {

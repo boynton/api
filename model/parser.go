@@ -132,8 +132,8 @@ func (p *Parser) Parse() error {
 				err = p.parseBaseDirective(comment)
 			case "operation":
 				err = p.parseOperation(comment)
-				//			case "http":
-				//				err = p.parseHttp(comment)
+			case "exception":
+				err = p.parseException(comment)
 			default:
 				if strings.HasPrefix(tok.Text, "x_") {
 					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
@@ -310,24 +310,44 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 		Comment: comment,
 	}
 	comment = ""
-	estatus, err := p.expectInt32()
-	if err != nil {
-		return nil, err
-	}
-	output.HttpStatus = estatus
+	//this is now an option that defaults to 200: (status=404)
+	/*
+		estatus, err := p.expectInt32()
+		if err != nil {
+			return nil, err
+		}
+		output.HttpStatus = estatus
+	*/
 	if isException {
-		output.Id = AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, estatus))
+		eName, err := p.ExpectIdentifier()
+		if err != nil {
+			return nil, err
+		}
+		output.Id = p.schema.Namespaced(eName)
+		//output.Id = AbsoluteIdentifier(fmt.Sprintf("%sException%d", op.Id, estatus))
 	} else {
 		output.Id = op.Id + "Output"
 	}
 	elName := StripNamespace(output.Id)
-	options, err := p.ParseOptions(elName, []string{"name"})
+	outOpts := []string{"status"}
+	if !isException {
+		outOpts = append(outOpts, "name")
+	}
+	options, err := p.ParseOptions(elName, outOpts)
 	if err != nil {
 		return nil, err
 	}
 	if options.Name != "" {
 		output.Id = p.schema.Namespaced(options.Name)
 		elName = StripNamespace(output.Id)
+	}
+	if options.Status == 0 {
+		if isException {
+			return nil, p.SyntaxError()
+		}
+		output.HttpStatus = 200
+	} else {
+		output.HttpStatus = options.Status
 	}
 	tok := p.GetToken()
 	if tok.Type != OPEN_BRACE {
@@ -388,6 +408,29 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 		tok = p.GetToken()
 	}
 	return nil, nil
+}
+
+func (p *Parser) parseException(comment string) error {
+	e, err := p.parseOperationOutput(nil, comment, true)
+	if err == nil {
+		p.schema.Exceptions = append(p.schema.Exceptions, e)
+	}
+	return err
+	/*
+		//	xxx := p.parseOperatsionOutput(
+		eName, err := p.ExpectIdentifier()
+		if err != nil {
+			return err
+		}
+		e := &OperationOutput{
+			Id:      p.schema.Namespaced(eName),
+			Comment: comment,
+		}
+		//options.
+
+		p.schema.Exceptions = append(p.schema.Exceptions, e)
+		return nil
+	*/
 }
 
 func (p *Parser) getIdentifier() string {
@@ -502,17 +545,34 @@ func (p *Parser) finishOperation(name, method, pathTemplate, resource, lifecycle
 				if err != nil {
 					return err
 				}
-			case "exception":
-				exception, err := p.parseOperationOutput(op, comment, true)
+			case "exceptions":
+				lst, err := p.ExpectIdentifierArray()
 				if err != nil {
 					return err
 				}
+				for _, ename := range lst {
+					eid := p.schema.Namespaced(ename)
+					for _, e := range op.Exceptions {
+						if e == eid {
+							return p.Error("Duplicate Exception name: " + ename)
+						}
+					}
+					op.Exceptions = append(op.Exceptions, eid)
+				}
+			case "exception":
+				//change this.
+				//exception, err := p.parseOperationOutput(op, comment, true)
+				ename, err := p.ExpectIdentifier()
+				if err != nil {
+					return err
+				}
+				eid := p.schema.Namespaced(ename)
 				for _, e := range op.Exceptions {
-					if e.Id == exception.Id {
-						return p.Error("Duplicate Exception name: " + string(e.Id))
+					if e == eid {
+						return p.Error("Duplicate Exception name: " + ename)
 					}
 				}
-				op.Exceptions = append(op.Exceptions, exception)
+				op.Exceptions = append(op.Exceptions, eid)
 			default:
 				return p.SyntaxError()
 			}
@@ -808,6 +868,34 @@ func (p *Parser) ExpectIdentifier() (string, error) {
 	return p.assertIdentifier(tok)
 }
 
+func (p *Parser) ExpectIdentifierArray() ([]string, error) {
+	tok := p.GetToken()
+	if tok == nil {
+		return nil, p.EndOfFileError()
+	}
+	if tok.Type != OPEN_BRACKET {
+		return nil, p.SyntaxError()
+	}
+	var items []string
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return nil, p.EndOfFileError()
+		}
+		if tok.Type == CLOSE_BRACKET {
+			break
+		}
+		if tok.Type == SYMBOL {
+			items = append(items, tok.Text)
+		} else if tok.Type == COMMA || tok.Type == NEWLINE || tok.Type == LINE_COMMENT {
+			//ignore
+		} else {
+			return nil, p.SyntaxError()
+		}
+	}
+	return items, nil
+}
+
 func (p *Parser) ExpectCompoundIdentifier() (string, error) {
 	tok := p.GetToken()
 	s, err := p.assertIdentifier(tok)
@@ -1002,6 +1090,7 @@ type Options struct {
 	Method    string
 	Resource  string
 	Lifecycle string
+	Status    int32
 	//Annotations map[string]string
 }
 
@@ -1064,6 +1153,12 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Resource, err = p.expectEqualsCompoundIdentifier()
 					case "lifecycle":
 						options.Lifecycle, err = p.expectEqualsCompoundIdentifier()
+					case "status":
+						pStatus, e := p.expectEqualsInt32()
+						if e == nil {
+							options.Status = *pStatus
+						}
+						err = e
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
@@ -1659,7 +1754,7 @@ func (p *Parser) MergeComment(comment1 string, comment2 string) string {
 }
 
 func (p *Parser) expectedDirectiveError() error {
-	msg := "Expected one of 'type', 'namespace', 'name', 'version', 'base'"
+	msg := "Expected one of 'type', 'operation', 'exception', 'namespace', 'name', 'version', 'base'"
 	msg = msg + " or an 'x_*' style extended annotation"
 	return p.Error(msg)
 }

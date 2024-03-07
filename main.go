@@ -36,7 +36,7 @@ var Version string = "development version"
 func main() {
 	conf := data.NewObject()
 	pVersion := flag.Bool("v", false, "Show api tool version and exit")
-	pQuiet := flag.Bool("q", false, "Minimizw tool output to be not so verbose")
+	pQuiet := flag.Bool("q", false, "Quiet tool output, make it less verbose")
 	pHelp := flag.Bool("h", false, "Show more help information")
 	pList := flag.Bool("l", false, "List the entities in the model")
 	pEntity := flag.String("e", "", "Show the specified entity.")

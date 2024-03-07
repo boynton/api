@@ -31,6 +31,7 @@ type Generator interface {
 	Configure(schema *Schema, conf *data.Object) error
 	Generate(schema *Schema, config *data.Object) error
 	GenerateOperation(op *OperationDef) error
+	GenerateException(exc *OperationOutput) error
 	GenerateType(td *TypeDef) error
 	Begin()
 	End() string
@@ -70,6 +71,26 @@ func (gen *BaseGenerator) SortedOperations() []*OperationDef {
 	var r []*OperationDef
 	if len(gen.Schema.Operations) > 0 {
 		for _, i := range gen.Schema.Operations {
+			r = append(r, i)
+		}
+		sort.Slice(r, func(i, j int) bool {
+			return StripNamespace(r[i].Id) < StripNamespace(r[j].Id)
+		})
+	}
+	return r
+}
+
+func (gen *BaseGenerator) Exceptions() []*OperationOutput {
+	if gen.Sort {
+		return gen.SortedExceptions()
+	}
+	return gen.Schema.Exceptions
+}
+
+func (gen *BaseGenerator) SortedExceptions() []*OperationOutput {
+	var r []*OperationOutput
+	if len(gen.Schema.Exceptions) > 0 {
+		for _, i := range gen.Schema.Exceptions {
 			r = append(r, i)
 		}
 		sort.Slice(r, func(i, j int) bool {
@@ -237,8 +258,9 @@ func (gen *BaseGenerator) accumulateOpDependencies(deps map[AbsoluteIdentifier]b
 			gen.accumulateDependenciesById(deps, f.Type)
 		}
 	}
-	for _, exc := range op.Exceptions {
-		for _, f := range exc.Fields {
+	for _, eid := range op.Exceptions {
+		edef := gen.Schema.GetExceptionDef(eid)
+		for _, f := range edef.Fields {
 			gen.accumulateDependenciesById(deps, f.Type)
 		}
 	}
