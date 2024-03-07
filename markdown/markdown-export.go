@@ -158,6 +158,10 @@ func (gen *Generator) GenerateOperations() {
 	}
 }
 
+func (gen *Generator) GenerateException(op *model.OperationOutput) error {
+	return nil
+}
+
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	s := StripNamespace(td.Id)
 	gen.Emitf("\n### %s\n\n", s)

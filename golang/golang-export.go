@@ -46,6 +46,10 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
 
+func (gen *Generator) GenerateException(op *model.OperationOutput) error {
+	return nil
+}
+
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
@@ -653,8 +657,9 @@ func (gen *Generator) GenerateServer() string {
 		w.Emitf("    %serr := handler.impl.%s(%s)\n", result, opName, arg)
 		w.Emit("    if err != nil {\n")
 		w.Emit("        switch e := err.(type) {\n")
-		for _, e := range op.Exceptions {
-			w.Emitf("       case %s:\n", gen.golangTypeRef(e.Id))
+		for _, eid := range op.Exceptions {
+			w.Emitf("       case %s:\n", gen.golangTypeRef(eid))
+			e := gen.Schema.GetExceptionDef(eid)
 			p := gen.entityPayload(e)
 			w.Emitf("           jsonResponse(w, %d, e%s)\n", e.HttpStatus, p)
 		}
@@ -791,9 +796,10 @@ func (w *GolangWriter) EmitServiceInterface() error {
 				}
 			}
 			if op.Exceptions != nil {
-				for _, e := range op.Exceptions {
-					if !w.gen.HasEmitted(e.Id) {
-						eType := gen.golangTypeName(e.Id)
+				for _, eid := range op.Exceptions {
+					e := schema.GetExceptionDef(eid)
+					if !w.gen.HasEmitted(eid) {
+						eType := gen.golangTypeName(eid)
 						w.Emitf("type %s struct {\n", eType)
 						//hack: the first string field defined will be used to create the error message
 						msg := ""

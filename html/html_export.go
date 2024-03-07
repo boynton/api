@@ -197,20 +197,33 @@ func (gen *Generator) GenerateOperations() {
 	}
 }
 
-func (gen *Generator) GenerateException(out *model.OperationOutput) error {
-	s := StripNamespace(out.Id)
+func (gen *Generator) GenerateException(exc *model.OperationOutput) error {
+	s := StripNamespace(exc.Id)
 	gen.Emitf("<h3 id=%q>%s</h3>\n", strings.ToLower(s), s)
 	gen.Emitf("<pre class=\"mknohighlight\"><code>\n")
-	gen.Emitf("%s\n\n//FIX ME: Exception\n")
+	gen.Emitf("%s\n", gen.generateExceptionType(exc))
 	gen.Emitf("</code></pre>\n")
 	return nil
+}
+
+func (gen *Generator) generateExceptionType(exc *model.OperationOutput) string {
+	g := gen.getDetailGenerator()
+	conf := data.NewObject()
+	err := g.Configure(gen.Schema, conf)
+	if err != nil {
+		return "Whoops: " + err.Error()
+	}
+	g.Begin()
+	g.GenerateException(exc)
+	s := g.End()
+	return s
 }
 
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	s := StripNamespace(td.Id)
 	gen.Emitf("<h3 id=%q>%s</h3>\n", strings.ToLower(s), s)
 	gen.Emitf("<pre class=\"mknohighlight\"><code>\n")
-	gen.Emitf("%s\n\n", gen.generateApiType(td))
+	gen.Emitf("%s\n", gen.generateApiType(td))
 	gen.Emitf("</code></pre>\n")
 	return nil
 }
@@ -229,6 +242,13 @@ func (gen *Generator) generateApiType(op *model.TypeDef) string {
 }
 
 func (gen *Generator) GenerateExceptions() {
+	lst := gen.Exceptions()
+	if len(lst) > 0 {
+		gen.Emitf("<h2 id=\"exceptions\">Exceptions</h2>\n")
+		for _, edef := range lst {
+			gen.GenerateException(edef)
+		}
+	}
 /*	emitted := make(map[model.AbsoluteIdentifier]*model.OperationOutput, 0)
 	for _, op := range gen.Operations() {		
 		for _, out := range op.Exceptions {
@@ -247,9 +267,6 @@ func (gen *Generator) GenerateExceptions() {
 		}
 	}
 */	
-}
-
-func (gen *Generator) collectExceptionTypes() {
 }
 
 func (gen *Generator) GenerateTypes() {
