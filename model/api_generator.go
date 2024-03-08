@@ -256,7 +256,7 @@ func (gen *ApiGenerator) GenerateOperationExceptionRefs(op *OperationDef) {
 			errname := gen.decorateType(StripNamespace(errid))
 			exceptions = append(exceptions, errname)
 		}
-		gen.Emitf("    exceptions [%s] {\n", strings.Join(exceptions, ", "))
+		gen.Emitf("    exceptions [%s]\n", strings.Join(exceptions, ", "))
 	}
 }
 
