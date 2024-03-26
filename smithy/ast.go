@@ -823,6 +823,9 @@ func (ast *AST) Filter(tags []string) {
 	}
 
 	for _, k := range ast.Shapes.Keys() {
+		if containsString(include, k) {
+			root = append(root, k)
+		}
 		shape := ast.Shapes.Get(k)
 		if shape == nil {
 			panic("whoops, shape is nil")
