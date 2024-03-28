@@ -282,10 +282,11 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 				return nil, p.SyntaxError()
 			}
 			in.Type = p.schema.Namespaced(tok.Text)
-			options, err := p.ParseOptions("operation.input."+string(in.Name), []string{"path", "query", "header", "payload", "required"})
+			options, err := p.ParseOptions("operation.input."+string(in.Name), []string{"path", "query", "header", "payload", "required", "default"})
 			if err != nil {
 				return nil, err
 			}
+			in.Default = options.Default
 			in.Required = options.Required
 			if options.Path {
 				in.HttpPath = true

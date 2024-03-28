@@ -268,9 +268,8 @@ func (node *NodeValue) Length() int {
 	case []interface{}:
 		return len(m)
 	default:
-		fmt.Println(".Length on a NodeValue of:", node)
+		return -1
 	}
-	panic("whoops")
 }
 
 func (node *NodeValue) Put(key string, val interface{}) *NodeValue {

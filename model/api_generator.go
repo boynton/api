@@ -143,6 +143,8 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 			var opts []string
 			if f.Required {
 				opts = append(opts, "required")
+			} else if f.Default != nil {
+				opts = append(opts, fmt.Sprintf("default=%s", data.JsonEncode(f.Default)))
 			}
 			if f.HttpPayload {
 				opts = append(opts, "payload")

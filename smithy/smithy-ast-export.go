@@ -277,6 +277,9 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		} else if fd.HttpPayload {
 			ensureMemberTraits(member).Put("smithy.api#httpPayload", NewNodeValue())
 		}
+		if fd.Default != nil {
+			ensureMemberTraits(member).Put("smithy.api#default", AsNodeValue(fd.Default))
+		}
 		members.Put(string(fd.Name), member)
 	}
 	shape.Members = members

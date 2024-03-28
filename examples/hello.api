@@ -1,0 +1,16 @@
+namespace examples
+service HelloService
+version "1.0"
+
+// 
+// A minimal hello world action
+// 
+operation Hello (method=GET, url="/hello") {
+    input {
+        caller String (query="caller", default="Mystery Caller")
+    }
+    output (status=200) {
+        greeting String (payload)
+    }
+}
+

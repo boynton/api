@@ -586,6 +586,8 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 			w.EmitPaginatedTrait(v)
 		case "smithy.api#trait":
 			w.EmitTraitTrait(v)
+		case "smithy.api#default":
+			//fmt.Println("FIX ME: emit defaut trait")
 		default:
 			w.EmitCustomTrait(k, v, indent)
 		}
@@ -818,7 +820,11 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[st
 					v := inputShape.Members.Get(k)
 					w.EmitTraits(v.Traits, i2)
 					tname := w.decorate(w.stripNamespace(v.Target))
-					w.Emit("%s%s: %s\n", i2, k, tname)
+					s := ""
+					if v.Traits.Has("smithy.api#default") {
+						s = " = " + data.JsonEncode(v.Traits.Get("smithy.api#default"))
+					}
+					w.Emit("%s%s: %s%s\n", i2, k, tname, s)
 				}
 				w.Emit("%s}\n", IndentAmount)
 				inputEmitted = true

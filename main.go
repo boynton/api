@@ -44,7 +44,7 @@ func main() {
 	pGen := flag.String("g", "api", "The generator for output")
 	pNs := flag.String("ns", "example", "The namespace to force if none is present")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
-	pWarn := flag.String("w", "show", "Warnings. 'show' or 'supress' or 'error'. Default is 'show'")
+	pWarn := flag.String("w", "show", "Warnings. 'show' or 'suppress' or 'error'. Default is 'show'")
 	var params Params
 	flag.Var(&params, "a", "Additional named arguments for a generator")
 	var tags Tags
