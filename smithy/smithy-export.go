@@ -15,7 +15,7 @@ type IdlGenerator struct {
 
 func (gen *IdlGenerator) GenerateResource(id string) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema)
+		ast, err := SmithyAST(gen.Schema, gen.Sort)
 		if err != nil {
 			return err
 		}
@@ -27,7 +27,7 @@ func (gen *IdlGenerator) GenerateResource(id string) error {
 
 func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema)
+		ast, err := SmithyAST(gen.Schema, gen.Sort)
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 
 func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema)
+		ast, err := SmithyAST(gen.Schema, gen.Sort)
 		if err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
 
 func (gen *IdlGenerator) GenerateException(op *model.OperationOutput) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema)
+		ast, err := SmithyAST(gen.Schema, gen.Sort)
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 		return err
 	}
 
-	ast, err := SmithyAST(schema)
+	ast, err := SmithyAST(schema, gen.Sort)
 	if err != nil {
 		return err
 	}

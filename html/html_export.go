@@ -61,7 +61,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
 	var resources []model.AbsoluteIdentifier
 	if gen.detailGenerator == "smithy" {
-		ast, err := smithy.SmithyAST(gen.Schema)
+		ast, err := smithy.SmithyAST(gen.Schema, gen.Sort)
 		if err != nil {
 			return resources
 		}
@@ -214,6 +214,7 @@ func (gen *Generator) GenerateResources() {
 		if len(resourceIds) > 0 {
 			g := gen.getDetailGenerator()
 			conf := data.NewObject()
+			conf.Put("sort", gen.Sort)
 			err := g.Configure(gen.Schema, conf)
 			if err != nil {
 				return

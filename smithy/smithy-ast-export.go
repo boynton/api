@@ -2,6 +2,7 @@ package smithy
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/boynton/api/model"
@@ -37,9 +38,10 @@ func (gen *AstGenerator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
 
-func SmithyAST(schema *model.Schema) (*AST, error) {
+func SmithyAST(schema *model.Schema, sorted bool) (*AST, error) {
 	gen := &AstGenerator{}
 	gen.Configure(schema, data.NewObject())
+	gen.Sort = sorted
 	return gen.ToAST()
 }
 
@@ -112,6 +114,17 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
+	var resourceKeys []string
+	if len(resources) > 0 {
+		for k := range resources {
+			resourceKeys = append(resourceKeys, k)
+		}
+		if gen.Sort {
+			sort.Slice(resourceKeys, func(i, j int) bool {
+				return resourceKeys[i] < resourceKeys[j]
+			})
+		}
+	}
 	if gen.Schema.Id != "" {
 		//the service we create needs to include resources
 		shape := &Shape{
@@ -121,7 +134,7 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 		if gen.Schema.Comment != "" {
 			ensureShapeTraits(shape).Put("smithy.api#documentation", gen.Schema.Comment)
 		}
-		for k := range resources {
+		for _, k := range resourceKeys {
 			ref := &ShapeRef{
 				Target: gen.EnsureNamespaced(k),
 			}
@@ -136,11 +149,9 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 			}
 		}
 		ast.PutShape(string(gen.Schema.Id), shape)
-		for k, shape := range resources {
-			ast.PutShape(k, shape)
-		}
 	}
-	for k, v := range resources {
+	for _, k := range resourceKeys {
+		v := resources[k]
 		ast.PutShape(k, v)
 	}
 	for _, op := range gen.Schema.Operations {

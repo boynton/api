@@ -800,9 +800,8 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 
 func (w *IdlWriter) decorate(tname string) string {
 	if w.decorator != nil {
-		//user defined types:
 		switch tname {
-		case "Int32", "String", "Int16", "Int8", "Int64", "Float64", "Float32", "Decimal", "Integer":
+		case "Boolean", "String", "Blob", "Timestamp", "Byte", "Short", "Integer", "Long", "Float", "Double", "BigDecimal", "BigInteger":
 			return w.decorator.BaseType(tname)
 		}
 		return w.decorator.UserType(tname)
