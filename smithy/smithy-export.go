@@ -13,6 +13,18 @@ type IdlGenerator struct {
 	ast       *AST
 }
 
+func (gen *IdlGenerator) GenerateResource(id string) error {
+	if gen.ast == nil {
+		ast, err := SmithyAST(gen.Schema)
+		if err != nil {
+			return err
+		}
+		gen.ast = ast
+	}
+	gen.Emit(gen.ast.IDLForResourceShape(id, gen.Decorator))
+	return nil
+}
+
 func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 	if gen.ast == nil {
 		ast, err := SmithyAST(gen.Schema)

@@ -76,6 +76,19 @@ func (ast *AST) IDLForTypeShape(shapeId string, decorator *model.Decorator) stri
 	return w.End()
 }
 
+func (ast *AST) IDLForResourceShape(shapeId string, decorator *model.Decorator) string {
+	shape := ast.GetShape(shapeId)
+	w := &IdlWriter{
+		ast:       ast,
+		namespace: shapeIdNamespace(shapeId),
+		version:   ast.AssemblyVersion(),
+		decorator: decorator,
+	}
+	w.Begin()
+	w.EmitResourceShape(shapeId, shape)
+	return w.End()
+}
+
 // Generate Smithy IDL to describe the Smithy model for a specified namespace
 func (ast *AST) IDL(ns string) string {
 	w := &IdlWriter{
@@ -735,7 +748,7 @@ func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
 
 func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("resource %s%s {\n", name, w.withMixins(shape.Mixins))
+	w.Emit("resource %s%s {\n", w.stripNamespace(name), w.withMixins(shape.Mixins))
 	if shape.Identifiers.Length() > 0 {
 		w.Emit("    identifiers: { ")
 		for i, k := range shape.Identifiers.Keys() {
@@ -744,37 +757,43 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 			if i > 0 {
 				s = ", "
 			}
-			w.Emit("%s%s: %s", s, k, w.stripNamespace(v.Target))
+			w.Emit("%s%s: %s", s, k, w.decorate(w.stripNamespace(v.Target)))
 		}
 		w.Emit(" }\n")
-		if shape.Create != nil {
-			w.Emit("    create: %v\n", w.stripNamespace(shape.Create.Target))
+	}
+	if shape.Create != nil {
+		tname := w.decorate(w.stripNamespace(shape.Create.Target))
+		w.Emit("    create: %v\n", tname)
+	}
+	if shape.Put != nil {
+		tname := w.decorate(w.stripNamespace(shape.Put.Target))
+		w.Emit("    put: %v\n", tname)
+	}
+	if shape.Read != nil {
+		tname := w.decorate(w.stripNamespace(shape.Read.Target))
+		w.Emit("    read: %v\n", tname)
+	}
+	if shape.Update != nil {
+		tname := w.decorate(w.stripNamespace(shape.Update.Target))
+		w.Emit("    update: %v\n", tname)
+	}
+	if shape.Delete != nil {
+		tname := w.decorate(w.stripNamespace(shape.Delete.Target))
+		w.Emit("    delete: %v\n", tname)
+	}
+	if shape.List != nil {
+		tname := w.decorate(w.stripNamespace(shape.List.Target))
+		w.Emit("    list: %v\n", tname)
+	}
+	if len(shape.Operations) > 0 {
+		var tmp []*ShapeRef
+		for _, id := range shape.Operations {
+			tmp = append(tmp, &ShapeRef{Target: w.stripNamespace(id.Target)})
 		}
-		if shape.Put != nil {
-			w.Emit("    put: %v\n", w.stripNamespace(shape.Put.Target))
-		}
-		if shape.Read != nil {
-			w.Emit("    read: %v\n", w.stripNamespace(shape.Read.Target))
-		}
-		if shape.Update != nil {
-			w.Emit("    update: %v\n", w.stripNamespace(shape.Update.Target))
-		}
-		if shape.Delete != nil {
-			w.Emit("    delete: %v\n", w.stripNamespace(shape.Delete.Target))
-		}
-		if shape.List != nil {
-			w.Emit("    list: %v\n", w.stripNamespace(shape.List.Target))
-		}
-		if len(shape.Operations) > 0 {
-			var tmp []*ShapeRef
-			for _, id := range shape.Operations {
-				tmp = append(tmp, &ShapeRef{Target: w.stripNamespace(id.Target)})
-			}
-			w.Emit("    %s\n", w.listOfShapeRefs("operations", "%s", tmp, true))
-		}
-		if len(shape.CollectionOperations) > 0 {
-			w.Emit("    %s\n", w.listOfShapeRefs("collectionOperations", "%s", shape.CollectionOperations, true))
-		}
+		w.Emit("    %s\n", w.listOfShapeRefs("operations", "%s", tmp, true))
+	}
+	if len(shape.CollectionOperations) > 0 {
+		w.Emit("    %s\n", w.listOfShapeRefs("collectionOperations", "%s", shape.CollectionOperations, true))
 	}
 	w.Emit("}\n")
 }

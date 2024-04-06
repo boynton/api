@@ -1576,12 +1576,20 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 				continue
 			}
 			if tok.Type == SYMBOL {
-				p.ignore(COLON)
-				val, err := p.parseLiteralValue()
-				if err != nil {
-					return nil, nil, err
+				if tok.Text == "true" {
+					literal = true
+					args = nil
+				} else if tok.Text == "false" {
+					literal = false
+					args = nil
+				} else {
+					p.ignore(COLON)
+					val, err := p.parseLiteralValue()
+					if err != nil {
+						return nil, nil, err
+					}
+					args = withTrait(args, tok.Text, val)
 				}
-				args = withTrait(args, tok.Text, val)
 			} else if tok.Type == OPEN_BRACKET {
 				literal, err = p.parseLiteralArray()
 				if err != nil {

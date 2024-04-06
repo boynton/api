@@ -82,7 +82,7 @@ func (swagger *Swagger) ImportInfo(ns, name string) error {
 		//name := swagger.ServiceName(name)
 		schema := swagger.schema
 		schema.Id = model.AbsoluteIdentifier(string(schema.Namespace) + "#" + name)
-		//schema.Version = info.GetString("version") //typically redundant
+		schema.Version = info.GetString("version")
 		schema.Comment = info.GetString("description")
 		schema.Base = swagger.raw.GetString("basePath")
 		license := info.GetObject("license")
@@ -179,33 +179,8 @@ func (swagger *Swagger) toCanonicalTypeName(prop *data.Object) model.AbsoluteIde
 		itemsType := swagger.toCanonicalTypeName(prop.GetObject("items"))
 		genTypeId := itemsType + "List"
 		genTypeName := model.StripNamespace(genTypeId)
-		com := prop.GetString("description")
 		if swagger.schema.GetTypeDef(genTypeId) == nil {
-			/*
-			if genTypeName == "ErrorList" {
-				if com != "A list of errors describing the failures." {
-					fmt.Println("fake def!")
-					//panic("whoops")
-				} else {
-					fmt.Println("ok, this is the real definition")
-					//panic("darn!")
-				}
-			} else {
-			*/
-			fmt.Println("======== generate type:", genTypeName, com)
-				swagger.ImportList(genTypeName, prop)
-			//}
-		} else {
-			/*
-			if genTypeName == "ErrorList" {
-				if com != "A list of errors describing the failures." {
-					fmt.Println("2: fake def!")
-				} else {
-					fmt.Println("2: ok, this is the real definition")
-					//panic("darn!")
-				}
-			}
-			*/
+			swagger.ImportList(genTypeName, prop)
 		}
 		name = genTypeName
 	default:
@@ -301,6 +276,99 @@ func (swagger *Swagger) ImportOperationInput(def *data.Object) (*model.Operation
 	return input, nil
 }
 
+func HttpStatusName(sStatus string) string {
+	status, err := strconv.Atoi(sStatus)
+	if err != nil {
+		switch status {
+		case 200:
+			return "OK"
+		case 201:
+			return "Created"
+		case 202:
+			return "Accepted"
+		case 203:
+			return "NonAuthoritativeInformation"
+		case 204:
+			return "NoContent"
+		case 205:
+			return "ResetContent"
+		case 206:
+			return "PartialContent"
+		case 300:
+			return "MultipleChoices"
+		case 301:
+			return "MovedPermanently"
+		case 302:
+			return "Found"
+		case 303:
+			return "SeeOther"
+		case 304:
+			return "NotModified"
+		case 307:
+			return "TemporaryRedirect"
+		case 308:
+			return "PermanentRedirect"
+		case 400:
+			return "BadRequest"
+		case 401:
+			return "Unauthorized"
+		case 403:
+			return "Forbidden"
+		case 404:
+			return "NotFound"
+		case 405:
+			return "MethodNotAllowed"
+		case 406:
+			return "NotAcceptable"
+		case 407:
+			return "ProxyAuthenticationRequired"
+		case 408:
+			return "RequestTimeout"
+		case 409:
+			return "Conflict"
+		case 410:
+			return "Gone"
+		case 411:
+			return "LengthRequired"
+		case 412:
+			return "PreconditionFailed"
+		case 413:
+			return "PayloadTooLarge"
+		case 414:
+			return "URITooLong"
+		case 415:
+			return "UnsupportedMediaType"
+		case 416:
+			return "RangeNotSatisfiable"
+		case 417:
+			return "ExpectationFailed"
+		case 418:
+			return "Teapot"
+		case 421:
+			return "MisdirectedRequest"
+		case 428:
+			return "PreconditionRequired"
+		case 429:
+			return "TooManyRequests"
+		case 431:
+			return "RequestHeaderFieldsTooLarge"
+		case 500:
+			return "InternalServerError"
+		case 501:
+			return "NotImplemented"
+		case 502:
+			return "BadGateway"
+		case 503:
+			return "ServiceUnavailable"
+		case 504:
+			return "GatewayTimeout"
+		case 505:
+			return "HTTPVersionNotSupported"
+		}
+	}
+	return sStatus + "Status"
+}
+
 func (swagger *Swagger) ImportOperation(method string, path string, def *data.Object) error {
 	//current assumption: The first 2xx response encountered becomes the "expected" output, others are "exceptions"
 	name := def.GetString("operationId")
@@ -324,25 +392,7 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 			output = outdef
 		} else {
 			if outdef.Id == "" {
-				ename := ""
-				switch sStatus {
-				case "400":
-					ename = "BadRequestException"
-				case "403":
-					ename = "ForbiddenException"
-				case "404":
-					ename = "NotFoundException"
-				case "409":
-					ename = "ConflictException"
-				case "415":
-					ename = "UnsupportedFormatException"
-				case "500":
-					ename = "InternalServiceException"
-				default:
-					fmt.Printf("--------- exception (%s) %q: %s\n%s\n", sStatus, outdef.Id, data.Pretty(outdef), data.Pretty(responses.GetObject(sStatus)))
-					panic("fix me: " + sStatus)
-				}
-
+				ename := HttpStatusName(sStatus) + "Exception"
 				outdef.Id = swagger.toCanonicalAbsoluteId(ename)
 			}
 			exceptions = append(exceptions, outdef)

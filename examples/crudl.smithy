@@ -3,7 +3,7 @@ $version: "2"
 namespace example
 
 /// A simple service to demonstrate CRUDL operations
-service TestService {
+service CrudlService {
     resources: [
         ItemResource
     ]

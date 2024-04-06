@@ -145,8 +145,11 @@ func addResourceOperations(schema *model.Schema, ast *AST, shapeId string, shape
 		rez = resource + "." + rez
 	}
 	var err error
+	if shape == nil {
+		return fmt.Errorf("Shape not found: %s", shapeId)
+	}
 	for _, ref := range shape.Operations {
-		err = addOperationFromRef(schema, ast, ref, rez, "op")
+		err = addOperationFromRef(schema, ast, ref, rez, "")
 		if err != nil {
 			return err
 		}
@@ -182,7 +185,7 @@ func addResourceOperations(schema *model.Schema, ast *AST, shapeId string, shape
 		return err
 	}
 	for _, ref := range shape.CollectionOperations {
-		err = addOperationFromRef(schema, ast, ref, rez, "cop")
+		err = addOperationFromRef(schema, ast, ref, rez, "collection")
 		if err != nil {
 			return err
 		}

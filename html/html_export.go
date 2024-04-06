@@ -41,9 +41,13 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
 	gen.detailGenerator = config.GetString("detail-generator") //should be either "smithy" or "
+	if gen.detailGenerator == "" {
+		gen.detailGenerator = "smithy"
+	}
 	gen.Begin()
 	gen.GenerateHeader()
 	gen.GenerateSummary()
+	gen.GenerateResources()
 	gen.GenerateOperations()
 	gen.GenerateExceptions()
 	gen.GenerateTypes()
@@ -52,6 +56,23 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	fname := gen.FileName(gen.name, ".md")
 	err = gen.Write(s, fname, "")
 	return err
+}
+
+func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
+	var resources []model.AbsoluteIdentifier
+	if gen.detailGenerator == "smithy" {
+		ast, err := smithy.SmithyAST(gen.Schema)
+		if err != nil {
+			return resources
+		}
+		for _, shapeId := range ast.Shapes.Keys() {
+			shape := ast.GetShape(shapeId)
+			if shape.Type == "resource" {
+				resources = append(resources, model.AbsoluteIdentifier(shapeId))
+			}
+		}
+	}
+	return resources
 }
 
 func (gen *Generator) getDetailGenerator() model.Generator {
@@ -64,17 +85,16 @@ func (gen *Generator) getDetailGenerator() model.Generator {
 		},
 	}
 	switch gen.detailGenerator {
-	case "smithy":
-		g := new(smithy.IdlGenerator)
+	case "api":
+		g := new(model.ApiGenerator)
 		g.Decorator = &dec
 		return g
-	default:
-		g := new(model.ApiGenerator)
+	default: //smithy
+		g := new(smithy.IdlGenerator)
 		g.Decorator = &dec
 		return g
 	}
 }
-
 
 func (gen *Generator) GenerateHeader() {
 	gen.Emitf("<!DOCTYPE html>\n<html lang=\"US\">\n")
@@ -93,7 +113,7 @@ func (gen *Generator) GenerateFooter() {
 }
 
 func (gen *Generator) GenerateSummary() {
-	gen.Emitf("<h1 id=%q>TestService</h1>\n", gen.name)
+	gen.Emitf("<h1 id=%q>%s</h1>\n", gen.name, model.Capitalize(gen.name))
 	gen.Emitf("<p>%s</p>\n", gen.Schema.Comment) //model.FormatComment("", "", gen.Schema.Comment, 80, true)
 	gen.Emitf("<ul>\n")
 	if gen.name != "" {
@@ -108,6 +128,14 @@ func (gen *Generator) GenerateSummary() {
 	if gen.Schema.Base != "" {
 		gen.Emitf("  <li><strong>Namespace</strong>: &ldquo;%s&rdquo;</li>\n", gen.Schema.Base)
 	}
+	gen.Emitf("</ul>\n")
+	gen.Emitf("<h3 id=\"resources\">Resources</h3>\n")
+	gen.Emitf("<ul>\n")
+	for _, id := range gen.ResourceIds() {
+		s := StripNamespace(id)
+		gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), s)
+	}
+	gen.Emitf("</ul>\n")
 	gen.Emitf("</ul>\n")
 	gen.Emitf("<h3 id=\"operations\">Operations</h3>\n")
 	gen.Emitf("<ul>\n")
@@ -162,6 +190,43 @@ func summarySignature(op *model.OperationDef) string {
 	out := ExplodeOutputs(op.Output)
 	s := StripNamespace(op.Id)
 	return fmt.Sprintf("%s(%s) → (%s)", s, in, out)
+}
+
+func (gen *Generator) generateApiResource(sg *smithy.IdlGenerator, id model.AbsoluteIdentifier) string {
+	sg.Begin()
+	sg.GenerateResource(string(id))
+	s := sg.End()
+	return s
+}
+
+func (gen *Generator) GenerateResource(sg *smithy.IdlGenerator, id model.AbsoluteIdentifier) error {
+	rezId := StripNamespace(id)
+	gen.Emitf("<h3 id=%q>%s</h3>\n", strings.ToLower(rezId), rezId)
+	gen.Emitf("<pre class=\"mknohighlight\"><code>\n")
+	gen.Emitf("%s\n\n", gen.generateApiResource(sg, id))
+	gen.Emitf("</code></pre>\n")
+	return nil
+}
+
+func (gen *Generator) GenerateResources() {
+	if gen.detailGenerator == "smithy" {
+		resourceIds := gen.ResourceIds()
+		if len(resourceIds) > 0 {
+			g := gen.getDetailGenerator()
+			conf := data.NewObject()
+			err := g.Configure(gen.Schema, conf)
+			if err != nil {
+				return
+			}
+			if sg, ok := g.(*smithy.IdlGenerator); ok {
+				gen.Emitf("<h2 id=\"resources\">Resources</h2>\n")
+				for _, id := range resourceIds {
+					gen.GenerateResource(sg, id)
+				}
+				gen.Emit("\n")
+			}
+		}
+	}
 }
 
 func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
