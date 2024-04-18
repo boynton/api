@@ -98,6 +98,15 @@ func (swagger *Swagger) ImportInfo(ns, name string) error {
 	return nil
 }
 
+func (swagger *Swagger) resolveRef(ref string) *data.Object {
+	d := swagger.raw.Get("definitions")
+	switch m := d.(type) {
+	case map[string]interface{}:
+		return data.ObjectFromMap(m)
+	}
+	return nil
+}
+
 func (swagger *Swagger) ImportService() error {
 	defs := swagger.raw.GetObject("definitions")
 	for _, k := range defs.Keys() {
@@ -129,8 +138,17 @@ func (swagger *Swagger) ImportService() error {
 				return err
 			}
 		default:
-			fmt.Println("whoops:", k, "->", model.Pretty(def))
-			panic("here")
+			//no type specified
+			allof := def.Get("allOf")
+			if allof != nil {
+				err := swagger.ImportAllOf(k, def)
+				if err != nil {
+					return err
+				}
+			} else {
+				fmt.Println("whoops:", k, "->", model.Pretty(def))
+				panic("here")
+			}
 		}
 	}
 	paths := swagger.raw.GetObject("paths")
@@ -278,7 +296,7 @@ func (swagger *Swagger) ImportOperationInput(def *data.Object) (*model.Operation
 
 func HttpStatusName(sStatus string) string {
 	status, err := strconv.Atoi(sStatus)
-	if err != nil {
+	if err == nil {
 		switch status {
 		case 200:
 			return "OK"
@@ -519,6 +537,40 @@ func (swagger *Swagger) ImportEnum(name string, def *data.Object) error {
 			Symbol: sym,
 		}
 		td.Elements = append(td.Elements, el)
+	}
+	return swagger.schema.AddTypeDef(td)
+}
+
+func (swagger *Swagger) ImportAllOf(name string, adef *data.Object) error {
+	td := &model.TypeDef{
+		Id:   swagger.toCanonicalAbsoluteId(name),
+		Base: model.Struct,
+		Comment: adef.GetString("description"),
+	}
+	defs := adef.Get("allOf")
+	for _, d := range data.AsSlice(defs) {
+		def := data.AsObject(d)
+		if def.Has("$ref") {
+			s := def.GetString("$ref")
+			def = swagger.resolveRef(s)
+		}
+		props := def.GetObject("properties")
+		req := def.GetStringSlice("required")
+		for _, name := range props.Keys() {
+			v := props.GetObject(name)
+			fd := &model.FieldDef{
+				Name: model.Identifier(name),
+				Comment: v.GetString("description"),
+			}
+			fd.Type = swagger.toCanonicalTypeName(v)
+			for _, rname := range req {
+				if rname == name {
+					fd.Required = true
+					break
+				}
+			}
+			td.Fields = append(td.Fields, fd)
+		}
 	}
 	return swagger.schema.AddTypeDef(td)
 }
