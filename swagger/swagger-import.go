@@ -109,12 +109,21 @@ func (swagger *Swagger) resolveRef(ref string) *data.Object {
 
 func (swagger *Swagger) ImportService() error {
 	defs := swagger.raw.GetObject("definitions")
-	for _, k := range defs.Keys() {
-		def := defs.GetObject(k)
+	for _, b := range defs.Bindings() {
+		k := b.Key
+		def := data.AsObject(b.Value)
 		otype := def.GetString("type")
 		switch strings.ToLower(otype) {
 		case "integer", "number":
-			return swagger.ImportNumber(k, def)
+			err := swagger.ImportNumber(k, def)
+			if err != nil {
+				return err
+			}
+		case "boolean":
+			err := swagger.ImportBoolean(k, def)
+			if err != nil {
+				return err
+			}
 		case "string":
 			if def.Has("enum") {
 				err := swagger.ImportEnum(k, def)
@@ -147,14 +156,16 @@ func (swagger *Swagger) ImportService() error {
 				}
 			} else {
 				fmt.Println("whoops:", k, "->", model.Pretty(def))
-				panic("here")
+				return fmt.Errorf("Cannot import this type: %s", otype)
 			}
 		}
 	}
 	paths := swagger.raw.GetObject("paths")
-	for _, path := range paths.Keys() {
-		def := paths.GetObject(path)
-		for _, method := range def.Keys() {
+	for _, b := range paths.Bindings() {
+		path := b.Key
+		def := data.AsObject(b.Value)
+		for _, bb := range def.Bindings() {
+			method := bb.Key
 			switch method {
 			case "post", "put", "get", "delete":
 				swagger.ImportOperation(method, path, def.GetObject(method))
@@ -169,6 +180,10 @@ func (swagger *Swagger) toCanonicalAbsoluteId(name string) model.AbsoluteIdentif
 }
 
 func (swagger *Swagger) toCanonicalTypeName(prop *data.Object) model.AbsoluteIdentifier {
+	return swagger.toCanonicalTypeNameWithContext(prop, "")
+}
+
+func (swagger *Swagger) toCanonicalTypeNameWithContext(prop *data.Object, context string) model.AbsoluteIdentifier {
 	ref := prop.GetString("$ref")
 	if ref != "" {
 		if ref == "#/definitions/Timestamp" {
@@ -195,7 +210,11 @@ func (swagger *Swagger) toCanonicalTypeName(prop *data.Object) model.AbsoluteIde
 		name = "base#Bool"
 	case "array":
 		itemsType := swagger.toCanonicalTypeName(prop.GetObject("items"))
-		genTypeId := itemsType + "List"
+		genTypeId := itemsType + "Array"
+		if context != "" {
+			genTypeId = model.AbsoluteIdentifier(string(genTypeId) + "_" + context)
+		}
+		//bug: may not be unique, depending on context. If a field in a structure, also prefix that structure's name
 		genTypeName := model.StripNamespace(genTypeId)
 		if swagger.schema.GetTypeDef(genTypeId) == nil {
 			swagger.ImportList(genTypeName, prop)
@@ -232,8 +251,9 @@ func (swagger *Swagger) ImportOperationOutput(sStatus string, def *data.Object) 
 	if false {
 		//need to verify how to name these, since Swagger doesn't.
 		headers := def.GetObject("headers")
-		for i, hname := range headers.Keys() {
-			hdef := headers.GetObject(hname)
+		for i, b := range headers.Bindings() {
+			hname := b.Key
+			hdef := data.AsObject(b.Value)
 			htype := swagger.toCanonicalTypeName(hdef)
 			fd := &model.OperationOutputField{
 				Name: model.Identifier(fmt.Sprintf("header_%d", i)),
@@ -247,9 +267,20 @@ func (swagger *Swagger) ImportOperationOutput(sStatus string, def *data.Object) 
 	return out, nil
 }
 
+func identifierFromHeader(s string) string {
+	parts := strings.Split(s, "-")
+	r := parts[0]
+	for i := 1; i<len(parts); i++ {
+		r = r + Capitalize(parts[i])
+	}
+	return r
+}
+
 func (swagger *Swagger) ImportOperationInputField(def *data.Object) (*model.OperationInputField, error) {
+	rawName := def.GetString("name")
+	name := identifierFromHeader(rawName)
 	f := &model.OperationInputField{
-		Name: model.Identifier(def.GetString("name")),
+		Name: model.Identifier(name),
 		Comment: def.GetString("description"),
 	}
 	switch def.GetString("in") {
@@ -259,6 +290,8 @@ func (swagger *Swagger) ImportOperationInputField(def *data.Object) (*model.Oper
 		f.HttpQuery = f.Name
 	case "body":
 		f.HttpPayload = true
+	case "header":
+		f.HttpHeader = rawName
 	default:
 		fmt.Println("FIX:", model.Pretty(def))
 		panic("FIX ME")
@@ -266,7 +299,7 @@ func (swagger *Swagger) ImportOperationInputField(def *data.Object) (*model.Oper
 	if def.GetBool("required") {
 		f.Required = true
 	}
-	f.Type = swagger.toCanonicalTypeName(def)
+	f.Type = swagger.toCanonicalTypeNameWithContext(def, name)
 	if f.Type == "base#String" {
 		minsize := def.GetInt64("minLength")
 		if minsize != 0 {
@@ -283,7 +316,7 @@ func (swagger *Swagger) ImportOperationInputField(def *data.Object) (*model.Oper
 func (swagger *Swagger) ImportOperationInput(def *data.Object) (*model.OperationInput, error) {
 	input := &model.OperationInput{
 	}
-	for _, param := range def.GetArray("parameters") {
+	for _, param := range def.GetSlice("parameters") {
 		p := data.AsObject(param)
 		f, err := swagger.ImportOperationInputField(p)
 		if err != nil {
@@ -401,8 +434,10 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 	var exceptions []*model.OperationOutput
 	var exceptionRefs []model.AbsoluteIdentifier
 
-	for _, sStatus := range responses.Keys() {
-		outdef, err := swagger.ImportOperationOutput(sStatus, responses.GetObject(sStatus))
+	for _, b := range responses.Bindings() {
+		sStatus := b.Key
+		resp := data.AsObject(b.Value)
+		outdef, err := swagger.ImportOperationOutput(sStatus, resp)
 		if err != nil {
 			return err
 		}
@@ -473,11 +508,21 @@ func (swagger *Swagger) numberBase(def *data.Object) model.BaseType {
 		}
 	}
 		
-	}
+}
+
 func (swagger *Swagger) ImportNumber(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
 		Base: swagger.numberBase(def),
+		Comment: def.GetString("description"),
+	}
+	return swagger.schema.AddTypeDef(td)
+}
+
+func (swagger *Swagger) ImportBoolean(name string, def *data.Object) error {
+	td := &model.TypeDef{
+		Id:   swagger.toCanonicalAbsoluteId(name),
+		Base: model.Bool,
 		Comment: def.GetString("description"),
 	}
 	return swagger.schema.AddTypeDef(td)
@@ -491,12 +536,14 @@ func (swagger *Swagger) ImportStruct(name string, def *data.Object) error {
 	}
 	props := def.GetObject("properties")
 	req := def.GetStringSlice("required")
-	for _, name := range props.Keys() {
-		v := props.GetObject(name)
+	for _, b := range props.Bindings() {
+		fname := b.Key
+		v := data.AsObject(b.Value)
 		fd := &model.FieldDef{
-			Name: model.Identifier(name),
+			Name: model.Identifier(fname),
 			Comment: v.GetString("description"),
 		}
+		//fd.Type = swagger.toCanonicalTypeNameWithContext(v, name)
 		fd.Type = swagger.toCanonicalTypeName(v)
 		for _, rname := range req {
 			if rname == name {
@@ -556,8 +603,9 @@ func (swagger *Swagger) ImportAllOf(name string, adef *data.Object) error {
 		}
 		props := def.GetObject("properties")
 		req := def.GetStringSlice("required")
-		for _, name := range props.Keys() {
-			v := props.GetObject(name)
+		for _, b := range props.Bindings() {
+			name := b.Key
+			v := data.AsObject(b.Value)
 			fd := &model.FieldDef{
 				Name: model.Identifier(name),
 				Comment: v.GetString("description"),

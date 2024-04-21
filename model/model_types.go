@@ -206,7 +206,7 @@ type OperationInputField struct {
 	Elements    EnumElementList    `json:"elements,omitempty"`
 	Name        Identifier         `json:"name"`
 	Type        AbsoluteIdentifier `json:"type"`
-	Default     data.Any           `json:"default,omitempty"`
+	Default     any                `json:"default,omitempty"`
 	HttpHeader  string             `json:"httpHeader,omitempty"`
 	HttpQuery   Identifier         `json:"httpQuery,omitempty"`
 	HttpPath    bool               `json:"httpPath,omitempty"`
