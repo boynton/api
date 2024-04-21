@@ -349,6 +349,8 @@ func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error
 		id, shape, err = gen.ShapeFromTimestamp(td)
 	case model.Union:
 		id, shape, err = gen.ShapeFromUnion(td)
+	case model.Bool:
+		id, shape, err = gen.ShapeFromBool(td)
 	case model.Any:
 		id, shape, err = gen.ShapeFromAny(td)
 	default:
@@ -406,6 +408,13 @@ func (gen *AstGenerator) ShapeFromNumber(td *model.TypeDef) (string, *Shape, err
 func (gen *AstGenerator) ShapeFromTimestamp(td *model.TypeDef) (string, *Shape, error) {
 	shape := &Shape{
 		Type: "timestamp",
+	}
+	return string(td.Id), shape, nil
+}
+
+func (gen *AstGenerator) ShapeFromBool(td *model.TypeDef) (string, *Shape, error) {
+	shape := &Shape{
+		Type: "boolean",
 	}
 	return string(td.Id), shape, nil
 }
