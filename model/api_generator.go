@@ -357,6 +357,9 @@ func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 	case Int8, Int16, Int32, Int64, Float32, Float64, Integer, Decimal:
 		sopts := ""
 		gen.Emitf("type %s %s%s\n", StripNamespace(td.Id), td.Base.String(), sopts)
+	case Bool:
+		sopts := ""
+		gen.Emitf("type %s Bool%s\n", StripNamespace(td.Id), sopts)
 	default:
 		gen.Emitf("type %s %s //FIX ME\n", StripNamespace(td.Id), td.Base)
 	}
