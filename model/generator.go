@@ -35,6 +35,7 @@ type Generator interface {
 	GenerateType(td *TypeDef) error
 	Begin()
 	End() string
+	Sorted() bool
 }
 
 type BaseGenerator struct {
@@ -47,6 +48,10 @@ type BaseGenerator struct {
 	Err            error
 	Sort           bool
 	typesEmitted   map[AbsoluteIdentifier]bool
+}
+
+func (gen *BaseGenerator) Sorted() bool {
+	return gen.Sort
 }
 
 func (gen *BaseGenerator) Configure(schema *Schema, conf *data.Object) error {

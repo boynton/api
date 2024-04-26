@@ -199,7 +199,9 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 		status = int(op.Output.HttpStatus)
 	}
 	ensureShapeTraits(shape).Put("smithy.api#http", httpTrait(op.HttpMethod, op.HttpUri, status))
-
+	if op.Comment != "" {
+		ensureShapeTraits(shape).Put("smithy.api#documentation", op.Comment)
+	}
 	switch op.HttpMethod {
 	case "GET":
 		ensureShapeTraits(shape).Put("smithy.api#readonly", NewNodeValue())
@@ -270,7 +272,17 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		Type: "structure",
 	}
 	members := NewMap[*Member]()
+	var fields []*model.OperationInputField
 	for _, fd := range input.Fields {
+		fields = append(fields, fd)
+	}
+	if gen.Sort {
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		})
+	}
+
+	for _, fd := range fields {
 		ftype := typeReference(string(fd.Type))
 		member := &Member{
 			Target: ftype,
@@ -291,6 +303,17 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		if fd.Default != nil {
 			ensureMemberTraits(member).Put("smithy.api#default", AsNodeValue(fd.Default))
 		}
+		//other traits!
+		if fd.MinSize != 0 || fd.MaxSize != 0 {
+			n := NewNodeValue()
+			if fd.MinSize != 0 {
+				n.Put("min", fd.MinSize)
+			}
+			if fd.MaxSize != 0 {
+				n.Put("min", fd.MaxSize)
+			}
+			ensureMemberTraits(member).Put("smithy.api#length", n)
+		}
 		members.Put(string(fd.Name), member)
 	}
 	shape.Members = members
@@ -302,8 +325,17 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 	shape := &Shape{
 		Type: "structure",
 	}
+	var fields []*model.OperationOutputField
 	shape.Members = NewMap[*Member]()
 	for _, fd := range output.Fields {
+		fields = append(fields, fd)
+	}
+	if gen.Sort {
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		})
+	}
+	for _, fd := range fields {
 		ftype := typeReference(string(fd.Type))
 		member := &Member{
 			Target: ftype,
@@ -536,10 +568,23 @@ func (gen *AstGenerator) ShapeFromStruct(td *model.TypeDef) (string, *Shape, err
 		Type: "structure",
 	}
 	members := NewMap[*Member]()
+	var fields []*model.FieldDef
+	shape.Members = NewMap[*Member]()
 	for _, fd := range td.Fields {
+		fields = append(fields, fd)
+	}
+	if gen.Sort {
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		})
+	}
+	for _, fd := range fields {
 		ftype := typeReference(string(fd.Type))
 		member := &Member{
 			Target: ftype,
+		}
+		if fd.Comment != "" {
+			ensureMemberTraits(member).Put("smithy.api#documentation", fd.Comment)
 		}
 		if fd.Required {
 			ensureMemberTraits(member).Put("smithy.api#required", NewNodeValue())

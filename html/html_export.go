@@ -91,6 +91,7 @@ func (gen *Generator) getDetailGenerator() model.Generator {
 		return g
 	default: //smithy
 		g := new(smithy.IdlGenerator)
+		g.Sort = gen.Sort
 		g.Decorator = &dec
 		return g
 	}
@@ -297,6 +298,9 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 func (gen *Generator) generateApiType(op *model.TypeDef) string {
 	g := gen.getDetailGenerator()
 	conf := data.NewObject()
+	if g.Sorted() {
+		conf.Put("sort", true) //!
+	}
 	err := g.Configure(gen.Schema, conf)
 	if err != nil {
 		return "Whoops: " + err.Error()

@@ -11,10 +11,14 @@ func Warning(format string, a ...any) {
 	model.Warning(format, a...)
 }
 
-func Import(paths []string, tags []string) (*model.Schema, error) {
+func Import(paths []string, tags []string, parseOnly bool) (*model.Schema, error) {
 	ast, err := Assemble(paths)
 	if err != nil {
 		return nil, err
+	}
+	if parseOnly {
+		fmt.Println(model.Pretty(ast))
+		return nil, nil
 	}
 	return ImportAST(ast, tags)
 }
@@ -273,6 +277,12 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 			if d != nil {
 				f.Default = d.RawValue()
 			}
+			if mem.Traits.Has("smithy.api#length") {
+				length := mem.Traits.Get("smithy.api#length")
+				f.MinSize = length.GetInt64("min", 0)
+				f.MaxSize = length.GetInt64("max", 0)
+			}
+			//other traits!!!
 			ti.Fields = append(ti.Fields, f)
 		}
 	}
