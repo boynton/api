@@ -26,6 +26,7 @@ import (
 	"github.com/boynton/api/markdown"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/openapi"
+	"github.com/boynton/api/rdl"
 	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
@@ -41,8 +42,9 @@ func main() {
 	pList := flag.Bool("l", false, "List the entities in the model")
 	pEntity := flag.String("e", "", "Show the specified entity.")
 	pForce := flag.Bool("f", false, "Force overwrite if output file exists")
+	pParseOnly := flag.Bool("p", false, "Parse input, display parse tree, and exit")
 	pGen := flag.String("g", "api", "The generator for output")
-	pNs := flag.String("ns", "example", "The namespace to force if none is present")
+	pNs := flag.String("ns", "", "The namespace to force if absent. Also used by the api generator to flatten to a single namespace")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
 	pWarn := flag.String("w", "show", "Warnings. 'show' or 'suppress' or 'error'. Default is 'show'")
 	var params Params
@@ -77,9 +79,12 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	schema, err := AssembleModel(files, tags, *pNs)
+	schema, err := AssembleModel(files, tags, *pNs, *pParseOnly)
 	if err != nil {
 		model.Error("%s\n", err)
+	}
+	if *pParseOnly {
+		os.Exit(0)
 	}
 	if *pList {
 		if schema.Id != "" {
@@ -113,6 +118,9 @@ func main() {
 		os.Exit(0)
 	}
 	conf.Put("outdir", outdir)
+	if *pNs != "" {
+		conf.Put("namespace", *pNs)
+	}
 	if *pForce {
 		conf.Put("force", true)
 	}
