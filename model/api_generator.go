@@ -46,7 +46,10 @@ func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 		return err
 	}
 	gen.indent = "    "
-	gen.ns = string(schema.ServiceNamespace())
+	gen.ns = config.GetString("namespace")
+	if gen.ns == "" {
+		gen.ns = string(schema.ServiceNamespace())
+	}
 	gen.name = string(schema.ServiceName())
 	gen.Begin()
 	gen.GenerateSummary()
