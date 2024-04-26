@@ -466,10 +466,14 @@ func (p *Parser) ExpectIdentifierMap() (*Map[string], error) {
 }
 
 func (p *Parser) MergeComment(comment1 string, comment2 string) string {
-	if comment1 == "" {
-		return TrimSpace(comment2)
+	t1 := TrimSpace(comment1)
+	t2 := TrimSpace(comment2)
+	if t1 == "" {
+		return t2
+	} else if t2 == "" {
+		return t1
 	}
-	return comment1 + "\n" + TrimSpace(comment2)
+	return t1 + " " + t2
 }
 
 func (p *Parser) Error(msg string) error {
