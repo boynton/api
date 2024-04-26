@@ -178,6 +178,8 @@ func Generator(genName string) (model.Generator, error) {
 		return new(smithy.IdlGenerator), nil
 	case "sadl":
 		return new(sadl.Generator), nil
+	case "rdl":
+		return new(rdl.Generator), nil
 	case "openapi":
 		return new(openapi.Generator), nil
 	case "swagger":
