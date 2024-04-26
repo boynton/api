@@ -161,29 +161,31 @@ func (node *NodeValue) GetString(key string) string {
 }
 
 func (node *NodeValue) AsInt() int {
+	return int(node.AsInt64())
+}
+
+func (node *NodeValue) AsInt64() int64 {
 	if node.value != nil {
 		switch n := node.value.(type) {
 		case int:
-			return n
+			return int64(n)
 		case *int:
-			return *n
+			return int64(*n)
 		case int64:
-			return int(n)
+			return n
 		case *int64:
-			return int(*n)
+			return *n
 		case float64:
-			return int(n)
+			return int64(n)
 		case *float64:
-			return int(*n)
+			return int64(*n)
 		case *data.Integer:
-			return n.AsInt()
+			return n.AsInt64()
 		case *data.Decimal:
-			return n.AsInt()
+			return n.AsInt64()
 		case *NodeValue:
 			panic("double NodeValue wrapper, oops")
 		}
-		fmt.Println("asInt?", node, Kind(*node))
-		panic("Whoa GetInt!")
 	}
 	return 0
 }
@@ -198,6 +200,14 @@ func (node *NodeValue) GetInt(key string, def int) int {
 		return def
 	}
 	return n.AsInt()
+}
+
+func (node *NodeValue) GetInt64(key string, def int64) int64 {
+	n := node.Get(key)
+	if n == nil {
+		return def
+	}
+	return n.AsInt64()
 }
 
 func (node *NodeValue) AsDecimal() *data.Decimal {
