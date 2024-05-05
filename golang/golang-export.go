@@ -40,6 +40,7 @@ type Generator struct {
 	timestampPrefix     string
 	anyPackage          string //use this package for the Any type, if "", then generate one in this package
 	anyPrefix           string //derived from the anyPackage
+	prefixEnums         bool   //prefix enum symbols with the typename to avoid collisions
 }
 
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
@@ -59,6 +60,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	if err != nil {
 		return err
 	}
+	gen.prefixEnums = !config.GetBool("golang.noEnumPrefix")
 	gen.inlineSlicesAndMaps = config.GetBool("golang.inlineSlicesAndMaps")
 	gen.inlinePrimitives = config.GetBool("golang.inlinePrimitives")
 	gen.anyPackage = config.GetString("golang.anyPackage")
@@ -425,7 +427,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		for _, f := range td.Fields {
 			fname := model.Capitalize(string(f.Name))
 			w.Emitf("    %s tmp.%s != nil {\n", p, fname)
-			w.Emitf("        u.Variant = %s%s\n", tname, fname)
+			w.Emitf("        u.Variant = %sVariantTag%s\n", tname, fname)
 			w.Emitf("        u.%s = %stmp.%s\n", fname, gen.indirectOp(f.Type), fname)
 			p = "} else if "
 		}
@@ -454,16 +456,17 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 	case model.Enum:
 		gen.generateTypeComment(td, w)
 		tname := gen.golangTypeName(td.Id)
+		prefix := tname + "_"
 		w.Emitf("type %s int\n", tname)
 		w.Emitf("const (\n")
 		w.Emitf("    _ %s = iota\n", tname)
 		for _, e := range td.Elements {
-			w.Emitf("    %s\n", e.Symbol)
+			w.Emitf("    %s%s\n", prefix, e.Symbol)
 		}
 		w.Emitf(")\n")
 		w.Emitf("var names%s = []string{\n", tname)
 		for _, e := range td.Elements {
-			w.Emitf("    %s: %q,\n", e.Symbol, e.Value) //assumes string enum!
+			w.Emitf("    %s%s: %q,\n", prefix, e.Symbol, e.Value) //assumes string enum!
 		}
 		w.Emitf("}\n")
 		w.Emitf("func (e %s) String() string {\n", tname)
