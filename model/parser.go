@@ -757,7 +757,7 @@ func (p *Parser) parseStructDef(td *TypeDef) error {
 }
 
 func (p *Parser) parseUnionDef(td *TypeDef) error {
-	td.Base = Struct
+	td.Base = Union
 	err := p.parseTypeOptions(td)
 	if err != nil {
 		return err
