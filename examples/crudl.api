@@ -61,7 +61,7 @@ operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResourc
 // 
 operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=list) {
     input {
-        limit Int32 (query="limit")
+        limit Int32 (query="limit", default=100)
         skip String (query="skip")
     }
     output (status=200) {
@@ -88,8 +88,30 @@ exception NotFound (status=404) {
 // 
 type Item Struct {
     id String (required) // the id of the item
+    status ItemStatus
     modified Timestamp // when the item ast last modified
-    data String // arbitrary data
+    attributes AttributeList
+}
+
+//
+// A List of Attributes
+//
+type AttributeList List[Attribute]
+
+//
+// A key/value pair
+//
+type Attribute Struct {
+	key String
+	val String
+}
+
+//
+// The value of the status field of an Item
+//
+type ItemStatus Enum {
+	DRAFT
+	PUBLISHED
 }
 
 // 

@@ -41,10 +41,10 @@ operation CreateItem {
 @readonly
 @http(method: "GET", uri: "/items/{itemId}", code: 200)
 operation GetItem {
-    input := for ItemResource {
+    input := {
         @required
         @httpLabel
-        $itemId
+        itemId: String
     }
 
     output := {
@@ -61,7 +61,7 @@ operation GetItem {
 @idempotent
 @http(method: "PUT", uri: "/items/{itemId}", code: 200)
 operation UpdateItem {
-    input := for ItemResource {
+    input := {
         @required
         @httpLabel
         itemId: String
@@ -86,7 +86,7 @@ operation UpdateItem {
 @idempotent
 @http(method: "DELETE", uri: "/items/{itemId}", code: 204)
 operation DeleteItem {
-    input := for ItemResource {
+    input := {
         @required
         @httpLabel
         itemId: String
@@ -99,7 +99,6 @@ operation DeleteItem {
 
 /// List existing items
 @readonly
-@paginated(inputToken: "skip", outputToken: "listing.next", items: "listing.items")
 @http(method: "GET", uri: "/items", code: 200)
 operation ListItems {
     input := {
@@ -117,16 +116,16 @@ operation ListItems {
 }
 
 /// An operation exception representing bad client input to a request
-@httpError(400)
 @error("client")
+@httpError(400)
 structure BadRequest {
-    @httpPayload
+	@httpPayload
     info: ExceptionInfo
 }
 
 /// An operation exception representing that a resource was not found
-@httpError(404)
 @error("client")
+@httpError(404)
 structure NotFound {
     @httpPayload
     info: ExceptionInfo
@@ -154,11 +153,20 @@ structure Item {
     /// when the item ast last modified
     modified: Timestamp
 
-    /// arbitrary data
-    data: String
+    /// attributes of the Item
+    attributes: AttributeList
 }
 
 /// Info for the body of an exception, what is encoded on the wire in exception responses
 structure ExceptionInfo {
     message: String
+}
+
+list AttributeList {
+	member: Attribute
+}
+
+structure Attribute {
+	key: String
+	val: String
 }
