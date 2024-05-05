@@ -3,7 +3,7 @@ module github.com/boynton/api
 go 1.18
 
 require (
-	github.com/boynton/data v0.0.5
+	github.com/boynton/data v0.0.6
 	github.com/ghodss/yaml v1.0.0
 )
 
