@@ -117,7 +117,7 @@ func expandPaths(paths []string) ([]string, string, error) {
 	return result, format, nil
 }
 
-func AssembleModel(paths []string, tags []string, ns string, parseOnly bool) (*model.Schema, error) {
+func AssembleModel(paths []string, tags []string, ns string, parseOnly bool, noValidate bool) (*model.Schema, error) {
 	flatPathList, format, err := expandPaths(paths)
 	if err != nil {
 		return nil, err
@@ -146,8 +146,10 @@ func AssembleModel(paths []string, tags []string, ns string, parseOnly bool) (*m
 	default:
 		err = fmt.Errorf("unknown format: %q", format)
 	}
-	if err == nil && !parseOnly {
-		err = schema.Validate()
+	if err == nil {
+		if !parseOnly && !noValidate {
+			err = schema.Validate()
+		}
 	}
 	return schema, err
 }

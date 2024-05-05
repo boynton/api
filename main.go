@@ -26,6 +26,7 @@ import (
 	"github.com/boynton/api/markdown"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/openapi"
+	"github.com/boynton/api/plantuml"
 	"github.com/boynton/api/rdl"
 	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
@@ -36,7 +37,7 @@ var Version string = "development version"
 
 func main() {
 	conf := data.NewObject()
-	pVersion := flag.Bool("v", false, "Show api tool version and exit")
+	pNoValidate := flag.Bool("v", false, "Suppress validation of the assembled model")
 	pQuiet := flag.Bool("q", false, "Quiet tool output, make it less verbose")
 	pHelp := flag.Bool("h", false, "Show more help information")
 	pList := flag.Bool("l", false, "List the entities in the model")
@@ -52,10 +53,7 @@ func main() {
 	var tags Tags
 	flag.Var(&tags, "t", "Tag of entities to include. Prefix tag with '-' to exclude that tag")
 	flag.Parse()
-	if *pVersion {
-		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
-		os.Exit(0)
-	} else if *pHelp {
+	if *pHelp {
 		help()
 		os.Exit(0)
 	}
@@ -75,11 +73,12 @@ func main() {
 	outdir := *pOutdir
 	files := flag.Args()
 	if len(files) == 0 {
+		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
 		fmt.Println("usage: api [-v] [-l] [-o outdir] [-g generator] [-a key=val]* [-t tag]* file ...")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	schema, err := AssembleModel(files, tags, *pNs, *pParseOnly)
+	schema, err := AssembleModel(files, tags, *pNs, *pParseOnly, *pNoValidate)
 	if err != nil {
 		model.Error("%s\n", err)
 	}
@@ -190,6 +189,8 @@ func Generator(genName string) (model.Generator, error) {
 	//case "ts":
 	//case "http-trace":
 	//case "swagger-ui":
+	case "plantuml":
+		return new(plantuml.Generator), nil
 	default:
 		return nil, fmt.Errorf("Unknown generator: %q", genName)
 	}
