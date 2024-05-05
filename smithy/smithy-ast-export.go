@@ -317,6 +317,7 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		members.Put(string(fd.Name), member)
 	}
 	shape.Members = members
+	ensureShapeTraits(shape).Put("smithy.api#documentation", input.Comment)
 	ensureShapeTraits(shape).Put("smithy.api#input", NewNodeValue())
 	return shape, nil
 }
@@ -357,6 +358,7 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 	} else {
 		ensureShapeTraits(shape).Put("smithy.api#output", NewNodeValue())
 	}
+	ensureShapeTraits(shape).Put("smithy.api#documentation", output.Comment)
 	return shape, nil
 }
 
