@@ -864,9 +864,6 @@ func (ast *AST) Filter(tags []string) {
 			}
 		}
 	}
-	if len(exclude) > 0 {
-		fmt.Println("exclude:", exclude)
-	}
 	ast.FilterDependencies(root, exclude)
 	/*
 		included := make(map[string]bool, 0)
