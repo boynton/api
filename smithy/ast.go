@@ -41,8 +41,8 @@ type NodeValue struct {
 }
 
 func NewNodeValue() *NodeValue {
-	//to do: use Map to preserve order of keys
 	return &NodeValue{value: make(map[string]interface{}, 0)}
+	//fixme: return &NodeValue{value: data.NewObject()}
 }
 
 func AsNodeValue(v interface{}) *NodeValue {
@@ -77,12 +77,16 @@ func (node *NodeValue) IsObject() bool {
 	switch node.value.(type) {
 	case map[string]interface{}:
 		return true
+	case *data.Object:
+		return true
 	}
 	return false
 }
 
 func (node *NodeValue) Keys() []string {
 	switch val := node.value.(type) {
+	case *data.Object:
+		return val.Keys()
 	case map[string]interface{}:
 		var keys []string
 		for k := range val {
@@ -101,6 +105,8 @@ func (node *NodeValue) Has(key string) bool {
 			if _, ok := m[key]; ok {
 				return true
 			}
+		case *data.Object:
+			return m.Has(key)
 		}
 	}
 	return false
@@ -116,6 +122,8 @@ func (node *NodeValue) Get(key string) *NodeValue {
 			return AsNodeValue(tmp)
 		}
 		return nil
+	case *data.Object:
+		return AsNodeValue(m.Get(key))
 	case *NodeValue:
 		return m.Get(key)
 	default:
@@ -243,6 +251,8 @@ func (node *NodeValue) GetSlice(key string) []interface{} {
 			}
 		}
 		return nil
+	case *data.Object:
+		return m.GetSlice(key)
 	default:
 		panic("Whoa, GetSlice()")
 	}
@@ -277,6 +287,8 @@ func (node *NodeValue) Length() int {
 		return len(m)
 	case []interface{}:
 		return len(m)
+	case *data.Object:
+		return len(m.Bindings())
 	default:
 		return -1
 	}
@@ -286,6 +298,8 @@ func (node *NodeValue) Put(key string, val interface{}) *NodeValue {
 	switch m := node.value.(type) {
 	case map[string]interface{}:
 		m[key] = val
+	case *data.Object:
+		m.Put(key, val)
 	default:
 		panic("Whoa, Put()")
 	}
@@ -771,7 +785,7 @@ func (ast *AST) ExpandMixins() error {
 	return nil
 }
 
-func (ast *AST) FilterDependencies(root []string) {
+func (ast *AST) FilterDependencies(root []string, exclude []string) {
 	included := NewMap[bool]()
 	for _, k := range root {
 		if !included.Has(k) {
@@ -780,7 +794,7 @@ func (ast *AST) FilterDependencies(root []string) {
 	}
 	filtered := NewMap[*Shape]()
 	for _, name := range included.Keys() {
-		if !strings.HasPrefix(name, "smithy.api#") {
+		if !containsString(exclude, name) && !strings.HasPrefix(name, "smithy.api#") {
 			filtered.Put(name, ast.GetShape(name))
 		}
 	}
@@ -808,7 +822,7 @@ func (ast *AST) ServiceDependencies() (string, error) {
 	case 0:
 		return ns, nil
 	case 1:
-		ast.FilterDependencies(root)
+		ast.FilterDependencies(root, nil)
 		return ns, nil
 	default:
 		return "", fmt.Errorf("Cannot handle more than one service in model")
@@ -832,7 +846,7 @@ func (ast *AST) Filter(tags []string) {
 	}
 
 	for _, k := range ast.Shapes.Keys() {
-		if containsString(include, k) {
+		if len(include) == 0 || containsString(include, k) {
 			root = append(root, k)
 		}
 		shape := ast.Shapes.Get(k)
@@ -850,7 +864,10 @@ func (ast *AST) Filter(tags []string) {
 			}
 		}
 	}
-	ast.FilterDependencies(root)
+	if len(exclude) > 0 {
+		fmt.Println("exclude:", exclude)
+	}
+	ast.FilterDependencies(root, exclude)
 	/*
 		included := make(map[string]bool, 0)
 		for _, k := range root {
@@ -865,10 +882,6 @@ func (ast *AST) Filter(tags []string) {
 			}
 		}
 	*/
-	if len(exclude) > 0 {
-		fmt.Print("TBD: exclude by tag: ", exclude)
-		panic("here")
-	}
 }
 
 func containsString(ary []string, val string) bool {
