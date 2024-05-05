@@ -70,9 +70,6 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 		}
 		return nil
 	})
-	if err == nil {
-		err = schema.Validate()
-	}
 	return schema, err
 }
 
