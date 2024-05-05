@@ -975,9 +975,12 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 			mtraits = nil
 			mems.Put(fname, mem)
 			if resource != nil {
-				idType := resource.Identifiers.Get(fname)
-				mem.Target = p.ensureNamespaced(idType.Target)
-			} else {
+				if resource.Identifiers != nil {
+					idType := resource.Identifiers.Get(fname)
+					mem.Target = p.ensureNamespaced(idType.Target)
+				}
+			}
+			if mem.Target == "" {
 				for _, mixin := range shape.Mixins {
 					mixshape := p.ast.GetShape(mixin.Target)
 					for _, mixname := range mixshape.Members.Keys() {
@@ -996,6 +999,9 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 						}
 					}
 				}
+			}
+			if mem.Target == "" {
+				return nil, p.Error(fmt.Sprintf("Target elision failure: %s", fname))
 			}
 		} else if tok.Type == SYMBOL {
 			fname := tok.Text
