@@ -1,17 +1,17 @@
 /*
-Copyright 2024 Lee R. Boynton
+   Copyright 2024 Lee R. Boynton
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 package plantuml
 
@@ -26,12 +26,24 @@ import (
 
 const IndentAmount = "    "
 
+const Association = "--"
+const Aggregation = "o"
+const Composition = "*"
+const ManySrc = "}"
+const ExactlyOne = "||"
+const ZeroOrManySrc = "}o"
+const OneOrManySrc = "}|"
+const ManyDst = "{"
+const ZeroOrManyDst = "o{"
+const OneOrManyDst = "|{"
+
 type Generator struct {
 	model.BaseGenerator
 	ns              string
 	name            string
 	detailGenerator string
 	generateExceptions bool
+	entities map[string]string
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -42,9 +54,29 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.generateExceptions = config.GetBool("generateExceptions")
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
+	gen.entities = make(map[string]string, 0)
+	for _, op := range gen.Operations() {
+		//		if op.Resource != ""  && op.Lifecycle == "read" {
+		if op.HttpMethod == "GET" {
+			entityType := ""
+			for _, out := range op.Output.Fields {
+				if out.HttpPayload {
+					entityType = StripNamespace(out.Type)
+				}
+			}
+			idField := ""
+			for _, in := range op.Input.Fields {
+				if in.HttpPath {
+					idField = string(in.Name) 
+					break //fixme: more than one pathparam for a resource id
+				}
+			}
+			gen.entities[entityType] = idField
+		}
+	}
 	gen.Begin()
 	gen.GenerateHeader()
-	//FIX gen.GenerateResources()
+	//FIX gen.GenerateResources() //could use this metadata to determine whether Entity or Struct
 	gen.GenerateOperations()
 	if gen.generateExceptions {
 		gen.GenerateExceptions()
@@ -83,21 +115,22 @@ func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
 		},
 	}
 	switch gen.detailGenerator {
-	case "api":
+case "api":
 		g := new(model.ApiGenerator)
 		g.Decorator = &dec
 		return g
-	default: //smithy
+default: //smithy
 		g := new(smithy.IdlGenerator)
 		g.Sort = gen.Sort
 		g.Decorator = &dec
 		return g
 	}
-}
+    }
 */
 
 func (gen *Generator) GenerateHeader() {
-	gen.Emitf("@startuml\nhide empty members\nset namespaceSeparator none\nskinparam linetype ortho\n\n")
+	//	gen.Emitf("@startuml\nhide empty members\nset namespaceSeparator none\nskinparam linetype ortho\n\n")
+	gen.Emitf("@startuml\nhide empty members\nset namespaceSeparator none\n\n")
 }
 
 func (gen *Generator) GenerateFooter() {
@@ -135,9 +168,10 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	connections := make(map[string]string, 0)
 	//	gen.Emitf("class %s<Operation> << (O,DarkSalmon) >> {\n", opId)
 	gen.Emitf("class %s << (O,DarkSalmon) >> {\n", opId)
-	gen.Emitf("<i><b>%s %s</b></i>\n\n", op.HttpMethod, op.HttpUri)
+	gen.Emitf("<b>%s %s</b>\n", op.HttpMethod, op.HttpUri)
+	//gen.Emitf("{static} %s %s\n", op.HttpMethod, op.HttpUri)
 	if op.Input != nil {
-		//gen.Emitf(".. <i>input</i> ..\n")
+		gen.Emitf(".. <i>inputs</i> ..\n")
 		for _, f := range op.Input.Fields {
 			where := ""
 			if f.HttpHeader != "" {
@@ -147,13 +181,22 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 			} else if f.HttpPath {
 				where = "path"
 			} else if f.HttpPayload {
-				where = "payload"
+				//where = "payload"
 			}
 			fref, link := gen.GenerateTypeRef(f.Type)
 			if link != "" {
 				connections[link] = opId
 			}
-			gen.Emitf("    {field} %s: %s (%s)\n", f.Name, fref, where)
+			if where != "" {
+				where = " <i>(" + where + ")</i>"
+			}
+			if f.Required {
+				//exactly 1 to target
+				gen.Emitf("    {field} <b>%s</b>: %s%s\n", f.Name, fref, where)
+			} else {
+				//0 or 1 to target
+				gen.Emitf("    {field} %s: %s%s\n", f.Name, fref, where)
+			}
 		}
 	}
 	if op.Output != nil {
@@ -167,7 +210,7 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 					if link != "" {
 						connections[link] = opId
 					}
-					gen.Emitf("   {field} <b>%d: %s</b>\n", op.Output.HttpStatus, fref)
+					gen.Emitf("   {field} <b>%d</b>: %s\n", op.Output.HttpStatus, fref)
 				}
 			}
 			/*		for _, f := range op.Output.Fields {
@@ -204,7 +247,7 @@ func (gen *Generator) GenerateOperations() {
 		s := StripNamespace(gen.Schema.Id)
 		if s != "" {
 			//gen.Emitf("class %s<Service> << (S,khaki) >>\n", s)
-			gen.Emitf("class %s << (S,khaki) >>\n", s)
+			gen.Emitf("interface %s<Service>\n", s)
 			for _, op := range gen.Operations() {
 				gen.Emitf("%s ..> %s\n", s, StripNamespace(op.Id))
 			}
@@ -262,19 +305,37 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
     s := StripNamespace(td.Id)
 	connections := make(map[string]string, 0)
 	targets := make(map[string]string, 0)
+	entityIdField := ""
+	if eid, ok := gen.entities[s]; ok {
+		entityIdField = eid
+	}
     switch td.Base {
     case model.Struct:
-		gen.Emitf("class %s {\n", s)
+		if entityIdField != "" {
+			gen.Emitf("class %s << (R,CadetBlue) >> {\n", s)
+		} else {
+			gen.Emitf("class %s {\n", s)
+		}
 		for _, f := range td.Fields {
             fname := string(f.Name)
             fref, link := gen.GenerateTypeRef(f.Type)
 			if link != "" {
 				connections[link] = s
 				if strings.HasPrefix(fref, "List<") {
-					targets[link] = "o--{"
+					if f.Required {
+						//should really check the type for length traits. Even a required list can be empty
+						targets[link] = Composition + Association + OneOrManyDst
+					} else {
+						targets[link] = Composition + Association + ManyDst
+					}
+					//targets[link] = "\"1\" --> \"*\""
 				}
 			}
-            gen.Emitf("    {field} <b>%s</b>: %s\n", fname, fref)
+			if f.Required {
+				gen.Emitf("    {field} <b>%s</b>: %s\n", fname, fref)
+			} else {
+				gen.Emitf("    {field} %s: %s\n", fname, fref)
+			}
 		}
 		gen.Emitf("}\n")
     case model.Union:
@@ -285,7 +346,9 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
             fref, link := gen.GenerateTypeRef(f.Type)
 			if link != "" {
 				connections[link] = s
-				//special arrow for unions?
+				if strings.HasPrefix(fref, "List<") {
+					targets[link] = Composition + Association + ManyDst
+				}
 			}
             gen.Emitf("    {field} <b>%s</b>: %s\n", fname, fref)
 		}
@@ -299,7 +362,7 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	}
 	for link, s := range connections {
 		//		gen.Emitf("%s --> %s\n", s, link)
-		arrow := "o--"
+		arrow := Composition + Association
 		if a, ok := targets[link]; ok {
 			arrow = a
 		}
@@ -307,24 +370,6 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	}
     return nil
 }
-
-/*
-   func (gen *Generator) generateApiType(op *model.TypeDef) string {
-	g := gen.getDetailGenerator()
-	conf := data.NewObject()
-	if g.Sorted() {
-		conf.Put("sort", true) //!
-	}
-	err := g.Configure(gen.Schema, conf)
-	if err != nil {
-		return "Whoops: " + err.Error()
-	}
-	g.Begin()
-	g.GenerateType(op)
-	s := g.End()
-	return s
-}
-*/
 
 func (gen *Generator) GenerateExceptions() {
 	lst := gen.Exceptions()
