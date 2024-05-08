@@ -69,7 +69,14 @@ func ImportSwagger(swagger *Swagger, ns string, name string) (*model.Schema, err
 func (swagger *Swagger) ServiceName(s string) string {
 	if !model.IsSymbol(s) {
 		//from filename?
-		s = "Untitled"
+		var b []rune
+		for _, r := range s {
+			if r == '-' {
+				r = '_'
+			}
+			b = append(b, r)
+		}
+		s = string(b)
 	}
 	return s
 }
@@ -79,7 +86,7 @@ func (swagger *Swagger) ImportInfo(ns, name string) error {
 	swagger.schema.Namespace = model.Namespace(ns)
 	if info := swagger.raw.GetObject("info"); info != nil {
 		//name := info.GetString("title")
-		//name := swagger.ServiceName(name)
+		name := swagger.ServiceName(name)
 		schema := swagger.schema
 		schema.Id = model.AbsoluteIdentifier(string(schema.Namespace) + "#" + name)
 		schema.Version = info.GetString("version")
