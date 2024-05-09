@@ -314,6 +314,10 @@ func (ast *AST) AssemblyVersion() int {
 }
 
 func (ast *AST) PutShape(id string, shape *Shape) {
+	if id == "" {
+		fmt.Println("shape:", shape)
+		panic("whoops, no id on a shape")
+	}
 	if ast.Shapes == nil {
 		ast.Shapes = NewMap[*Shape]()
 	}

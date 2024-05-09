@@ -223,20 +223,21 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 			Target: "smithy.api#Unit",
 		}
 	}
-	if op.Output != nil {
-		if op.Output.Id != "" {
+	if op.Output.Fields != nil {
+		outputShapeId = string(op.Output.Id)
+		if outputShapeId == "" {
 			outputShapeId = string(op.Id) + "Output"
-			shape.Output = &ShapeRef{
-				Target: outputShapeId,
-			}
-			outputShape, err = gen.shapeFromOpOutput(op.Output, false)
-			if err != nil {
-				return err
-			}
-		} else {
-			shape.Output = &ShapeRef{
-				Target: "smithy.api#Unit",
-			}
+		}
+		shape.Output = &ShapeRef{
+			Target: outputShapeId,
+		}
+		outputShape, err = gen.shapeFromOpOutput(op.Output, false)
+		if err != nil {
+			return err
+		}
+	} else {
+		shape.Output = &ShapeRef{
+			Target: "smithy.api#Unit",
 		}
 	}
 	if op.Exceptions != nil {
