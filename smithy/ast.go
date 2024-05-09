@@ -792,7 +792,7 @@ func (ast *AST) ExpandMixins() error {
 func (ast *AST) FilterDependencies(root []string, exclude []string) {
 	included := NewMap[bool]()
 	for _, k := range root {
-		if !included.Has(k){
+		if !included.Has(k) {
 			ast.noteDependencies(included, k)
 		}
 	}
@@ -852,7 +852,7 @@ func (ast *AST) Filter(tags []string) {
 
 	for _, k := range ast.Shapes.Keys() {
 		kNoNamespace := stripNamespace(k)
-		if len(include) == 0 || containsString(include, k) || containsString(include, kNoNamespace){
+		if len(include) == 0 || containsString(include, k) || containsString(include, kNoNamespace) {
 			root = append(root, k)
 		}
 		shape := ast.Shapes.Get(k)
