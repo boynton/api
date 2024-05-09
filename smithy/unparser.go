@@ -258,12 +258,16 @@ func (w *IdlWriter) Begin() {
 	w.writer = bufio.NewWriter(&w.buf)
 }
 
-func (w *IdlWriter) stripNamespace(id string) string {
+func stripNamespace(id string) string {
 	n := strings.Index(id, "#")
 	if n < 0 {
 		return id
 	}
 	return id[n+1:]
+}
+
+func (w *IdlWriter) stripNamespace(id string) string {
+	return stripNamespace(id)
 	/*
 		match := w.namespace + "#"
 		if strings.HasPrefix(id, match) {
