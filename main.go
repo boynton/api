@@ -211,15 +211,23 @@ Supported generators and options used from config if present
 - json: Prints the parsed API data representation in JSON to stdout
 - smithy: Prints the Smithy IDL representation to stdout.
 - smithy-ast: Prints the Smithy AST representation to stdout
-- sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
 - openapi: Prints the OpenAPI Spec v3 representation to stdout
+- plantuml: Prints the PlantUML representation of the API to stdout.
+- sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
+- html: Prints html to stdout
+   "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
 - markdown: Prints markdown to stdout
-   "-a detail-generator=smithy" - to generate the detail entries with "smithy" instead of "api", which is the default
-- go: Generate Go server code for the model. By default, send output to stdout
+   "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
 
 For any generator the following additional parameters are accepted:
 - "-a sort" - causes the operations and types to be alphabetically sorted, by default the original order is preserved
 
 `
+	//not yet:
+	// - java: Generate Java client code
+	// - go: Generate Go client code
+	// - gorilla: Generate Go code for a Gorilla-based server.
+	// - jaxrs: Generate Java code for a Jersey/Jetty/Jackson based JAX-RS servier
+
 	fmt.Println(msg)
 }
