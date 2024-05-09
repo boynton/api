@@ -1,7 +1,7 @@
 # api
 An HTTP-oriented API design and prototyping tool.
 
-This tool can read and write several API description formats, generate concise summaries, as well as working code in several languages.
+This tool can read and write several API description formats, generate concise summaries.
 
 ## Installation
 
@@ -20,9 +20,11 @@ Invoked with no arguments, `api` shows basic usage:
 
 ```
 $ api
-usage: api [-v] [-l] [-o outdir] [-g generator] [-a key=val]* [-t tag]* file ...
+usage: api [-vlfhpq] [-w warnlev] [-ns namespace] [-e entityid] [-d outdir] [-g generator] [-a key=val]* [-t tag]* file ...
   -a value
         Additional named arguments for a generator
+  -d string
+        The directory to generate output into (defaults to none, i.e. echo to stdout)
   -e string
         Show the specified entity.
   -f    Force overwrite if output file exists
@@ -31,15 +33,43 @@ usage: api [-v] [-l] [-o outdir] [-g generator] [-a key=val]* [-t tag]* file ...
   -h    Show more help information
   -l    List the entities in the model
   -ns string
-        The namespace to force if none is present (default "example")
-  -o string
-        The directory to generate output into (defaults to stdout)
+    	The namespace to force if absent. Also used by the default api generator to flatten to a single namespace
+  -p	Parse input, display parse tree, and exit.
   -q    Quiet tool output, make it less verbose
   -t value
         Tag of entities to include. Prefix tag with '-' to exclude that tag
-  -v    Show api tool version and exit
+  -v	Suppress validation of the assembled model.
   -w string
         Warnings. 'show' or 'supress' or 'error'. Default is 'show' (default "show")
+```
+For additional help and dezcription of supported generators, use the -h flag:
+
+```
+rio:api lee$ ./bin/api -h
+
+Supported API description formats for each input file extension:
+   .api      api (the default for this tool
+   .smithy   smithy
+   .json     api, smithy, openapi, swagger (inferred by looking at the file contents)
+
+The '' and 'namespace' options allow specifying those attributes for input formats
+that do not require or support them. Otherwise a default is used based on the model being parsed.
+
+Supported generators and options used from config if present
+- api: Prints the native API representation to stdout. This is the default.
+- json: Prints the parsed API data representation in JSON to stdout
+- smithy: Prints the Smithy IDL representation to stdout.
+- smithy-ast: Prints the Smithy AST representation to stdout
+- openapi: Prints the OpenAPI Spec v3 representation to stdout
+- plantuml: Prints the PlantUML representation of the API to stdout.
+- sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
+- html: Prints html to stdout
+   "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
+- markdown: Prints markdown to stdout
+   "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
+
+For any generator the following additional parameters are accepted:
+- "-a sort" - causes the operations and types to be alphabetically sorted, by default the original order is preserved
 ```
 
 In general, it takes an arbitrary set of input files, parses them, assembles them into a single model, and then uses
@@ -129,7 +159,8 @@ $ api -g json examples/hello.api
 
 To convert this to [Smithy](https://awslabs.github.io/smithy/):
 ```
-$ api -g smithy examples/hello.api
+$ api -g smithy examples/hello.api > /tmp/hello.smithy
+$ cat /tmp/hello.smithy
 $version: "2"
 
 namespace examples
@@ -159,48 +190,22 @@ operation Hello {
 To parse the smithy back into api's native format:
 
 ```
-$ api -g smithy examples/hello.api > /tmp/hello.smithy
 $ api /tmp/hello.smithy
 namespace examples
-name hello
+service HelloService
+version "1.0"
+
 
 //
 // A minimal hello world action
 //
-action hello GET "/hello?caller={caller}" {
-    caller String
-
-    expect 200 {
-        greeting String
-   }
+operation Hello (method=GET, url="/hello") {
+    input {
+        caller String (query="caller")
+    }
+    output (status=200) {
+        greeting String (payload)
+    }
 }
-```
-
-The complete list of supported formats and generators is access with the help flag:
-
-```
-$ api -h
-
-Supported API description formats for each input file extension:
-   .api      api (the default for this tool)
-   .smithy   smithy
-   .json     api, smithy, openapi, swagger (inferred by looking at the file contents)
-
-The 'ns' option allow specifying the namespace for input formats
-that do not require or support them. Otherwise a default is used based on the model being parsed.
-
-Supported generators and options used from config if present
-- api: Prints the native API representation to stdout. This is the default.
-- json: Prints the parsed API data representation in JSON to stdout
-- smithy: Prints the Smithy IDL representation to stdout.
-- smithy-ast: Prints the Smithy AST representation to stdout
-- sadl: Prints the SADL (an older format similar to api) to stdout. Useful for some additional generators.
-- openapi: Prints the OpenAPI Spec v3 representation to stdout
-- html: Prints an html summary to stdout
-   "-a detail-generator=smithy" - to generate the detail entries with "smithy" instead of "api", which is the default
-- go: Generate Go server code for the model. By default, send output to stdout
-
-For any generator the following additional parameters are accepted:
-- "-a sort" - causes the operations and types to be alphabetically sorted, by default the original order is preserved
 ```
 

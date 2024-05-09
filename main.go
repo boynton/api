@@ -74,7 +74,7 @@ func main() {
 	files := flag.Args()
 	if len(files) == 0 {
 		fmt.Printf("API tool %s [%s]\n", Version, "https://github.com/boynton/api")
-		fmt.Println("usage: api [-v] [-l] [-o outdir] [-g generator] [-a key=val]* [-t tag]* file ...")
+		fmt.Println("usage: api [-vlfhpq] [-w warnlev] [-ns namespace] [-e entityid] [-d outdir] [-g generator] [-a key=val]* [-t tag]* file ...")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
