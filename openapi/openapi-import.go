@@ -49,8 +49,8 @@ type ModelBuilder struct {
 
 func (mb *ModelBuilder) Build() (*model.Schema, error) {
 	//fmt.Println("openapi:", model.Pretty(mb.openapi))
-	if mb.openapi.OpenAPI != "3.0.0" {
-		return nil, fmt.Errorf("Not a supported openapi document. Only version 3.0.0 is supported")
+	if !strings.HasPrefix(mb.openapi.OpenAPI, "3.") {
+		return nil, fmt.Errorf("Not a supported openapi document. Only version 3.x.x is supported")
 	}
 	err := mb.ImportInfo()
 	if err != nil {
@@ -156,6 +156,17 @@ func (mb *ModelBuilder) opComment(pop *Operation) string {
 
 func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operation) error {
 	opId := mb.toCanonicalAbsoluteId(model.Capitalize(pop.OperationId))
+	if pop.OperationId == "" {
+		if pop.Summary != "" {
+			s := ""
+			for _, ss := range strings.Split(pop.Summary, " ") {
+				s = s + model.Capitalize(ss)
+			}
+			opId = mb.toCanonicalAbsoluteId(s)
+		} else {
+			opId = mb.toCanonicalAbsoluteId(fmt.Sprintf("Operation%d", len(mb.schema.Operations)))
+		}
+	}
 	op := &model.OperationDef{
 		Id:         opId,
 		HttpMethod: method,
@@ -282,7 +293,9 @@ func (mb *ModelBuilder) ImportOperation(path string, method string, pop *Operati
 	}
 	mb.schema.Operations = append(mb.schema.Operations, op)
 	if len(edefs) > 0 {
-		panic("fix me: emit exception defs in new format")
+		for _, edef := range edefs {
+			mb.schema.EnsureExceptionDef(edef)
+		}
 	}
 	return nil
 }
