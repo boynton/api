@@ -53,7 +53,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.GenerateTypes()
 	gen.GenerateFooter()
 	s := gen.End()
-	fname := gen.FileName(gen.name, ".md")
+	fname := gen.FileName(gen.name, ".html")
 	err = gen.Write(s, fname, "")
 	return err
 }
