@@ -17,6 +17,9 @@ func Import(paths []string, tags []string, parseOnly bool) (*model.Schema, error
 		return nil, err
 	}
 	if parseOnly {
+		if len(tags) > 0 {
+			ast.Filter(tags)
+		}
 		fmt.Println(model.Pretty(ast))
 		return nil, nil
 	}
