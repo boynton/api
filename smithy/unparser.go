@@ -219,25 +219,32 @@ func (ast *AST) noteExternalRefs(match string, name string, shape *Shape, refs m
 	}
 	if match == "" || !strings.HasPrefix(name, match) {
 		refs[name] = true
-		if shape != nil {
-			ast.noteExternalTraitRefs(match, shape.Traits, refs)
-			switch shape.Type {
-			case "map":
-				ast.noteExternalRefs(match, shape.Key.Target, ast.GetShape(shape.Key.Target), refs)
-				ast.noteExternalTraitRefs(match, shape.Key.Traits, refs)
-				ast.noteExternalRefs(match, shape.Value.Target, ast.GetShape(shape.Value.Target), refs)
-				ast.noteExternalTraitRefs(match, shape.Value.Traits, refs)
-			case "list", "set":
-				ast.noteExternalRefs(match, shape.Member.Target, ast.GetShape(shape.Member.Target), refs)
-				ast.noteExternalTraitRefs(match, shape.Member.Traits, refs)
-			case "structure", "union":
-				if shape.Members != nil {
-					for _, k := range shape.Members.Keys() {
-						member := shape.Members.Get(k)
-						ast.noteExternalRefs(match, member.Target, ast.GetShape(member.Target), refs)
-						ast.noteExternalTraitRefs(match, member.Traits, refs)
-					}
+	}
+	if shape != nil {
+		ast.noteExternalTraitRefs(match, shape.Traits, refs)
+		switch shape.Type {
+		case "map":
+			ast.noteExternalRefs(match, shape.Key.Target, ast.GetShape(shape.Key.Target), refs)
+			ast.noteExternalTraitRefs(match, shape.Key.Traits, refs)
+			ast.noteExternalRefs(match, shape.Value.Target, ast.GetShape(shape.Value.Target), refs)
+			ast.noteExternalTraitRefs(match, shape.Value.Traits, refs)
+		case "list", "set":
+			ast.noteExternalRefs(match, shape.Member.Target, ast.GetShape(shape.Member.Target), refs)
+			ast.noteExternalTraitRefs(match, shape.Member.Traits, refs)
+		case "structure", "union":
+			if shape.Members != nil {
+				for _, k := range shape.Members.Keys() {
+					member := shape.Members.Get(k)
+					ast.noteExternalRefs(match, member.Target, ast.GetShape(member.Target), refs)
+					ast.noteExternalTraitRefs(match, member.Traits, refs)
 				}
+			}
+		case "service":
+			for _, rez := range shape.Resources {
+				ast.noteExternalRefs(match, rez.Target, ast.GetShape(rez.Target), refs)
+			}
+			for _, op := range shape.Operations {
+				ast.noteExternalRefs(match, op.Target, ast.GetShape(op.Target), refs)
 			}
 		}
 	}
