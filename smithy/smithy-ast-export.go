@@ -51,7 +51,7 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 	for _, od := range gen.Schema.Operations {
 		if od.Resource != "" {
 			operations[od.Id] = true
-			rezId := gen.EnsureNamespaced(od.Resource)
+			rezId := strings.Split(string(od.Id), "#")[0] + "#" + od.Resource
 			var shape *Shape
 			if rez, ok := resources[rezId]; ok {
 				shape = rez
