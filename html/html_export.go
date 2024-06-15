@@ -130,22 +130,27 @@ func (gen *Generator) GenerateSummary() {
 		gen.Emitf("  <li><strong>Namespace</strong>: &ldquo;%s&rdquo;</li>\n", gen.Schema.Base)
 	}
 	gen.Emitf("</ul>\n")
-	gen.Emitf("<h3 id=\"resources\">Resources</h3>\n")
-	gen.Emitf("<ul>\n")
-	for _, id := range gen.ResourceIds() {
-		s := StripNamespace(id)
-		gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), s)
+	rezIds := gen.ResourceIds()
+	if len(rezIds) > 0 {
+		gen.Emitf("<h3 id=\"resources\">Resources</h3>\n")
+		gen.Emitf("<ul>\n")
+		for _, id := range rezIds {
+			s := StripNamespace(id)
+			gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), s)
+		}
+		gen.Emitf("</ul>\n")
 	}
-	gen.Emitf("</ul>\n")
-	gen.Emitf("</ul>\n")
-	gen.Emitf("<h3 id=\"operations\">Operations</h3>\n")
-	gen.Emitf("<ul>\n")
-	for _, op := range gen.Operations() {
-		sum := summarySignature(op)
-		s := StripNamespace(op.Id)
-		gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), sum)
+	opIds := gen.Operations()
+	if len(opIds) > 0 {
+		gen.Emitf("<h3 id=\"operations\">Operations</h3>\n")
+		gen.Emitf("<ul>\n")
+		for _, op := range opIds {
+			sum := summarySignature(op)
+			s := StripNamespace(op.Id)
+			gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), sum)
+		}
+		gen.Emitf("</ul>\n")
 	}
-	gen.Emitf("</ul>\n")
 	gen.Emitf("<h3 id=\"types\">Types</h3>\n")
 	gen.Emitf("<ul>\n")
 	for _, td := range gen.Types() {
@@ -223,6 +228,7 @@ func (gen *Generator) GenerateResources() {
 			if sg, ok := g.(*smithy.IdlGenerator); ok {
 				gen.Emitf("<h2 id=\"resources\">Resources</h2>\n")
 				for _, id := range resourceIds {
+					panic("what?")
 					gen.GenerateResource(sg, id)
 				}
 				gen.Emit("\n")

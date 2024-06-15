@@ -227,6 +227,13 @@ func (swagger *Swagger) toCanonicalTypeNameWithContext(prop *data.Object, contex
 			swagger.ImportList(genTypeName, prop)
 		}
 		name = genTypeName
+	case "object":
+		genTypeId := model.AbsoluteIdentifier(context)
+		genTypeName := model.StripNamespace(genTypeId)
+		if swagger.schema.GetTypeDef(genTypeId) == nil {
+			swagger.ImportStruct(genTypeName, prop)
+		}
+		name = genTypeName
 	default:
 		sch := prop.GetObject("schema")
 		if sch != nil {
@@ -550,8 +557,7 @@ func (swagger *Swagger) ImportStruct(name string, def *data.Object) error {
 			Name: model.Identifier(fname),
 			Comment: v.GetString("description"),
 		}
-		//fd.Type = swagger.toCanonicalTypeNameWithContext(v, name)
-		fd.Type = swagger.toCanonicalTypeName(v)
+		fd.Type = swagger.toCanonicalTypeNameWithContext(v, name + Capitalize(fname))
 		for _, rname := range req {
 			if rname == name {
 				fd.Required = true
