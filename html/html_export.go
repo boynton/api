@@ -228,7 +228,6 @@ func (gen *Generator) GenerateResources() {
 			if sg, ok := g.(*smithy.IdlGenerator); ok {
 				gen.Emitf("<h2 id=\"resources\">Resources</h2>\n")
 				for _, id := range resourceIds {
-					panic("what?")
 					gen.GenerateResource(sg, id)
 				}
 				gen.Emit("\n")
