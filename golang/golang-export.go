@@ -205,7 +205,7 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
 		return gen.anyPrefix + "Any"
 	default:
 		//not a base type, but an operation input or output (looks like a Struct, but not declared as a type)
-		return "*" + stripLocalNamespace(typeRef, gen.ns)
+		return "*" + stripNamespace(typeRef)
 	}
 }
 
@@ -281,7 +281,7 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 	default:
 		indirect = "*"
 	}
-	return indirect + stripLocalNamespace(typeRef, gen.ns)
+	return indirect + stripNamespace(typeRef)
 }
 
 // for now, assume a single package, so we strip the namespace of non-language types
