@@ -184,11 +184,12 @@ func (ast *AST) ExternalRefs(ns string) []string {
 		match = ""
 	}
 	refs := make(map[string]bool, 0)
+	visited := make(map[string]bool, 0)
 	for _, k := range ast.Shapes.Keys() {
 		lst := strings.Split(k, "#")
 		if ns == "" || lst[0] == ns {
 			v := ast.GetShape(k)
-			ast.noteExternalRefs(match, k, v, refs)
+			ast.noteExternalRefs(match, k, v, refs, visited)
 		}
 	}
 	var res []string
@@ -208,7 +209,11 @@ func (ast *AST) noteExternalTraitRefs(match string, traits *NodeValue, refs map[
 	}
 }
 
-func (ast *AST) noteExternalRefs(match string, name string, shape *Shape, refs map[string]bool) {
+func (ast *AST) noteExternalRefs(match string, name string, shape *Shape, refs map[string]bool, visited map[string]bool) {
+	if ok, b := visited[name]; ok && b {
+		return
+	}
+	visited[name] = true
 	if name == "smithy.api#Document" {
 		//force an alias to this to get emitted.
 	} else if strings.HasPrefix(name, "smithy.api#") {
@@ -224,27 +229,27 @@ func (ast *AST) noteExternalRefs(match string, name string, shape *Shape, refs m
 		ast.noteExternalTraitRefs(match, shape.Traits, refs)
 		switch shape.Type {
 		case "map":
-			ast.noteExternalRefs(match, shape.Key.Target, ast.GetShape(shape.Key.Target), refs)
+			ast.noteExternalRefs(match, shape.Key.Target, ast.GetShape(shape.Key.Target), refs, visited)
 			ast.noteExternalTraitRefs(match, shape.Key.Traits, refs)
-			ast.noteExternalRefs(match, shape.Value.Target, ast.GetShape(shape.Value.Target), refs)
+			ast.noteExternalRefs(match, shape.Value.Target, ast.GetShape(shape.Value.Target), refs, visited)
 			ast.noteExternalTraitRefs(match, shape.Value.Traits, refs)
 		case "list", "set":
-			ast.noteExternalRefs(match, shape.Member.Target, ast.GetShape(shape.Member.Target), refs)
+			ast.noteExternalRefs(match, shape.Member.Target, ast.GetShape(shape.Member.Target), refs, visited)
 			ast.noteExternalTraitRefs(match, shape.Member.Traits, refs)
 		case "structure", "union":
 			if shape.Members != nil {
 				for _, k := range shape.Members.Keys() {
 					member := shape.Members.Get(k)
-					ast.noteExternalRefs(match, member.Target, ast.GetShape(member.Target), refs)
+					ast.noteExternalRefs(match, member.Target, ast.GetShape(member.Target), refs, visited)
 					ast.noteExternalTraitRefs(match, member.Traits, refs)
 				}
 			}
 		case "service":
 			for _, rez := range shape.Resources {
-				ast.noteExternalRefs(match, rez.Target, ast.GetShape(rez.Target), refs)
+				ast.noteExternalRefs(match, rez.Target, ast.GetShape(rez.Target), refs, visited)
 			}
 			for _, op := range shape.Operations {
-				ast.noteExternalRefs(match, op.Target, ast.GetShape(op.Target), refs)
+				ast.noteExternalRefs(match, op.Target, ast.GetShape(op.Target), refs, visited)
 			}
 		}
 	}
