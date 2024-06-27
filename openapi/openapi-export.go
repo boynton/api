@@ -78,9 +78,20 @@ func (gen *Generator) SchemaFromTypeRef(tref model.AbsoluteIdentifier) *Schema {
 	if strings.HasPrefix(ref, "base#") {
 		var otype, oformat string
 		switch ref {
-		case "base#Int32":
+		case "base#Int8", "base#Int16", "base#Int32":
 			otype = "integer"
 			oformat = "int32"
+		case "base#Int64":
+			otype = "integer"
+			oformat = "int64"
+		case "base#Float64":
+			otype = "number"
+			oformat = "double"
+		case "base#Float32":
+			otype = "number"
+			oformat = "float"
+		case "base#Decimal", "base#Integer":
+			otype = "number"
 		case "base#Timestamp":
 			otype = "string"
 			oformat = "date-time"
