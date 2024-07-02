@@ -82,7 +82,6 @@ func toCanonicalAbsoluteId(id string) model.AbsoluteIdentifier {
 		return model.AbsoluteIdentifier(strings.Join(lst, "#"))
 	}
 	model.Warning("Non-absolute id: %q\n", id)
-	//FIX: apply default namespace
 	return model.AbsoluteIdentifier("fixme#" + id)
 }
 
@@ -555,7 +554,9 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 					Name: model.Identifier(name),
 				}
 				v := shape.Members.Get(name)
-				fd.Type = toCanonicalTypeName(v.Target)
+				if v.Target != "" {
+					fd.Type = toCanonicalTypeName(v.Target)
+				}
 				if v.Traits != nil {
 					if v.Traits.Get("smithy.api#required") != nil {
 						fd.Required = true

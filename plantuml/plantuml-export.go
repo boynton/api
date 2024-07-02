@@ -65,11 +65,16 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 				}
 			}
 			idField := ""
-			for _, in := range op.Input.Fields {
-				if in.HttpPath {
-					idField = string(in.Name) 
-					break //fixme: more than one pathparam for a resource id
+			if op.Input != nil {
+				for _, in := range op.Input.Fields {
+					if in.HttpPath {
+						idField = string(in.Name) 
+						break //fixme: more than one pathparam for a resource id
+					}
 				}
+			}
+			if idField == "" {
+				idField = "-"
 			}
 			gen.entities[entityType] = idField
 		}
@@ -138,6 +143,7 @@ func (gen *Generator) GenerateFooter() {
 }
 
 func StripNamespace(target model.AbsoluteIdentifier) string {
+	fmt.Printf("StripNamespace: %q\n", target)
 	t := string(target)
 	n := strings.Index(t, "#")
 	if n < 0 {
@@ -184,6 +190,10 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 				//where = "payload"
 			}
 			fref, link := gen.GenerateTypeRef(f.Type)
+			if len(fref) <= 1 {
+				fmt.Printf("fref: %q, %q\n", fref, f.Type)
+				panic("what?!")
+			}
 			if link != "" {
 				connections[link] = opId
 			}
@@ -294,7 +304,7 @@ func (gen *Generator) GenerateTypeRef(ref model.AbsoluteIdentifier) (string, str
 			case model.Enum:
 				return sref, sref
 			default:
-				return string(td.Base), ""
+				return td.Base.String(), ""
 			}
 		}
 	}
