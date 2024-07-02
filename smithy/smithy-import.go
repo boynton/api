@@ -282,7 +282,15 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 				f.MinSize = length.GetInt64("min", 0)
 				f.MaxSize = length.GetInt64("max", 0)
 			}
+			if mem.Traits.Has("smithy.api#range") {
+				r := mem.Traits.Get("smithy.api#range")
+				f.MinValue = r.GetDecimal("min", nil)
+				f.MaxValue = r.GetDecimal("max", nil)
+			}
 			//other traits!!!
+			if mem.Traits.Has("smithy.api#documentation") {
+				f.Comment = mem.Traits.GetString("smithy.api#documentation")
+			}
 			ti.Fields = append(ti.Fields, f)
 		}
 	}
@@ -593,27 +601,6 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		return addOperation(schema, ast, shapeId, shape, "", "")
 	case "resource":
 		return addResource(schema, ast, shapeId, shape)
-	case "apply":
-		/*
-			//apply to another shape. Do I handle forward references? The model keeps separate. Hmm.
-			shapeMember := strings.Split(shapeId, "$")
-			if len(shapeMember) != 2 {
-			panic("apply id has no member component")
-			} else {
-			targetId := model.AbsoluteIdentifier(shapeMember[0])
-			targetTd := schema.GetTypeDef(targetId)
-			fmt.Printf("targetId: %q, targetTd: %v\n", targetId, targetTd)
-			if targetTd == nil {
-			fmt.Print("Cannot find target shape for apply: " + shapeMember[0])
-			panic("whoa")
-			} else {
-			fmt.Println("apply to", shapeMember, ", targetTd:", targetTd, ", these traits:", model.Pretty(shape))
-			panic("here")
-			}
-			}
-			//		panic("implement 'apply': '" + shapeId + "' -> " + model.Pretty(shape))
-		*/
-		return nil
 	default:
 		panic("implement me:" + shape.Type)
 	}

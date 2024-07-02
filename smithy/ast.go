@@ -65,6 +65,13 @@ func (node *NodeValue) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func cloneNodeValue(node *NodeValue) *NodeValue {
+	if node == nil {
+		return nil
+	}
+	return &NodeValue{value: node.value}
+}
+
 func (node *NodeValue) RawValue() interface{} {
 	return node.value
 }
@@ -218,6 +225,14 @@ func (node *NodeValue) GetInt64(key string, def int64) int64 {
 	return n.AsInt64()
 }
 
+func (node *NodeValue) GetDecimal(key string, def *data.Decimal) *data.Decimal {
+	n := node.Get(key)
+	if n == nil {
+		return def
+	}
+	return n.AsDecimal()
+}
+
 func (node *NodeValue) AsDecimal() *data.Decimal {
 	if node == nil {
 		return nil
@@ -345,6 +360,76 @@ func (ast *AST) ForAllShapes(visitor func(shapeId string, shape *Shape) error) e
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func cloneShape(shape *Shape) *Shape {
+	newShape := &Shape{
+		Type:                 shape.Type,
+		Version:              shape.Version,
+		Member:               cloneMember(shape.Member),
+		Members:              cloneMembers(shape.Members),
+		Mixins:               cloneShapeRefs(shape.Mixins),
+		Key:                  cloneMember(shape.Key),
+		Value:                cloneMember(shape.Value),
+		Create:               cloneShapeRef(shape.Create),
+		Put:                  cloneShapeRef(shape.Put),
+		Read:                 cloneShapeRef(shape.Read),
+		Update:               cloneShapeRef(shape.Update),
+		Delete:               cloneShapeRef(shape.Delete),
+		List:                 cloneShapeRef(shape.List),
+		CollectionOperations: cloneShapeRefs(shape.CollectionOperations),
+		Operations:           cloneShapeRefs(shape.Operations),
+		Resources:            cloneShapeRefs(shape.Resources),
+		Input:                cloneShapeRef(shape.Input),
+		Output:               cloneShapeRef(shape.Output),
+		Errors:               cloneShapeRefs(shape.Errors),
+		Traits:               cloneNodeValue(shape.Traits),
+	}
+	if shape.Identifiers != nil {
+		m := NewMap[*ShapeRef]()
+		for _, k := range shape.Identifiers.Keys() {
+			sr := shape.Identifiers.Get(k)
+			m.Put(k, cloneShapeRef(sr))
+		}
+		newShape.Identifiers = m
+	}
+	return newShape
+}
+
+func cloneShapeRef(ref *ShapeRef) *ShapeRef {
+	if ref != nil {
+		tmp := *ref
+		return &tmp
+	}
+	return nil
+}
+
+func cloneShapeRefs(refs []*ShapeRef) []*ShapeRef {
+	var res []*ShapeRef
+	for _, r := range refs {
+		res = append(res, cloneShapeRef(r))
+	}
+	return res
+}
+
+func cloneMember(member *Member) *Member {
+	if member != nil {
+		tmp := *member
+		return &tmp
+	}
+	return nil
+}
+
+func cloneMembers(members *Map[*Member]) *Map[*Member] {
+	if members != nil {
+		mems := NewMap[*Member]()
+		for _, k := range members.Keys() {
+			m := members.Get(k)
+			mems.Put(k, cloneMember(m))
+		}
+		return mems
 	}
 	return nil
 }
@@ -647,7 +732,8 @@ func Assemble(paths []string) (*AST, error) {
 	return assembly, nil
 }
 
-func (ast *AST) Apply(target string, traits *NodeValue) error {
+func (ast *AST) Apply(sftarget string, traits *NodeValue) error {
+	target := sftarget
 	lst := strings.Split(target, "$")
 	field := ""
 	if len(lst) == 2 {
@@ -658,12 +744,14 @@ func (ast *AST) Apply(target string, traits *NodeValue) error {
 		if field != "" {
 			m := shape.Members.Get(field)
 			if m == nil {
-				fmt.Println("field not found:", field, target, data.Pretty(shape))
-				panic("whoops")
+				m = &Member{}
+				shape.Members.Put(field, m)
 			}
-			t := ensureMemberTraits(m)
+			if m.Traits == nil {
+				m.Traits = NewNodeValue()
+			}
 			for _, k := range traits.Keys() {
-				t.Put(k, traits.Get(k))
+				m.Traits.Put(k, traits.Get(k))
 			}
 		} else {
 			t := ensureShapeTraits(shape)
@@ -722,28 +810,29 @@ func (ast *AST) mergeConflict(k string, v1 interface{}, v2 interface{}) error {
 	return fmt.Errorf("Conflict when merging metadata in models: %s\n", k)
 }
 
-func (ast *AST) expandMixins(shapeId string) error {
-	//destructive: every mixin is merged once
-	shape := ast.Shapes.Get(shapeId)
-	if shape == nil {
-		return fmt.Errorf("Shape not available: %s", shapeId)
+func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
+	prevShape := ast.Shapes.Get(shapeId)
+	if prevShape == nil {
+		return nil, fmt.Errorf("Shape not available: %s", shapeId)
 	}
-	//for _, mixinRef := range shape.Mixins {
+	shape := cloneShape(prevShape)
 	if shape.Mixins != nil {
 		last := len(shape.Mixins) - 1
 		for i := last; i >= 0; i-- {
 			mixinRef := shape.Mixins[i]
 			mixinId := mixinRef.Target
-			ast.expandMixins(mixinId)        //this causes reverse order, not what we want
-			mixin := ast.Shapes.Get(mixinId) //expanded
+			mixin, err := ast.expandMixins(mixinId) //this causes reverse order, not what we want
+			if err != nil {
+				return nil, err
+			}
 			if mixin == nil {
 				panic("oops, should have deferred elision and apply at assembly time")
 			}
 			if mixin.Members != nil {
-				if shape.Type != "structure" {
-					return fmt.Errorf("Target for mixin with members not a Structure: %s", shapeId)
-				}
 				newMembers := NewMap[*Member]()
+				if shape.Type != "structure" {
+					return nil, fmt.Errorf("Target for mixin with members not a Structure: %s", shapeId)
+				}
 				for _, memKey := range mixin.Members.Keys() {
 					mem := mixin.Members.Get(memKey)
 					newMembers.Put(memKey, mem)
@@ -779,7 +868,7 @@ func (ast *AST) expandMixins(shapeId string) error {
 		}
 		shape.Mixins = nil
 	}
-	return nil
+	return shape, nil
 }
 
 func (ast *AST) ExpandMixins() error {

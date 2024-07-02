@@ -147,7 +147,7 @@ func (p *Parser) Parse() error {
 				//to do: parse straight to a "target" shape, then apply it later during assembly?
 				var ftype string
 				ftype, err = p.expectShapeId()
-				fmt.Println("apply to shapeId:", ftype)
+				//fmt.Println("apply to shapeId:", ftype)
 				//ftype, err = p.expectTarget()
 				tok := p.GetToken()
 				if tok == nil {
@@ -921,7 +921,7 @@ func (p *Parser) parseMap(sname string, traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
+func (p *Parser) parseStructureBody(name string, traits *NodeValue) (*Shape, error) {
 	shape := &Shape{
 		Type:   "structure",
 		Traits: traits,
@@ -960,48 +960,27 @@ func (p *Parser) parseStructureBody(traits *NodeValue) (*Shape, error) {
 				return nil, err
 			}
 		} else if tok.Type == DOLLAR {
-			//create a new 'apply' shape on the traits we've got here. Let mixin do its thing
-			//note: apply also is eager now, should wait until at least assembly time.
-			//so for now,
-			//Target elision with a mixin
 			tok := p.GetToken()
 			if tok.Type != SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			fname := tok.Text
-			mem := &Member{
-				Traits: mtraits,
+			if mtraits != nil && mtraits.Length() > 0 {
+				shape := &Shape{
+					Type:   "apply",
+					Traits: mtraits,
+				}
+				p.ast.PutShape(p.ensureNamespaced(name+"$"+fname), shape)
+				mtraits = nil
 			}
-			mtraits = nil
-			mems.Put(fname, mem)
 			if resource != nil {
 				if resource.Identifiers != nil {
-					idType := resource.Identifiers.Get(fname)
-					mem.Target = p.ensureNamespaced(idType.Target)
+					panic("fix me")
+					/*
+						idType := resource.Identifiers.Get(fname)
+						mem.Target = p.ensureNamespaced(idType.Target)
+					*/
 				}
-			}
-			if mem.Target == "" {
-				for _, mixin := range shape.Mixins {
-					mixshape := p.ast.GetShape(mixin.Target)
-					for _, mixname := range mixshape.Members.Keys() {
-						if mixname == fname {
-							mixmem := mixshape.Members.Get(fname)
-							if mixmem == nil {
-								fmt.Println("mixin field name match:", fname)
-								panic("whoops, nil!")
-							}
-							if mem.Target == "" {
-								mem.Target = mixmem.Target
-							}
-							for _, k := range mixmem.Traits.Keys() {
-								mem.Traits = withTrait(mem.Traits, k, mixmem.Traits.Get(k))
-							}
-						}
-					}
-				}
-			}
-			if mem.Target == "" {
-				return nil, p.Error(fmt.Sprintf("Target elision failure: %s", fname))
 			}
 		} else if tok.Type == SYMBOL {
 			fname := tok.Text
@@ -1057,7 +1036,7 @@ func (p *Parser) parseStructure(traits *NodeValue) error {
 	if err != nil {
 		return err
 	}
-	body, err := p.parseStructureBody(traits)
+	body, err := p.parseStructureBody(name, traits)
 	if err != nil {
 		return err
 	}
@@ -1281,8 +1260,9 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 				if p.version < 2 {
 					err = p.SyntaxError()
 				} else {
+					inName := name + "Input"
 					traits = NewNodeValue().Put("smithy.api#input", NewNodeValue())
-					body, err := p.parseStructureBody(traits)
+					body, err := p.parseStructureBody(inName, traits)
 					if err != nil {
 						return err
 					}
@@ -1297,7 +1277,6 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 							p.SyntaxError()
 						}
 					}
-					inName := name + "Input"
 					shape.Input = &ShapeRef{Target: p.ensureNamespaced(inName)}
 					p.addShapeDefinition(inName, body)
 				}
@@ -1314,8 +1293,9 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 				if p.version < 2 {
 					err = p.SyntaxError()
 				} else {
+					outName := name + "Output"
 					traits = NewNodeValue().Put("smithy.api#output", NewNodeValue())
-					body, err := p.parseStructureBody(traits)
+					body, err := p.parseStructureBody(outName, traits)
 					if err != nil {
 						return err
 					}
@@ -1330,7 +1310,6 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 							p.SyntaxError()
 						}
 					}
-					outName := name + "Output"
 					shape.Output = &ShapeRef{Target: p.ensureNamespaced(outName)}
 					p.addShapeDefinition(outName, body)
 				}
@@ -1591,6 +1570,9 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 					args = nil
 				} else if tok.Text == "false" {
 					literal = false
+					args = nil
+				} else if tok.Text == "null" {
+					literal = nil
 					args = nil
 				} else {
 					p.ignore(COLON)

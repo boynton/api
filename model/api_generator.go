@@ -158,6 +158,18 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 			} else if f.HttpHeader != "" {
 				opts = append(opts, fmt.Sprintf("header=%q", f.HttpHeader))
 			}
+			if f.MinValue != nil {
+				opts = append(opts, fmt.Sprintf("minvalue=%v", f.MinValue))
+			}
+			if f.MaxValue != nil {
+				opts = append(opts, fmt.Sprintf("maxvalue=%v", f.MaxValue))
+			}
+			if f.MinSize != 0 {
+				opts = append(opts, fmt.Sprintf("minsize=%d", f.MinSize))
+			}
+			if f.MaxSize != 0 {
+				opts = append(opts, fmt.Sprintf("maxsize=%d", f.MaxSize))
+			}
 			sopts := ""
 			if len(opts) > 0 {
 				sopts = " (" + strings.Join(opts, ", ") + ")"
