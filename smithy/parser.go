@@ -965,6 +965,10 @@ func (p *Parser) parseStructureBody(name string, traits *NodeValue) (*Shape, err
 				return nil, p.SyntaxError()
 			}
 			fname := tok.Text
+			if comment != "" {
+				mtraits = withCommentTrait(mtraits, comment)
+				comment = ""
+			}
 			if mtraits != nil && mtraits.Length() > 0 {
 				shape := &Shape{
 					Type:   "apply",
