@@ -362,11 +362,11 @@ func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
 		min := nv.Get("min")
 		max := nv.Get("max")
 		if min != nil && max != nil {
-			w.Emit("%s@length(min: %d, max: %d)\n", indent, data.AsInt(min), data.AsInt(max))
+			w.Emit("%s@length(min: %v, max: %v)\n", indent, min, max)
 		} else if max != nil {
-			w.Emit("%s@length(max: %d)\n", indent, data.AsInt(max))
+			w.Emit("%s@length(max: %v)\n", indent, max)
 		} else if min != nil {
-			w.Emit("%s@length(min: %d)\n", indent, data.AsInt(min))
+			w.Emit("%s@length(min: %v)\n", indent, min)
 		}
 	}
 }
@@ -376,11 +376,11 @@ func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
 		min := r.Get("min")
 		max := r.Get("max")
 		if min != nil && max != nil {
-			w.Emit("@range(min: %v, max: %v)\n", data.AsDecimal(min), data.AsDecimal(max))
+			w.Emit("%s@range(min: %v, max: %v)\n", indent, min, max)
 		} else if max != nil {
-			w.Emit("@range(max: %v)\n", data.AsDecimal(max))
+			w.Emit("%s@range(max: %v)\n", indent, max)
 		} else if min != nil {
-			w.Emit("@range(min: %v)\n", data.AsDecimal(min))
+			w.Emit("%s@range(min: %v)\n", indent, min)
 		}
 	}
 }
