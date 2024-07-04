@@ -155,6 +155,9 @@ func (gen *Generator) GenerateSummary() {
 	gen.Emitf("<ul>\n")
 	for _, td := range gen.Types() {
 		//check if a type has input or output trait, if so, omit it here.
+		if strings.HasPrefix(string(td.Id), "aws.protocols#") || strings.HasPrefix(string(td.Id), "smithy.api#"){
+			continue
+		}
 		s := StripNamespace(td.Id)
 		gen.Emitf("  <li><a href=\"#%s\">%s</a> → <em>%s</em></li>\n", strings.ToLower(s), s, td.Base)
 	}
@@ -195,7 +198,7 @@ func summarySignature(op *model.OperationDef) string {
 	in := ExplodeInputs(op.Input)
 	out := ExplodeOutputs(op.Output)
 	s := StripNamespace(op.Id)
-	return fmt.Sprintf("%s(%s) → (%s)", s, in, out)
+	return fmt.Sprintf("<b>%s</b>(%s) → (%s)", s, in, out)
 }
 
 func (gen *Generator) generateApiResource(sg *smithy.IdlGenerator, id model.AbsoluteIdentifier) string {
@@ -351,7 +354,9 @@ func (gen *Generator) GenerateTypes() {
 	if len(tds) > 0 {
 		gen.Emitf("<h2 id=\"types\">Types</h2>\n")
 		for _, td := range gen.Types() {
-			gen.GenerateType(td)
+			if !strings.HasPrefix(string(td.Id), "aws.protocols#") && !strings.HasPrefix(string(td.Id), "smithy.api#") {
+				gen.GenerateType(td)
+			}
 		}
 		gen.Emit("\n")
 	}
