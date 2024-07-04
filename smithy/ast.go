@@ -16,7 +16,7 @@ limitations under the License.
 package smithy
 
 import (
-	//	"bytes"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -36,13 +36,35 @@ type AST struct {
 	Shapes   *Map[*Shape] `json:"shapes,omitempty"`
 }
 
+func jsonEncode(obj interface{}) string {
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(&obj); err != nil {
+		return fmt.Sprint(obj)
+	}
+	return strings.TrimRight(string(buf.String()), " \t\n\v\f\r")
+}
+
+func jsonDecode(j string) interface{} {
+	var tmp interface{}
+	err := json.Unmarshal([]byte(j), &tmp)
+	if err != nil {
+		return nil
+	}
+	return tmp
+}
+
+func clone(o interface{}) interface{} {
+	return jsonDecode(jsonEncode(o))
+}
+
 type NodeValue struct {
 	value interface{}
 }
 
 func NewNodeValue() *NodeValue {
 	return &NodeValue{value: make(map[string]interface{}, 0)}
-	//fixme: return &NodeValue{value: data.NewObject()}
 }
 
 func AsNodeValue(v interface{}) *NodeValue {
@@ -65,11 +87,18 @@ func (node *NodeValue) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (node *NodeValue) Clone() *NodeValue {
+	if node.value == nil {
+		return &NodeValue{}
+	}
+	return &NodeValue{value: clone(node.value)}
+}
+
 func cloneNodeValue(node *NodeValue) *NodeValue {
 	if node == nil {
 		return nil
 	}
-	return &NodeValue{value: node.value}
+	return node.Clone()
 }
 
 func (node *NodeValue) RawValue() interface{} {
@@ -400,8 +429,9 @@ func cloneShape(shape *Shape) *Shape {
 
 func cloneShapeRef(ref *ShapeRef) *ShapeRef {
 	if ref != nil {
-		tmp := *ref
-		return &tmp
+		return &ShapeRef{
+			Target: ref.Target,
+		}
 	}
 	return nil
 }
@@ -416,8 +446,10 @@ func cloneShapeRefs(refs []*ShapeRef) []*ShapeRef {
 
 func cloneMember(member *Member) *Member {
 	if member != nil {
-		tmp := *member
-		return &tmp
+		return &Member{
+			Target: member.Target,
+			Traits: cloneNodeValue(member.Traits),
+		}
 	}
 	return nil
 }
@@ -426,8 +458,8 @@ func cloneMembers(members *Map[*Member]) *Map[*Member] {
 	if members != nil {
 		mems := NewMap[*Member]()
 		for _, k := range members.Keys() {
-			m := members.Get(k)
-			mems.Put(k, cloneMember(m))
+			m := cloneMember(members.Get(k))
+			mems.Put(k, m)
 		}
 		return mems
 	}
@@ -725,7 +757,7 @@ func Assemble(paths []string) (*AST, error) {
 		if tmp := assembly.GetShape(k); tmp != nil {
 			if tmp.Type == "apply" {
 				assembly.Apply(k, tmp.Traits)
-				//assembly.Shapes.Delete(k)
+				assembly.Shapes.Delete(k)
 			}
 		}
 	}
@@ -751,12 +783,12 @@ func (ast *AST) Apply(sftarget string, traits *NodeValue) error {
 				m.Traits = NewNodeValue()
 			}
 			for _, k := range traits.Keys() {
-				m.Traits.Put(k, traits.Get(k))
+				m.Traits.Put(k, cloneNodeValue(traits.Get(k)))
 			}
 		} else {
 			t := ensureShapeTraits(shape)
 			for _, k := range traits.Keys() {
-				t.Put(k, traits.Get(k))
+				t.Put(k, cloneNodeValue(traits.Get(k)))
 			}
 		}
 		return nil
@@ -810,12 +842,13 @@ func (ast *AST) mergeConflict(k string, v1 interface{}, v2 interface{}) error {
 	return fmt.Errorf("Conflict when merging metadata in models: %s\n", k)
 }
 
+var mixinSeq int
+
 func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
-	prevShape := ast.Shapes.Get(shapeId)
-	if prevShape == nil {
+	shape := ast.Shapes.Get(shapeId)
+	if shape == nil {
 		return nil, fmt.Errorf("Shape not available: %s", shapeId)
 	}
-	shape := cloneShape(prevShape)
 	if shape.Mixins != nil {
 		last := len(shape.Mixins) - 1
 		for i := last; i >= 0; i-- {
@@ -825,16 +858,17 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 			if err != nil {
 				return nil, err
 			}
+			//mixin := ast.Shapes.Get(mixinId)
 			if mixin == nil {
 				panic("oops, should have deferred elision and apply at assembly time")
 			}
 			if mixin.Members != nil {
-				newMembers := NewMap[*Member]()
 				if shape.Type != "structure" {
 					return nil, fmt.Errorf("Target for mixin with members not a Structure: %s", shapeId)
 				}
+				newMembers := NewMap[*Member]()
 				for _, memKey := range mixin.Members.Keys() {
-					mem := mixin.Members.Get(memKey)
+					mem := cloneMember(mixin.Members.Get(memKey))
 					newMembers.Put(memKey, mem)
 				}
 				for _, memKey := range shape.Members.Keys() {
@@ -850,12 +884,12 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 				}
 				shape.Members = newMembers
 			}
-			//note: `@private @mixin(localTraits: [private])`, which is a way to not propage a trait on a mixin, is NYI
+			//note: `@private @mixin(localTraits: [private])`, which is a way to not propagate a trait on a mixin, is NYI
 			if mixin.Traits != nil && mixin.Traits.Length() > 1 {
 				newTraits := NewNodeValue()
 				for _, trait := range mixin.Traits.Keys() {
 					if trait != "smithy.api#mixin" && trait != "smithy.api#trait" {
-						newTraits.Put(trait, mixin.Traits.Get(trait))
+						newTraits.Put(trait, cloneNodeValue(mixin.Traits.Get(trait)))
 					}
 				}
 				if shape.Traits != nil {
@@ -872,9 +906,17 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 }
 
 func (ast *AST) ExpandMixins() error {
+	newShapes := NewMap[*Shape]()
 	for _, shapeId := range ast.Shapes.Keys() {
-		ast.expandMixins(shapeId)
+		newShape, err := ast.expandMixins(shapeId)
+		if err != nil {
+			return err
+		}
+		if !newShape.Traits.Has("smithy.api#mixin") {
+			newShapes.Put(shapeId, newShape)
+		}
 	}
+	ast.Shapes = newShapes
 	return nil
 }
 
