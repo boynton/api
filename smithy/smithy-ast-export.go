@@ -304,16 +304,28 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		if fd.Default != nil {
 			ensureMemberTraits(member).Put("smithy.api#default", AsNodeValue(fd.Default))
 		}
-		//other traits!
+		if fd.MinValue != nil || fd.MaxValue != nil {
+			n := NewNodeValue()
+			if fd.MinValue != nil {
+				n.Put("min", fd.MinValue.AsInt64())
+			}
+			if fd.MaxValue != nil {
+				n.Put("max", fd.MaxValue.AsInt64())
+			}
+			ensureMemberTraits(member).Put("smithy.api#range", n)
+		}
 		if fd.MinSize != 0 || fd.MaxSize != 0 {
 			n := NewNodeValue()
 			if fd.MinSize != 0 {
 				n.Put("min", fd.MinSize)
 			}
 			if fd.MaxSize != 0 {
-				n.Put("min", fd.MaxSize)
+				n.Put("max", fd.MaxSize)
 			}
 			ensureMemberTraits(member).Put("smithy.api#length", n)
+		}
+		if fd.Pattern != "" {
+			ensureMemberTraits(member).Put("smithy.api#pattern", fd.Pattern)
 		}
 		members.Put(string(fd.Name), member)
 	}

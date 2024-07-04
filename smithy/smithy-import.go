@@ -565,6 +565,28 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 					if comment != "" {
 						fd.Comment = comment
 					}
+					length := v.Traits.Get("smithy.api#length")
+					if length != nil {
+						min := length.GetInt64("min", 0)
+						if min != 0 {
+							fd.MinSize = min
+						}
+						max := length.GetInt64("max", 0)
+						if max != 0 {
+							fd.MaxSize = max
+						}
+					}
+					rnge := v.Traits.Get("smithy.api#range")
+					if length != nil {
+						min := rnge.GetDecimal("min", nil)
+						if min != nil {
+							fd.MinValue = min
+						}
+						max := rnge.GetDecimal("max", nil)
+						if max != nil {
+							fd.MaxValue = max
+						}
+					}
 				}
 				//BUG: arbitrary traits on the field are not preserved. Notably: base#Int32 cannot have a smithy.api#range
 				// trait, the MinValue/MaxValue properties require that a new type be defined: type Foo Int32 (MinValue...)
@@ -602,6 +624,9 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		return addOperation(schema, ast, shapeId, shape, "", "")
 	case "resource":
 		return addResource(schema, ast, shapeId, shape)
+	case "apply":
+		//normally handled elsewhere
+		return nil
 	default:
 		panic("implement me:" + shape.Type)
 	}
