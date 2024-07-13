@@ -35,10 +35,10 @@ type Generator struct {
 
 func (gen *Generator) getDetailGenerator() model.Generator {
 	switch gen.detailGenerator {
-	case "smithy":
-		return new(smithy.IdlGenerator)
+	case "api":
+		return new(model.ApiGenerator)
 	}
-	return new(model.ApiGenerator)
+	return new(smithy.IdlGenerator)
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
