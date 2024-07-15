@@ -238,14 +238,16 @@ func (gen *BaseGenerator) accumulateDependencies(deps map[AbsoluteIdentifier]boo
 	}
 	deps[td.Id] = true
 	switch td.Base {
-	case Bool, Int8, Int16, Int32, Int64, Float32, Float64, Decimal, Blob, String, Timestamp, Enum:
+	case BaseType_Bool, BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64:
 		return
-	case List:
+	case BaseType_Decimal, BaseType_Blob, BaseType_String, BaseType_Timestamp, BaseType_Enum:
+		return
+	case BaseType_List:
 		gen.accumulateDependenciesById(deps, td.Items)
-	case Map:
+	case BaseType_Map:
 		gen.accumulateDependenciesById(deps, td.Keys)
 		gen.accumulateDependenciesById(deps, td.Items)
-	case Struct, Union:
+	case BaseType_Struct, BaseType_Union:
 		for _, f := range td.Fields {
 			gen.accumulateDependenciesById(deps, f.Type)
 		}

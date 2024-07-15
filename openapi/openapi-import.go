@@ -368,17 +368,17 @@ func (mb *ModelBuilder) ImportSchema(name string, s *Schema) error {
 	}
 	switch s.Type {
 	case "object":
-		td.Base = model.Struct
+		td.Base = model.BaseType_Struct
 		td.Fields = mb.ImportFields(s, s.Required)
 	case "array":
-		td.Base = model.List
+		td.Base = model.BaseType_List
 		td.Items = mb.toCanonicalTypeName(s.Items)
 	case "string":
 		//check t.Format
-		td.Base = model.String
+		td.Base = model.BaseType_String
 	case "number":
 		//check t.Format
-		td.Base = model.Decimal
+		td.Base = model.BaseType_Decimal
 	}
 	return mb.schema.AddTypeDef(td)
 }

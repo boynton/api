@@ -296,12 +296,12 @@ func (gen *Generator) GenerateTypeRef(ref model.AbsoluteIdentifier) (string, str
 		td := gen.Schema.GetTypeDef(ref)
 		if td != nil {
 			switch td.Base {
-			case model.List:
+			case model.BaseType_List:
 				s, link := gen.GenerateTypeRef(td.Items)
 				return fmt.Sprintf("List<%s>", s), link
-			case model.Struct, model.Union:
+			case model.BaseType_Struct, model.BaseType_Union:
 				return sref, sref
-			case model.Enum:
+			case model.BaseType_Enum:
 				return sref, sref
 			default:
 				return td.Base.String(), ""
@@ -320,7 +320,7 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 		entityIdField = eid
 	}
     switch td.Base {
-    case model.Struct:
+    case model.BaseType_Struct:
 		if entityIdField != "" {
 			gen.Emitf("class %s << (R,CadetBlue) >> {\n", s)
 		} else {
@@ -348,7 +348,7 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 			}
 		}
 		gen.Emitf("}\n")
-    case model.Union:
+    case model.BaseType_Union:
 		//gen.Emitf("class %s<Union> {\n", s)
 		gen.Emitf("class %s << (U,CornflowerBlue) >>{\n", s)
 		for _, f := range td.Fields {
@@ -363,7 +363,7 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
             gen.Emitf("    {field} <b>%s</b>: %s\n", fname, fref)
 		}
 		gen.Emitf("}\n")
-	case model.Enum:
+	case model.BaseType_Enum:
 		gen.Emitf("enum %s {\n", s)
 		for _, el := range td.Elements {
             gen.Emitf("    {field} %s\n", el.Symbol)

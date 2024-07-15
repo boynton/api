@@ -490,7 +490,7 @@ func (swagger *Swagger) ImportOperation(method string, path string, def *data.Ob
 func (swagger *Swagger) ImportString(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.String,
+		Base: model.BaseType_String,
 		Comment: def.GetString("description"),
 	}
 	return swagger.schema.AddTypeDef(td)
@@ -501,24 +501,24 @@ func (swagger *Swagger) numberBase(def *data.Object) model.BaseType {
 	case "integer":
 		switch def.GetString("format") {
 		case "int8":
-			return model.Int8
+			return model.BaseType_Int8
 		case "int16":
-			return model.Int16
+			return model.BaseType_Int16
 		case "int32":
-			return model.Int32
+			return model.BaseType_Int32
 		case "int64":
-			return model.Int64
+			return model.BaseType_Int64
 		default:
-			return model.Integer
+			return model.BaseType_Integer
 		}
 	default:
 		switch def.GetString("format") {
 		case "float":
-			return model.Float32
+			return model.BaseType_Float32
 		case "double":
-			return model.Float64
+			return model.BaseType_Float64
 		default:
-			return model.Decimal
+			return model.BaseType_Decimal
 		}
 	}
 		
@@ -536,7 +536,7 @@ func (swagger *Swagger) ImportNumber(name string, def *data.Object) error {
 func (swagger *Swagger) ImportBoolean(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.Bool,
+		Base: model.BaseType_Bool,
 		Comment: def.GetString("description"),
 	}
 	return swagger.schema.AddTypeDef(td)
@@ -545,7 +545,7 @@ func (swagger *Swagger) ImportBoolean(name string, def *data.Object) error {
 func (swagger *Swagger) ImportStruct(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.Struct,
+		Base: model.BaseType_Struct,
 		Comment: def.GetString("description"),
 	}
 	props := def.GetObject("properties")
@@ -572,7 +572,7 @@ func (swagger *Swagger) ImportStruct(name string, def *data.Object) error {
 func (swagger *Swagger) ImportList(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.List,
+		Base: model.BaseType_List,
 	}
 	td.Comment = def.GetString("description")
     items := def.GetObject("items")
@@ -586,7 +586,7 @@ func (swagger *Swagger) ImportList(name string, def *data.Object) error {
 func (swagger *Swagger) ImportEnum(name string, def *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.Enum,
+		Base: model.BaseType_Enum,
 		Comment: def.GetString("description"),
 	}
     syms := def.GetStringSlice("enum")
@@ -604,7 +604,7 @@ func (swagger *Swagger) ImportEnum(name string, def *data.Object) error {
 func (swagger *Swagger) ImportAllOf(name string, adef *data.Object) error {
 	td := &model.TypeDef{
 		Id:   swagger.toCanonicalAbsoluteId(name),
-		Base: model.Struct,
+		Base: model.BaseType_Struct,
 		Comment: adef.GetString("description"),
 	}
 	defs := adef.Get("allOf")

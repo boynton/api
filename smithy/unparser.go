@@ -63,6 +63,22 @@ func (ast *AST) IDLForOperationShape(shapeId string, decorator *model.Decorator)
 	return w.End()
 }
 
+func (ast *AST) IDLForOperationExamples(shapeId string, decorator *model.Decorator) string {
+	shape := ast.GetShape(shapeId)
+	if shape != nil && shapeId != "" && shape.Traits.Get("smithy.api#examples") != nil {
+		w := &IdlWriter{
+			ast:       ast,
+			namespace: shapeIdNamespace(shapeId),
+			version:   ast.AssemblyVersion(),
+			decorator: decorator,
+		}
+		w.Begin()
+		w.EmitOperationExamples(shapeId, shape)
+		return w.End()
+	}
+	return ""
+}
+
 func (ast *AST) IDLForTypeShape(shapeId string, decorator *model.Decorator) string {
 	shape := ast.GetShape(shapeId)
 	w := &IdlWriter{
@@ -150,6 +166,7 @@ func (ast *AST) IDL(ns string) string {
 			if shape.Type == "operation" {
 				w.Emit("\n")
 				w.EmitOperationShape(k, shape, emitted)
+				w.EmitOperationExamples(k, shape)
 			}
 		}
 	}
@@ -825,6 +842,41 @@ func (w *IdlWriter) decorate(tname string) string {
 		return w.decorator.UserType(tname)
 	}
 	return tname
+}
+
+func (w *IdlWriter) EmitOperationExamples(name string, shape *Shape) {
+	if examples := shape.Traits.GetSlice("smithy.api#examples"); examples != nil {
+		w.Emit("apply %s @examples(%s)\n", stripNamespace(name), model.Pretty(examples))
+		/*		for _, rex := range examples {
+					ex := AsNodeValue(rex)
+					w.Emit("    {\n")
+					w.Emit("        title: %q\n", ex.GetString("title"))
+					in := ex.Get("input")
+					if in != nil {
+						w.Emit(model.Pretty(in))
+					}
+					out := ex.Get("output")
+					if out != nil {
+						w.Emit(model.Pretty(out))
+					}
+					operr := ex.Get("error")
+					if operr != nil {
+						w.Emir
+						ope := AsNodeValue(operr)
+						sid := ope.GetString("shapeId")
+						content := ope.Get("Content")
+						w.Emit(
+						example.Error = &model.OperationErrorExample{
+							OperationId: model.AbsoluteIdentifier(sid),
+							Entity: clone(ope.Get("content")),
+						}
+					}
+
+					w.Emit("    }\n")
+				}
+				w.Emit("])\n")
+		*/
+	}
 }
 
 func (w *IdlWriter) EmitOperationShape(name string, shape *Shape, emitted map[string]bool) {

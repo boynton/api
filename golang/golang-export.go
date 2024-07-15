@@ -143,32 +143,32 @@ type GolangWriter struct {
 
 func (gen *Generator) golangBaseTypeName(bt model.BaseType) string {
 	switch bt {
-	case model.Bool:
+	case model.BaseType_Bool:
 		return "bool"
-	case model.Int8:
+	case model.BaseType_Int8:
 		return "int8"
-	case model.Int16:
+	case model.BaseType_Int16:
 		return "int16"
-	case model.Int32:
+	case model.BaseType_Int32:
 		return "int" //!
-	case model.Int64:
+	case model.BaseType_Int64:
 		return "int64"
-	case model.Float32:
+	case model.BaseType_Float32:
 		return "float32"
-	case model.Float64:
+	case model.BaseType_Float64:
 		return "float64"
-	case model.Blob:
+	case model.BaseType_Blob:
 		return "[]byte"
-	case model.String:
+	case model.BaseType_String:
 		return "string"
-	case model.Integer:
+	case model.BaseType_Integer:
 		return "*" + gen.decimalPrefix + "Integer"
-	case model.Decimal:
+	case model.BaseType_Decimal:
 		return "*" + gen.decimalPrefix + "Decimal"
-	case model.Timestamp:
+	case model.BaseType_Timestamp:
 		return "*" + gen.timestampPrefix + "Timestamp"
-	case model.Any:
-		return gen.anyPrefix + "Any"
+	case model.BaseType_Any:
+		return "any"
 	default:
 		fmt.Println("bt:", bt)
 		panic("not concrete")
@@ -216,67 +216,67 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 	}
 	indirect := ""
 	switch td.Base {
-	case model.Bool:
+	case model.BaseType_Bool:
 		if gen.inlinePrimitives {
 			return "bool"
 		}
-	case model.Int8:
+	case model.BaseType_Int8:
 		if gen.inlinePrimitives {
 			return "int8"
 		}
-	case model.Int16:
+	case model.BaseType_Int16:
 		if gen.inlinePrimitives {
 			return "int16"
 		}
-	case model.Int32:
+	case model.BaseType_Int32:
 		if gen.inlinePrimitives {
 			return "int32"
 		}
-	case model.Int64:
+	case model.BaseType_Int64:
 		if gen.inlinePrimitives {
 			return "int64"
 		}
-	case model.Float32:
+	case model.BaseType_Float32:
 		if gen.inlinePrimitives {
 			return "float32"
 		}
-	case model.Float64:
+	case model.BaseType_Float64:
 		if gen.inlinePrimitives {
 			return "float64"
 		}
-	case model.String:
+	case model.BaseType_String:
 		if gen.inlinePrimitives {
 			return "string"
 		}
-	case model.Blob:
+	case model.BaseType_Blob:
 		if gen.inlinePrimitives {
 			return "[]byte"
 		}
-	case model.Integer:
+	case model.BaseType_Integer:
 		if gen.inlinePrimitives {
 			return "*data.Integer"
 		}
 		indirect = "*"
-	case model.Decimal:
+	case model.BaseType_Decimal:
 		if gen.inlinePrimitives {
 			return "*data.Decimal"
 		}
 		indirect = "*"
-	case model.Timestamp:
+	case model.BaseType_Timestamp:
 		if gen.inlinePrimitives {
 			return "*data.Timestamp"
 		}
 		indirect = "*"
-	case model.List:
+	case model.BaseType_List:
 		if gen.inlineSlicesAndMaps {
 			return "[]" + gen.golangTypeRef(td.Items)
 		}
-	case model.Map:
+	case model.BaseType_Map:
 		if gen.inlineSlicesAndMaps {
 			return "map[" + gen.golangTypeRef(td.Keys) + "]" + gen.golangTypeRef(td.Items)
 		}
 		indirect = "*"
-	case model.Enum:
+	case model.BaseType_Enum:
 		//no indirection
 	default:
 		indirect = "*"
@@ -320,19 +320,19 @@ func (gen *Generator) goImports(forDef bool) map[string]bool {
 	for _, dep := range deps {
 		bt := gen.Schema.BaseType(dep)
 		switch bt {
-		case model.Decimal: //if expanded, then ["fmt", "math/big"]
+		case model.BaseType_Decimal: //if expanded, then ["fmt", "math/big"]
 			if gen.decimalPackage != "" {
 				includes[gen.decimalPackage] = true
 			} else {
 				includes["fmt"] = true
 				includes["math/big"] = true
 			}
-		case model.Enum:
+		case model.BaseType_Enum:
 			if forDef {
 				includes["encoding/json"] = true
 				includes["fmt"] = true
 			}
-		case model.Timestamp:
+		case model.BaseType_Timestamp:
 			if gen.timestampPackage != "" {
 				includes[gen.timestampPackage] = true //if expanded, then ["encoding/json","fmt","strings","time"]
 			}
@@ -365,7 +365,7 @@ func stripLocalNamespace(trait model.AbsoluteIdentifier, ns model.Namespace) str
 func (w *GolangWriter) xgolangTypeRef(typeRef model.AbsoluteIdentifier, required bool) string {
 	bt := w.gen.Schema.BaseType(typeRef)
 	switch bt {
-	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.String:
+	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_String:
 		return stripLocalNamespace(typeRef, w.gen.ns)
 	}
 	return w.gen.golangTypeRef(typeRef)
@@ -382,7 +382,7 @@ func (gen *Generator) generateTypeComment(td *model.TypeDef, w *GolangWriter) {
 func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 	w.Emit("\n")
 	switch td.Base {
-	case model.Struct:
+	case model.BaseType_Struct:
 		gen.generateTypeComment(td, w)
 		w.Emitf("type %s struct {\n", gen.golangTypeName(td.Id))
 		for _, f := range td.Fields {
@@ -394,7 +394,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 			w.Emitf("    %s %s `json:\"%s%s\"`\n", model.Capitalize(name), w.gen.golangTypeRef(f.Type), model.Uncapitalize(name), opt)
 		}
 		w.Emitf("}\n")
-	case model.Union:
+	case model.BaseType_Union:
 		gen.generateTypeComment(td, w)
 		tname := gen.golangTypeName(td.Id)
 		w.Emitf("type %sVariantTag int\n", tname)
@@ -436,24 +436,24 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("    }\n")
 		w.Emitf("    return nil\n")
 		w.Emitf("}\n")
-	case model.String, model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64:
+	case model.BaseType_String, model.BaseType_Bool, model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64:
 		if !gen.inlinePrimitives {
 			gen.generateTypeComment(td, w)
 			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td.Base))
 		}
 		//    case model.BaseTypeTimestamp:
 		//		return comment + "type " + gname + " *data.Timestamp\n"
-	case model.List:
+	case model.BaseType_List:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
 			w.Emitf("type %s []%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Items))
 		}
-	case model.Map:
+	case model.BaseType_Map:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
 			w.Emitf("type %s map[%s]%s\n", gen.golangTypeName(td.Id), gen.golangTypeRef(td.Keys), gen.golangTypeRef(td.Items))
 		}
-	case model.Enum:
+	case model.BaseType_Enum:
 		gen.generateTypeComment(td, w)
 		tname := gen.golangTypeName(td.Id)
 		prefix := tname + "_"
@@ -498,7 +498,7 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 func (gen *Generator) indirectOp(id model.AbsoluteIdentifier) string {
 	indirect := ""
 	switch gen.Schema.BaseType(id) {
-	case model.Bool, model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.String:
+	case model.BaseType_Bool, model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_String:
 		indirect = "*"
 	}
 	return indirect

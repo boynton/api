@@ -309,7 +309,7 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 			ti.Fields = append(ti.Fields, payloadField)
 			payloadTd := &model.TypeDef{
 				Id:      contentType,
-				Base:    model.Struct,
+				Base:    model.BaseType_Struct,
 				Comment: "synthesized content for operation input payload",
 				Fields:  payloadContentFields,
 			}
@@ -378,7 +378,7 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 			if schema.GetTypeDef(contentType) == nil {
 				payloadTd := &model.TypeDef{
 					Id:      contentType,
-					Base:    model.Struct,
+					Base:    model.BaseType_Struct,
 					Comment: "synthesized content for operation input payload",
 					Fields:  payloadContentFields,
 				}
@@ -472,6 +472,41 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 			return fmt.Errorf("Smithy operation output for a non-204 response must have a payload specified: %s", op.Id)
 		}
 	}
+	examples := shape.Traits.GetSlice("smithy.api#examples")
+	if examples != nil {
+		uniqueTitles := make(map[string]bool, 0)
+		for _, rex := range examples {
+			ex := AsNodeValue(rex)
+			title := ex.GetString("title")
+			if _, ok := uniqueTitles[title]; ok {
+				return fmt.Errorf("Smithy operation example does not have a unique title: %q", title)
+			}
+			uniqueTitles[title] = true
+
+			example := &model.OperationExample{
+				Title: title,
+			}
+			in := ex.Get("input")
+			if in != nil {
+				example.Input = clone(in)
+			}
+			out := ex.Get("output")
+			if out != nil {
+				example.Output = clone(out)
+			}
+			operr := ex.Get("error")
+			if operr != nil {
+				ope := AsNodeValue(operr)
+				sid := ope.GetString("shapeId")
+				//validate it?
+				example.Error = &model.OperationErrorExample{
+					OperationId: model.AbsoluteIdentifier(sid),
+					Entity:      clone(ope.Get("content")),
+				}
+			}
+			op.Examples = append(op.Examples, example)
+		}
+	}
 	schema.Operations = append(schema.Operations, &op)
 	return nil
 }
@@ -487,41 +522,41 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 	number := false
 	switch shape.Type {
 	case "byte":
-		td.Base = model.Int8
+		td.Base = model.BaseType_Int8
 		number = true
 	case "short":
-		td.Base = model.Int16
+		td.Base = model.BaseType_Int16
 		number = true
 	case "integer":
-		td.Base = model.Int32
+		td.Base = model.BaseType_Int32
 		number = true
 	case "long":
-		td.Base = model.Int64
+		td.Base = model.BaseType_Int64
 		number = true
 	case "float":
-		td.Base = model.Float32
+		td.Base = model.BaseType_Float32
 		number = true
 	case "double":
-		td.Base = model.Float64
+		td.Base = model.BaseType_Float64
 		number = true
 	case "bigInteger":
-		td.Base = model.Integer
+		td.Base = model.BaseType_Integer
 		number = true
 	case "bigDecimal":
-		td.Base = model.Decimal
+		td.Base = model.BaseType_Decimal
 		number = true
 	case "string":
-		td.Base = model.String
+		td.Base = model.BaseType_String
 		td.Pattern = shape.Traits.GetString("smithy.api#pattern")
 	case "list":
-		td.Base = model.List
+		td.Base = model.BaseType_List
 		td.Items = toCanonicalTypeName(shape.Member.Target)
 	case "map":
-		td.Base = model.Map
+		td.Base = model.BaseType_Map
 		td.Keys = toCanonicalTypeName(shape.Key.Target)
 		td.Items = toCanonicalTypeName(shape.Value.Target)
 	case "union":
-		td.Base = model.Union
+		td.Base = model.BaseType_Union
 		for _, name := range shape.Members.Keys() {
 			fd := &model.FieldDef{
 				Name: model.Identifier(name),
@@ -548,7 +583,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			out.Comment = shape.GetStringTrait("smithy.api#documentation")
 			return schema.EnsureExceptionDef(out)
 		} else {
-			td.Base = model.Struct
+			td.Base = model.BaseType_Struct
 			for _, name := range shape.Members.Keys() {
 				fd := &model.FieldDef{
 					Name: model.Identifier(name),
@@ -596,7 +631,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			}
 		}
 	case "enum":
-		td.Base = model.Enum
+		td.Base = model.BaseType_Enum
 		for _, sym := range shape.Members.Keys() {
 			el := &model.EnumElement{
 				Symbol: model.Identifier(sym),
@@ -617,7 +652,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 			td.Elements = append(td.Elements, el)
 		}
 	case "timestamp":
-		td.Base = model.Timestamp
+		td.Base = model.BaseType_Timestamp
 	case "service":
 		return addService(schema, ast, shapeId, shape)
 	case "operation":

@@ -56,6 +56,7 @@ func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 	gen.GenerateOperations()
 	gen.GenerateExceptions()
 	gen.GenerateTypes()
+	//	gen.GenerateExamples()
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".api")
 	err = gen.Write(s, fname, "")
@@ -324,7 +325,7 @@ func (gen *ApiGenerator) GenerateTypes() {
 func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 	gen.GenerateBlockComment(td.Comment, "")
 	switch td.Base {
-	case String:
+	case BaseType_String:
 		sopts := ""
 		var opts []string
 		if td.Pattern != "" {
@@ -334,19 +335,19 @@ func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
 		gen.Emitf("type %s String%s\n", StripNamespace(td.Id), sopts)
-	case Struct:
+	case BaseType_Struct:
 		gen.Emitf("type %s Struct {\n", StripNamespace(td.Id))
 		gen.GenerateFields(td.Fields, "    ")
 		gen.Emitf("}\n")
-	case Union:
+	case BaseType_Union:
 		gen.Emitf("type %s Union {\n", StripNamespace(td.Id))
 		gen.GenerateFields(td.Fields, "    ")
 		gen.Emitf("}\n")
-	case List:
+	case BaseType_List:
 		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Items)))
-	case Map:
+	case BaseType_Map:
 		gen.Emitf("type %s Map[%s,%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Keys)), gen.decorateType(StripNamespace(td.Items)))
-	case Enum:
+	case BaseType_Enum:
 		sopt := ""
 		//for _, el := range td.Elements {
 		//if el.Type != "" {
@@ -366,13 +367,13 @@ func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 			gen.Emitf("    %s%s\n", el.Symbol, sopts)
 		}
 		gen.Emitf("}\n")
-	case Timestamp:
+	case BaseType_Timestamp:
 		sopts := ""
 		gen.Emitf("type %s Timestamp%s\n", StripNamespace(td.Id), sopts)
-	case Int8, Int16, Int32, Int64, Float32, Float64, Integer, Decimal:
+	case BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64, BaseType_Integer, BaseType_Decimal:
 		sopts := ""
 		gen.Emitf("type %s %s%s\n", StripNamespace(td.Id), td.Base.String(), sopts)
-	case Bool:
+	case BaseType_Bool:
 		sopts := ""
 		gen.Emitf("type %s Bool%s\n", StripNamespace(td.Id), sopts)
 	default:

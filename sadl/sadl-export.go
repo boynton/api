@@ -112,25 +112,25 @@ func (gen *Generator) opAnnotations(op *model.OperationDef) []string {
 
 func (gen *Generator) EmitType(td *model.TypeDef) {
 	switch td.Base {
-	case model.Bool:
+	case model.BaseType_Bool:
 		gen.EmitBooleanType(td)
-	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.Integer, model.Decimal:
+	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_Integer, model.BaseType_Decimal:
 		gen.EmitNumericType(td)
-	case model.Blob:
+	case model.BaseType_Blob:
 		gen.EmitBlobType(td)
-	case model.String:
+	case model.BaseType_String:
 		gen.EmitStringType(td)
-	case model.Timestamp:
+	case model.BaseType_Timestamp:
 		gen.EmitTimestampType(td)
-	case model.List:
+	case model.BaseType_List:
 		gen.EmitListType(td)
-	case model.Map:
+	case model.BaseType_Map:
 		gen.EmitMapType(td)
-	case model.Struct:
+	case model.BaseType_Struct:
 		gen.EmitStructType(td)
-	case model.Union:
+	case model.BaseType_Union:
 		gen.EmitUnionType(td)
-	case model.Enum:
+	case model.BaseType_Enum:
 		gen.EmitEnumType(td)
 		//	case "document":
 		//		gen.EmitDocumentShape(name, shape, opts)

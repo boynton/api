@@ -247,12 +247,12 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 		Description: td.Comment,
 	}
 	switch td.Base {
-	case model.String:
+	case model.BaseType_String:
 		sch.Type = "string"
 		if td.Pattern != "" {
 			sch.Pattern = td.Pattern
 		}
-	case model.Struct, model.Union:
+	case model.BaseType_Struct, model.BaseType_Union:
 		sch.Type = "object"
 		var required []string
 		props := make(map[string]*Schema, 0)
@@ -264,35 +264,35 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 		}
 		sch.Properties = props
 		sch.Required = required
-	case model.List:
+	case model.BaseType_List:
 		sch.Type = "array"
 		sch.Items = gen.SchemaFromTypeRef(td.Items)
-	case model.Map:
+	case model.BaseType_Map:
 		sch.Type = "array"
 		sch.Items = gen.SchemaFromTypeRef(td.Items)
-	case model.Int8:
+	case model.BaseType_Int8:
 		sch.Type = "integer"
 		sch.Format = "int8"
-	case model.Int16:
+	case model.BaseType_Int16:
 		sch.Type = "integer"
 		sch.Format = "int16"
-	case model.Int32:
+	case model.BaseType_Int32:
 		sch.Type = "integer"
 		sch.Format = "int32"
-	case model.Int64:
+	case model.BaseType_Int64:
 		sch.Type = "integer"
 		sch.Format = "int64"
-	case model.Integer:
+	case model.BaseType_Integer:
 		sch.Type = "integer"
-	case model.Float32:
+	case model.BaseType_Float32:
 		sch.Type = "number"
 		sch.Format = "float"
-	case model.Float64:
+	case model.BaseType_Float64:
 		sch.Type = "number"
 		sch.Format = "double"
-	case model.Decimal:
+	case model.BaseType_Decimal:
 		sch.Type = "number"
-	case model.Enum:
+	case model.BaseType_Enum:
 		sch.Type = "string"
 		for _, el := range td.Elements {
 			sch.Enum = append(sch.Enum, el.Value)

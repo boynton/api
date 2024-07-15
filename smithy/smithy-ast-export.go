@@ -245,6 +245,30 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 			shape.Errors = append(shape.Errors, &ShapeRef{Target: string(errId)})
 		}
 	}
+	if op.Examples != nil {
+		var examples []any
+		for _, ex := range op.Examples {
+			smex := make(map[string]any, 0)
+			smex["title"] = ex.Title
+			if ex.Input != nil {
+				smex["input"] = ex.Input
+			}
+			if ex.Output != nil {
+				smex["output"] = ex.Output
+			}
+			if ex.Error != nil {
+				smexerr := make(map[string]any, 0)
+				smexerr["shapeId"] = string(ex.Error.OperationId)
+				smexerr["content"] = ex.Error.Entity
+				smex["error"] = smexerr
+				smex["allowConstraintErrors"] = true
+			}
+			examples = append(examples, smex)
+		}
+		if len(examples) > 0 {
+			ensureShapeTraits(shape).Put("smithy.api#examples", examples)
+		}
+	}
 	ast.PutShape(string(op.Id), shape)
 	if inputShape != nil {
 		ast.PutShape(inputShapeId, inputShape)
@@ -380,25 +404,25 @@ func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error
 	var shape *Shape
 	var err error
 	switch td.Base {
-	case model.Struct:
+	case model.BaseType_Struct:
 		id, shape, err = gen.ShapeFromStruct(td)
-	case model.List:
+	case model.BaseType_List:
 		id, shape, err = gen.ShapeFromList(td)
-	case model.Map:
+	case model.BaseType_Map:
 		id, shape, err = gen.ShapeFromMap(td)
-	case model.String:
+	case model.BaseType_String:
 		id, shape, err = gen.ShapeFromString(td)
-	case model.Int8, model.Int16, model.Int32, model.Int64, model.Float32, model.Float64, model.Decimal, model.Integer:
+	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_Decimal, model.BaseType_Integer:
 		id, shape, err = gen.ShapeFromNumber(td)
-	case model.Enum:
+	case model.BaseType_Enum:
 		id, shape, err = gen.ShapeFromEnum(td)
-	case model.Timestamp:
+	case model.BaseType_Timestamp:
 		id, shape, err = gen.ShapeFromTimestamp(td)
-	case model.Union:
+	case model.BaseType_Union:
 		id, shape, err = gen.ShapeFromUnion(td)
-	case model.Bool:
+	case model.BaseType_Bool:
 		id, shape, err = gen.ShapeFromBool(td)
-	case model.Any:
+	case model.BaseType_Any:
 		id, shape, err = gen.ShapeFromAny(td)
 	default:
 		panic("handle this type:" + model.Pretty(td))
@@ -429,21 +453,21 @@ func (gen *AstGenerator) ShapeFromAny(td *model.TypeDef) (string, *Shape, error)
 func (gen *AstGenerator) ShapeFromNumber(td *model.TypeDef) (string, *Shape, error) {
 	shape := Shape{}
 	switch td.Base {
-	case model.Int8:
+	case model.BaseType_Int8:
 		shape.Type = "byte"
-	case model.Int16:
+	case model.BaseType_Int16:
 		shape.Type = "short"
-	case model.Int32:
+	case model.BaseType_Int32:
 		shape.Type = "integer"
-	case model.Int64:
+	case model.BaseType_Int64:
 		shape.Type = "long"
-	case model.Float32:
+	case model.BaseType_Float32:
 		shape.Type = "float"
-	case model.Float64:
+	case model.BaseType_Float64:
 		shape.Type = "double"
-	case model.Decimal:
+	case model.BaseType_Decimal:
 		shape.Type = "bigDecimal"
-	case model.Integer:
+	case model.BaseType_Integer:
 		shape.Type = "bigInteger"
 	}
 	if td.MinValue != nil || td.MaxValue != nil {

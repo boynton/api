@@ -165,37 +165,36 @@ func (out *OperationOutput) String() string {
 func (schema *Schema) BaseType(id AbsoluteIdentifier) BaseType {
 	switch id {
 	case "base#Blob":
-		return Blob
+		return BaseType_Blob
 	case "base#Bool":
-		return Bool
+		return BaseType_Bool
 	case "base#String":
-		return String
+		return BaseType_String
 	case "base#Int8":
-		return Int8
+		return BaseType_Int8
 	case "base#Int16":
-		return Int16
+		return BaseType_Int16
 	case "base#Int32":
-		return Int32
+		return BaseType_Int32
 	case "base#Int64":
-		return Int64
+		return BaseType_Int64
 	case "base#Float32":
-		return Float32
+		return BaseType_Float32
 	case "base#Float64":
-		return Float64
+		return BaseType_Float64
 	case "base#Decimal":
-		return Decimal
+		return BaseType_Decimal
 	case "base#Integer":
-		panic("big int!")
-		return Integer
+		return BaseType_Integer
 	case "base#Timestamp":
-		return Timestamp
+		return BaseType_Timestamp
 	}
 	td := schema.GetTypeDef(id)
 	if td != nil {
 		return td.Base
 	}
 	//not an explicit type, i.e. an operation input/output/error, all effectively structs
-	return Struct
+	return BaseType_Struct
 }
 
 func (schema *Schema) ShapeNames() []string {
@@ -338,7 +337,7 @@ func (schema *Schema) noteDependencies(included map[AbsoluteIdentifier]bool, id 
 		return
 	}
 	switch td.Base {
-	case Struct, Union:
+	case BaseType_Struct, BaseType_Union:
 		for _, f := range td.Fields {
 			schema.noteDependencies(included, f.Type)
 		}
@@ -348,9 +347,9 @@ func (schema *Schema) noteDependencies(included map[AbsoluteIdentifier]bool, id 
 				case Object:
 					//could be *any*, do we need to mark that?
 		*/
-	case List:
+	case BaseType_List:
 		schema.noteDependencies(included, td.Items)
-	case Map:
+	case BaseType_Map:
 		schema.noteDependencies(included, td.Items)
 		schema.noteDependencies(included, td.Keys)
 	default:
@@ -371,12 +370,13 @@ func (od *OperationDef) OutputHttpPayloadName() string {
 
 func (schema *Schema) IsStringType(id AbsoluteIdentifier) bool {
 	bt := schema.BaseType(id)
-	return bt == String
+	return bt == BaseType_String
 }
 
 func (schema *Schema) IsNumericType(id AbsoluteIdentifier) bool {
 	bt := schema.BaseType(id)
-	return bt == Int32 || bt == Int64 || bt == Int16 || bt == Int8 || bt == Float64 || bt == Float32 //not decimal, it is an object
+	return bt == BaseType_Int32 || bt == BaseType_Int64 || bt == BaseType_Int16 || bt == BaseType_Int8 ||
+		bt == BaseType_Float64 || bt == BaseType_Float32 //not decimal, it is an object
 }
 
 func (schema *Schema) IsBaseType(id AbsoluteIdentifier) bool {

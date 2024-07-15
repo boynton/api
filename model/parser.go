@@ -676,9 +676,9 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	case "Enum":
 		err = p.parseEnumDef(td)
 	case "Bool":
-		err = p.parseSimpleDef(td, Bool)
+		err = p.parseSimpleDef(td, BaseType_Bool)
 	case "Timestamp":
-		err = p.parseSimpleDef(td, Timestamp)
+		err = p.parseSimpleDef(td, BaseType_Timestamp)
 	//? case "Any":
 	default:
 		return p.Error("Base type NYI: " + base)
@@ -700,7 +700,7 @@ func (p *Parser) parseSimpleDef(td *TypeDef, base BaseType) error {
 }
 
 func (p *Parser) parseBlobDef(td *TypeDef) error {
-	td.Base = Blob
+	td.Base = BaseType_Blob
 	err := p.parseTypeOptions(td, "minsize", "maxsize")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -711,21 +711,21 @@ func (p *Parser) parseBlobDef(td *TypeDef) error {
 func (p *Parser) parseNumberDef(td *TypeDef, ntype string) error {
 	switch ntype {
 	case "Int8":
-		td.Base = Int8
+		td.Base = BaseType_Int8
 	case "Int16":
-		td.Base = Int16
+		td.Base = BaseType_Int16
 	case "Int32":
-		td.Base = Int32
+		td.Base = BaseType_Int32
 	case "Int64":
-		td.Base = Int64
+		td.Base = BaseType_Int64
 	case "Float32":
-		td.Base = Float32
+		td.Base = BaseType_Float32
 	case "Float64":
-		td.Base = Float64
+		td.Base = BaseType_Float64
 	case "Decimal":
-		td.Base = Decimal
+		td.Base = BaseType_Decimal
 	case "Integer":
-		td.Base = Integer
+		td.Base = BaseType_Integer
 	}
 	err := p.parseTypeOptions(td, "minvalue", "maxvalue")
 	if err == nil {
@@ -735,7 +735,7 @@ func (p *Parser) parseNumberDef(td *TypeDef, ntype string) error {
 }
 
 func (p *Parser) parseStructDef(td *TypeDef) error {
-	td.Base = Struct
+	td.Base = BaseType_Struct
 	err := p.parseTypeOptions(td)
 	if err != nil {
 		return err
@@ -757,7 +757,7 @@ func (p *Parser) parseStructDef(td *TypeDef) error {
 }
 
 func (p *Parser) parseUnionDef(td *TypeDef) error {
-	td.Base = Union
+	td.Base = BaseType_Union
 	err := p.parseTypeOptions(td)
 	if err != nil {
 		return err
@@ -779,7 +779,7 @@ func (p *Parser) parseUnionDef(td *TypeDef) error {
 }
 
 func (p *Parser) parseListDef(td *TypeDef) error {
-	td.Base = List
+	td.Base = BaseType_List
 	err := p.expect(OPEN_BRACKET)
 	if err != nil {
 		return err
@@ -802,7 +802,7 @@ func (p *Parser) parseListDef(td *TypeDef) error {
 }
 
 func (p *Parser) parseMapDef(td *TypeDef) error {
-	td.Base = Map
+	td.Base = BaseType_Map
 	err := p.expect(OPEN_BRACKET)
 	if err != nil {
 		return err
@@ -834,7 +834,7 @@ func (p *Parser) parseMapDef(td *TypeDef) error {
 }
 
 func (p *Parser) parseStringDef(td *TypeDef) error {
-	td.Base = String
+	td.Base = BaseType_String
 	err := p.parseTypeOptions(td, "minsize", "maxsize", "pattern")
 	if err != nil {
 		return err
@@ -1337,7 +1337,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 }
 
 func (p *Parser) parseEnumDef(td *TypeDef) error {
-	td.Base = Enum
+	td.Base = BaseType_Enum
 	tok := p.GetToken()
 	if tok.Type != OPEN_BRACE {
 		return p.SyntaxError()

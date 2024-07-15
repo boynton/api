@@ -122,10 +122,32 @@ structure OperationDef with [GenericTraits] {
     resource: String
 
     lifecycle: String
+
+	examples: OperationExampleList
 }
 
 list OperationOutputList {
     member: OperationOutput
+}
+
+list OperationExampleList {
+    member: OperationExample
+}
+
+structure OperationExample {
+    title: String
+
+    input: Document
+
+    output: Document
+
+    error: OperationErrorExample
+}
+
+structure OperationErrorExample {
+	operationId: AbsoluteIdentifier
+
+	entity: Document
 }
 
 /// OperationInput - the description of an operation input. It is similar to a Struct definition,

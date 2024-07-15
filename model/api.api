@@ -136,9 +136,24 @@ type OperationDef Struct {
     exceptions AbsoluteIdentifierList
     resource String
     lifecycle String
+    examples OperationExampleList
 }
 
 type OperationOutputList List[OperationOutput]
+
+type OperationExampleList List[OperationExample]
+
+type OperationExample Struct {
+    title String
+    input Any
+    output Any
+    error OperationErrorExample
+}
+
+type OperationErrorExample Struct {
+    operationId AbsoluteIdentifier
+    entity Any
+}
 
 // 
 // OperationInput - the description of an operation input. It is similar to a

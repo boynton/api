@@ -148,7 +148,7 @@ func (gen *SummaryGenerator) GenerateExceptions() error {
 
 func (gen *SummaryGenerator) GenerateType(td *TypeDef) error {
 	switch td.Base {
-	case Struct, Union:
+	case BaseType_Struct, BaseType_Union:
 		var lst []string
 		for _, fd := range td.Fields {
 			lst = append(lst, string(fd.Name))
@@ -158,9 +158,9 @@ func (gen *SummaryGenerator) GenerateType(td *TypeDef) error {
 			s = "{" + strings.Join(lst, ", ") + "}"
 		}
 		gen.Emitf("type %s %s %s\n", StripNamespace(td.Id), td.Base, s)
-	case List:
+	case BaseType_List:
 		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), StripNamespace(td.Items))
-	case Map:
+	case BaseType_Map:
 		gen.Emitf("type %s Map[%s → %s]\n", StripNamespace(td.Id), StripNamespace(td.Keys), StripNamespace(td.Items))
 	default:
 		gen.Emitf("type %s %s\n", StripNamespace(td.Id), td.Base)
