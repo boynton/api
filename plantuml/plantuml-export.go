@@ -143,7 +143,6 @@ func (gen *Generator) GenerateFooter() {
 }
 
 func StripNamespace(target model.AbsoluteIdentifier) string {
-	fmt.Printf("StripNamespace: %q\n", target)
 	t := string(target)
 	n := strings.Index(t, "#")
 	if n < 0 {
