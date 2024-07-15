@@ -173,6 +173,8 @@ func (p *Parser) Parse() error {
 					if e != nil {
 						return e
 					}
+				} else {
+					err = p.Error(fmt.Sprintf("Unknown shape: %s", ftype))
 				}
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
@@ -1801,7 +1803,8 @@ func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
 	case "null":
 		return nil, nil
 	default:
-		return nil, p.Error(fmt.Sprintf("Not a valid symbol: %s", tok.Text))
+		return tok.Text, nil
+		//		return nil, p.Error(fmt.Sprintf("Not a valid symbol: %s", tok.Text))
 	}
 }
 func (p *Parser) parseLiteralString(tok *Token) (interface{}, error) {
