@@ -31,14 +31,32 @@ type Generator struct {
 	ns              string
 	name            string
 	detailGenerator string
+	useHtmlPreTag       bool
 }
 
 func (gen *Generator) getDetailGenerator() model.Generator {
+	var dec *model.Decorator
+	if gen.useHtmlPreTag {
+		dec = &model.Decorator{
+			BaseType: func(s string) string {
+				return fmt.Sprintf("<em><strong>%s</strong></em>", s)
+			},
+			UserType: func(s string) string {
+				return fmt.Sprintf("<em><strong><a href=\"#%s\">%s</a></strong></em>", strings.ToLower(s), s)
+			},
+		}
+	}
 	switch gen.detailGenerator {
 	case "api":
-		return new(model.ApiGenerator)
+		g := new(model.ApiGenerator)
+		g.Decorator = dec
+		return g
+	default: //smithy
+		g := new(smithy.IdlGenerator)
+		g.Sort = gen.Sort
+		g.Decorator = dec
+		return g
 	}
-	return new(smithy.IdlGenerator)
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -49,6 +67,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
 	gen.detailGenerator = config.GetString("detail-generator") //should be either "smithy" or "
+	gen.useHtmlPreTag = config.GetBool("use-html-pre-tag")
 	gen.Begin()
 	gen.GenerateSummary()
 	gen.GenerateOperations()
@@ -143,7 +162,11 @@ func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	opId := StripNamespace(op.Id)
 	gen.Emitf("### %s\n\n", opId)
-	gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+	if true { //doesn't work with some quicklook markdown viewers, the <pre> block gets skipped altogether
+		gen.Emitf("<pre>\n%s</pre>\n\n", gen.generateApiOperation(op))
+	} else {
+		gen.Emitf("```\n%s```\n\n", gen.generateApiOperation(op))
+	}
 	return nil
 }
 
