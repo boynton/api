@@ -9,7 +9,7 @@ service CrudlService
 // 
 operation CreateItem (method=POST, url="/items", resource=ItemResource, lifecycle=create) {
     input {
-        item Item (required, payload)
+        data ItemData (required, payload)
     }
     output (status=201) {
         item Item (payload)
@@ -61,7 +61,7 @@ operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResourc
 // 
 operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=list) {
     input {
-        limit Int32 (query="limit", default=100)
+        limit Int32 (query="limit")
         skip String (query="skip")
     }
     output (status=200) {
@@ -84,34 +84,28 @@ exception NotFound (status=404) {
 }
 
 // 
+// Data to create an Item
+// 
+type ItemData Struct {
+    title String (required)
+    attributes AttributeList
+}
+
+type AttributeList List[Attribute]
+
+type Attribute Struct {
+    key String
+    val String
+}
+
+// 
 // The Item resource itself
 // 
 type Item Struct {
     id String (required) // the id of the item
-    status ItemStatus
-    modified Timestamp // when the item ast last modified
-    attributes AttributeList
-}
-
-//
-// A List of Attributes
-//
-type AttributeList List[Attribute]
-
-//
-// A key/value pair
-//
-type Attribute Struct {
-	key String
-	val String
-}
-
-//
-// The value of the status field of an Item
-//
-type ItemStatus Enum {
-	DRAFT
-	PUBLISHED
+    title String (required)
+    attributes AttributeList // attributes of the Item
+    modified Timestamp // when the item was last last modified
 }
 
 // 
