@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/boynton/api/doc"
 	"github.com/boynton/api/golang"
 	"github.com/boynton/api/html"
 	"github.com/boynton/api/markdown"
@@ -167,6 +168,8 @@ func Generator(genName string) (model.Generator, error) {
 		return new(model.SummaryGenerator), nil
 	case "api":
 		return new(model.ApiGenerator), nil
+	case "doc":
+		return new(doc.Generator), nil
 	case "markdown":
 		return new(markdown.Generator), nil
 	case "html":
@@ -218,6 +221,7 @@ Supported generators and options used from config if present
    "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
 - markdown: Prints markdown to stdout
    "-a detail-generator=api" - to generate the detail entries with "api" instead of "smithy", which is the default
+   "-a use-html-pre-tag" - use the HTML <pre> tags instead of code fencing, allowing interior links. Not as compatible.
 
 For any generator the following additional parameters are accepted:
 - "-a sort" - causes the operations and types to be alphabetically sorted, by default the original order is preserved
