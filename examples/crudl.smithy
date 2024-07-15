@@ -24,7 +24,7 @@ operation CreateItem {
     input := {
         @required
         @httpPayload
-        item: Item
+        data: ItemData
     }
 
     output := {
@@ -69,6 +69,7 @@ operation UpdateItem {
         @required
         @httpPayload
         item: Item
+
     }
 
     output := {
@@ -119,7 +120,7 @@ operation ListItems {
 @error("client")
 @httpError(400)
 structure BadRequest {
-	@httpPayload
+    @httpPayload
     info: ExceptionInfo
 }
 
@@ -150,10 +151,20 @@ structure Item {
     @required
     id: String
 
-    /// when the item ast last modified
-    modified: Timestamp
+    @required
+    title: String
 
     /// attributes of the Item
+    attributes: AttributeList
+
+    /// when the item was last last modified
+    modified: Timestamp
+}
+
+/// Data to create an Item
+structure ItemData {
+    @required
+    title: String
     attributes: AttributeList
 }
 
@@ -163,10 +174,10 @@ structure ExceptionInfo {
 }
 
 list AttributeList {
-	member: Attribute
+    member: Attribute
 }
 
 structure Attribute {
-	key: String
-	val: String
+    key: String
+    val: String
 }
