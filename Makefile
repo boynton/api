@@ -4,6 +4,10 @@ bin/api:: go.mod *.go */*.go
 	mkdir -p bin
 	go build -ldflags "-X main.Version=`git describe --tag`" -o bin/api github.com/boynton/api
 
+## bootstrap the model from the smithy definition
+model/model_types.go: model/api.smithy bin/api
+	./bin/api -f -g golang -o model/ model/api.smithy
+
 install:: all
 	rm -f $(HOME)/bin/api
 	cp -p bin/api $(HOME)/bin/api
