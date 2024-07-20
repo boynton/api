@@ -24,6 +24,7 @@ import (
 	"github.com/boynton/api/doc"
 	"github.com/boynton/api/golang"
 	"github.com/boynton/api/html"
+	"github.com/boynton/api/httptrace"
 	"github.com/boynton/api/markdown"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/openapi"
@@ -99,6 +100,7 @@ func main() {
 		os.Exit(0)
 	} else if *pEntity != "" {
 		eid := model.AbsoluteIdentifier(*pEntity)
+		fmt.Println(">>>>>>>", eid, "<<<<<<")
 		td := schema.GetTypeDef(eid)
 		if td != nil {
 			fmt.Println(td)
@@ -184,16 +186,15 @@ func Generator(genName string) (model.Generator, error) {
 		return new(rdl.Generator), nil
 	case "openapi":
 		return new(openapi.Generator), nil
-	case "swagger":
-		return nil, fmt.Errorf("swagger.Generator NYI")
-	//return new(swagger.Generator), nil
 	case "go", "golang":
 		return new(golang.Generator), nil
-	//case "ts":
-	//case "http-trace":
-	//case "swagger-ui":
+	case "httptrace":
+		return new(httptrace.Generator), nil
 	case "plantuml":
 		return new(plantuml.Generator), nil
+	//case "swagger":
+	//case "swagger-ui":
+	//case "ts":
 	default:
 		return nil, fmt.Errorf("Unknown generator: %q", genName)
 	}
