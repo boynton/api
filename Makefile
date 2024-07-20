@@ -5,7 +5,7 @@ bin/api:: go.mod *.go */*.go
 	go build -ldflags "-X main.Version=`git describe --tag`" -o bin/api github.com/boynton/api
 
 ## bootstrap the model from the smithy definition
-model/model_types.go: model/api.smithy bin/api
+model/model_types.go:
 	./bin/api -f -g golang -o model/ model/api.smithy
 
 install:: all

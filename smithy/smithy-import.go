@@ -65,14 +65,6 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
-		if shape != nil {
-			if shape.Type == "resource" {
-				return addResource(schema, ast, shapeId, shape)
-			}
-		}
-		return nil
-	})
 	return schema, err
 }
 
@@ -412,7 +404,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 	id := model.AbsoluteIdentifier(shapeId)
 	if operationAlreadyAdded(schema, shapeId) {
 		prev := schema.GetOperationDef(id)
-		if prev != nil {
+		if prev != nil && resource != "" { //i.e. we added the op *not* from the resource first
 			prev.Resource = resource
 			prev.Lifecycle = lifecycle
 		}
@@ -656,12 +648,12 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 	case "service":
 		return addService(schema, ast, shapeId, shape)
 	case "operation":
+		//the resource/lifecycle *could* be looked up. passing "" means we must also addResource to update it.
 		return addOperation(schema, ast, shapeId, shape, "", "")
 	case "resource":
 		return addResource(schema, ast, shapeId, shape)
 	case "apply":
-		//normally handled elsewhere
-		return nil
+		panic("Assertion failure: smithy.AST.Assemble() should have resolved all 'apply' shapes")
 	default:
 		panic("implement me:" + shape.Type)
 	}

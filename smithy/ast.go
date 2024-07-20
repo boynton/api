@@ -163,8 +163,7 @@ func (node *NodeValue) Get(key string) *NodeValue {
 	case *NodeValue:
 		return m.Get(key)
 	default:
-		fmt.Println("Whoa:", m)
-		panic("Whoa, Get()")
+		return nil
 	}
 }
 
@@ -277,26 +276,18 @@ func (node *NodeValue) AsDecimal() *data.Decimal {
 		case *NodeValue:
 			panic("ooops, double wrapoper")
 		}
-		fmt.Println("val:", node.value)
-		panic("Whoa GetDecimal")
 	}
 	return nil
 }
 
 func (node *NodeValue) GetSlice(key string) []interface{} {
-	if node == nil {
+	n := node.Get(key)
+	if n == nil {
 		return nil
 	}
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		if tmp, ok := m[key]; ok {
-			if a, ok := tmp.([]interface{}); ok {
-				return a
-			}
-		}
-		return nil
-	case *data.Object:
-		return m.GetSlice(key)
+	switch v := n.value.(type) {
+	case []interface{}:
+		return v
 	default:
 		panic("Whoa, GetSlice()")
 	}
@@ -358,10 +349,6 @@ func (ast *AST) AssemblyVersion() int {
 }
 
 func (ast *AST) PutShape(id string, shape *Shape) {
-	if id == "" {
-		fmt.Println("shape:", shape)
-		panic("whoops, no id on a shape")
-	}
 	if ast.Shapes == nil {
 		ast.Shapes = NewMap[*Shape]()
 	}
@@ -870,12 +857,8 @@ func (ast *AST) mergeShape(key string, shape1 *Shape, shape2 *Shape) error {
 		return err
 	}
 	if shape1.Type == "apply" {
-		//		if shape2.Type == "apply" {
 		shape2.Traits = mergedTraits
 		ast.PutShape(key, shape2)
-		//		} else {
-		//
-		//		}
 	} else if shape2.Type == "apply" {
 		shape1.Traits = mergedTraits
 		ast.PutShape(key, shape1)
