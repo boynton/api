@@ -493,7 +493,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 				//to do: ensure namespaced
 				example.Error = &model.OperationErrorExample{
 					ShapeId: model.AbsoluteIdentifier(sid),
-					Entity:  clone(ope.Get("content")),
+					Output:  clone(ope.Get("content")),
 				}
 			}
 			op.Examples = append(op.Examples, example)

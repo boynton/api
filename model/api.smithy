@@ -146,7 +146,7 @@ structure OperationExample {
 structure OperationErrorExample {
 	shapeId: AbsoluteIdentifier
 
-	entity: Document
+	output: Document
 }
 
 /// OperationInput - the description of an operation input. It is similar to a Struct definition,

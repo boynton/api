@@ -56,7 +56,6 @@ func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 	gen.GenerateOperations()
 	gen.GenerateExceptions()
 	gen.GenerateTypes()
-	//	gen.GenerateExamples()
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".api")
 	err = gen.Write(s, fname, "")
@@ -121,6 +120,7 @@ func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
 	gen.GenerateOperationExceptionRefs(op)
+	gen.GenerateOperationExamples(op)
 	gen.Emit("}\n")
 	return nil
 }
@@ -278,6 +278,78 @@ func (gen *ApiGenerator) GenerateOperationExceptionRefs(op *OperationDef) {
 	}
 }
 
+func (gen *ApiGenerator) GenerateOperationExamples(op *OperationDef) {
+	if len(op.Examples) > 0 {
+		gen.Emitf("    examples [\n")
+		for _, ex := range op.Examples {
+			gen.Emitf("        {\n")
+			gen.Emitf("            title: %q\n", ex.Title)
+			if ex.Input != nil {
+				gen.Emitf("            input: %s\n", prettyData(ex.Input, "            "))
+			}
+			if ex.Output != nil {
+				gen.Emitf("            output: %s\n", prettyData(ex.Output, "            "))
+			}
+			if ex.Error != nil {
+				gen.Emitf("            error: {\n")
+				gen.Emitf("                shapeId: %q\n", ex.Error.ShapeId)
+				gen.Emitf("                output: %s\n", prettyData(ex.Error.Output, "                "))
+				gen.Emitf("            }\n")
+			}
+			gen.Emitf("        }\n")
+		}
+		gen.Emitf("    ]\n")
+	}
+}
+
+func prettyData(a any, indent string) string {
+	nextIndent := indent + "    "
+	if a == nil {
+		return "null"
+	}
+	switch v := a.(type) {
+	case string:
+		return fmt.Sprintf("%q", v)
+	case float64:
+		return fmt.Sprintf("%g", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	case int32:
+		return fmt.Sprintf("%d", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	case []any:
+		s := "[\n"
+		i := 0
+		last := len(v) - 1
+		comma := ","
+		for _, v := range v {
+			if i == last {
+				comma = ""
+			}
+			i++
+			s = s + fmt.Sprintf("%s%s%s\n", nextIndent, prettyData(v, nextIndent), comma)
+		}
+		return s + indent + "]"
+	case map[string]any:
+		s := "{\n"
+		i := 0
+		last := len(v) - 1
+		comma := ","
+		for k, v := range v {
+			if i == last {
+				comma = ""
+			}
+			i++
+			s = s + fmt.Sprintf("%s%q: %s%s\n", nextIndent, k, prettyData(v, nextIndent), comma)
+		}
+		return s + indent + "}"
+	default:
+		fmt.Println("a:", v)
+		panic("prettyData: FIX ME")
+	}
+}
+
 func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 	commentHeaders := false
 	for _, f := range fields {
@@ -313,6 +385,18 @@ func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 			gen.Emitf("%s%s %s%s%s\n", indent, f.Name, tname, sopts, comm)
 		}
 	}
+}
+
+func (gen *ApiGenerator) GenerateExamples() {
+	for _, op := range gen.Schema.Operations {
+		for _, ex := range op.Examples {
+			gen.GenerateExample(op, ex)
+		}
+	}
+}
+func (gen *ApiGenerator) GenerateExample(op *OperationDef, ex *OperationExample) {
+	opName := StripNamespace(op.Id)
+	gen.Emitf("example %s %s\n", opName, data.Pretty(ex))
 }
 
 func (gen *ApiGenerator) GenerateTypes() {

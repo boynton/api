@@ -169,7 +169,7 @@ type OperationExample struct {
 
 type OperationErrorExample struct {
 	ShapeId AbsoluteIdentifier `json:"shapeId,omitempty"`
-	Entity  any                `json:"entity,omitempty"`
+	Output  any                `json:"output,omitempty"`
 }
 
 // OperationInput - the description of an operation input. It is similar to a
