@@ -71,7 +71,7 @@ apply ListItems @examples([
                 "next": "32vg321"
             }
         }
-    },
+    }
     {
         title: "Listing page 2"
         input: {
