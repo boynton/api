@@ -498,10 +498,10 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, 
 			if operr != nil {
 				ope := AsNodeValue(operr)
 				sid := ope.GetString("shapeId")
-				//validate it?
+				//to do: ensure namespaced
 				example.Error = &model.OperationErrorExample{
-					OperationId: model.AbsoluteIdentifier(sid),
-					Entity:      clone(ope.Get("content")),
+					ShapeId: model.AbsoluteIdentifier(sid),
+					Entity:  clone(ope.Get("content")),
 				}
 			}
 			op.Examples = append(op.Examples, example)

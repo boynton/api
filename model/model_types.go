@@ -25,7 +25,6 @@ const (
 	BaseType_Blob
 	BaseType_String
 	BaseType_Timestamp
-	BaseType_Value
 	BaseType_List
 	BaseType_Map
 	BaseType_Struct
@@ -47,7 +46,6 @@ var namesBaseType = []string{
 	BaseType_Blob:      "Blob",
 	BaseType_String:    "String",
 	BaseType_Timestamp: "Timestamp",
-	BaseType_Value:     "Value",
 	BaseType_List:      "List",
 	BaseType_Map:       "Map",
 	BaseType_Struct:    "Struct",
@@ -170,8 +168,8 @@ type OperationExample struct {
 }
 
 type OperationErrorExample struct {
-	OperationId AbsoluteIdentifier `json:"operationId,omitempty"`
-	Entity      any                `json:"entity,omitempty"`
+	ShapeId AbsoluteIdentifier `json:"shapeId,omitempty"`
+	Entity  any                `json:"entity,omitempty"`
 }
 
 // OperationInput - the description of an operation input. It is similar to a

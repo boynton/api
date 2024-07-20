@@ -827,11 +827,60 @@ func (ast *AST) Merge(src *AST) error {
 	}
 	if src.Shapes != nil {
 		for _, k := range src.Shapes.Keys() {
-			if tmp := ast.GetShape(k); tmp != nil {
-				return fmt.Errorf("Duplicate shape in assembly: %s\n", k)
+			srcShape := src.GetShape(k)
+			curShape := ast.GetShape(k)
+			if curShape == nil {
+				ast.PutShape(k, srcShape)
+			} else {
+				err := ast.mergeShape(k, curShape, srcShape)
+				if err != nil {
+					return err
+				}
 			}
-			ast.PutShape(k, src.GetShape(k))
 		}
+	}
+	return nil
+}
+
+func (ast *AST) mergeTraits(t1 *NodeValue, t2 *NodeValue) (*NodeValue, error) {
+	for _, tk := range t2.Keys() {
+		tv := t2.Get(tk)
+		if t1.Get(tk) == nil {
+			if t1 == nil {
+			}
+			t1.Put(tk, tv)
+		} else {
+			//if lists, append
+			//if identical, ignore
+			//else err
+			return nil, fmt.Errorf("Duplicate trait in assembly: %s\n", tk)
+		}
+	}
+	return t1, nil
+}
+
+func (ast *AST) mergeShape(key string, shape1 *Shape, shape2 *Shape) error {
+	//note: only shape1 can be nil
+	if shape1 == nil {
+		ast.PutShape(key, shape2)
+		return nil
+	}
+	mergedTraits, err := ast.mergeTraits(ensureShapeTraits(shape1), ensureShapeTraits(shape2))
+	if err != nil {
+		return err
+	}
+	if shape1.Type == "apply" {
+		//		if shape2.Type == "apply" {
+		shape2.Traits = mergedTraits
+		ast.PutShape(key, shape2)
+		//		} else {
+		//
+		//		}
+	} else if shape2.Type == "apply" {
+		shape1.Traits = mergedTraits
+		ast.PutShape(key, shape1)
+	} else { //neither is apply, just merge if we can
+		return fmt.Errorf("Duplicate shape in assembly: %s\n", key) //not yet
 	}
 	return nil
 }
@@ -839,7 +888,7 @@ func (ast *AST) Merge(src *AST) error {
 func (ast *AST) mergeConflict(k string, v1 interface{}, v2 interface{}) error {
 	//todo: if values are identical, accept one of them
 	//todo: concat list values
-	return fmt.Errorf("Conflict when merging metadata in models: %s\n", k)
+	return fmt.Errorf("Conflict when merging models (not yet handled): %s\n", k)
 }
 
 var mixinSeq int

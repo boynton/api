@@ -144,11 +144,9 @@ func (p *Parser) Parse() error {
 					p.use[shortName] = use
 				}
 			case "apply":
-				//to do: parse straight to a "target" shape, then apply it later during assembly?
-				var ftype string
-				ftype, err = p.expectShapeId()
-				//fmt.Println("apply to shapeId:", ftype)
-				//ftype, err = p.expectTarget()
+				var targetId string
+				traits = withCommentTrait(traits, comment)
+				targetId, err = p.expectShapeId()
 				tok := p.GetToken()
 				if tok == nil {
 					return p.SyntaxError()
@@ -156,25 +154,18 @@ func (p *Parser) Parse() error {
 				if tok.Type != AT {
 					return p.SyntaxError()
 				}
-				lst := strings.Split(ftype, "$")
-				field := ""
-				if len(lst) == 2 {
-					ftype = lst[0]
-					field = lst[1]
+				traits, err = p.parseTrait(traits)
+				if err != nil {
+					return err
 				}
-				if shape := p.ast.GetShape(p.ensureNamespaced(ftype)); shape != nil {
-					var e error
-					if field != "" {
-						m := shape.Members.Get(field)
-						m.Traits, e = p.parseTrait(m.Traits)
-					} else {
-						shape.Traits, e = p.parseTrait(shape.Traits)
-					}
-					if e != nil {
-						return e
-					}
-				} else {
-					err = p.Error(fmt.Sprintf("Unknown shape: %s", ftype))
+				shape := &Shape{
+					Type:   "apply",
+					Traits: traits,
+				}
+				traits = nil
+				err = p.addShapeDefinition(targetId, shape)
+				if err != nil {
+					return err
 				}
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
@@ -1723,6 +1714,14 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 		}
 		if lit == nil {
 			return traits, p.SyntaxError()
+		}
+		for _, ex := range AsSlice(lit) {
+			e := Get(ex, "error")
+			if e != nil {
+				s := GetString(e, "shapeId")
+				s = p.ensureNamespaced(s)
+				Put(e, "shapeId", s)
+			}
 		}
 		return withTrait(traits, "smithy.api#examples", lit), nil
 	case "trait":

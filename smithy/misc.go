@@ -19,6 +19,8 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/boynton/data" //for Pretty
 )
 
 var Verbose bool
@@ -31,6 +33,10 @@ func Debug(args ...interface{}) {
 		}
 		fmt.Println(str(args[max]))
 	}
+}
+
+func pretty(arg any) string {
+	return data.Pretty(arg)
 }
 
 func str(arg interface{}) string {
@@ -121,4 +127,109 @@ func TrimRightSpace(s string) string {
 
 func TrimLeftSpace(s string) string {
 	return strings.TrimLeft(s, " \t\n\v\f\r")
+}
+
+func AsString(a any) string {
+	if a == nil {
+		return ""
+	}
+	switch v := a.(type) {
+	case string:
+		return v
+	default:
+		return ""
+	}
+}
+
+func AsFloat64(a any) float64 {
+	if a == nil {
+		return 0
+	}
+	switch v := a.(type) {
+	case float64:
+		return v
+	default:
+		return 0
+	}
+}
+
+func AsInt(a any) int {
+	if a == nil {
+		return 0
+	}
+	switch v := a.(type) {
+	case int:
+		return v
+	case int8:
+		return int(v)
+	case int16:
+		return int(v)
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case float32:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+func AsSlice(a any) []any {
+	if a == nil {
+		return nil
+	}
+	switch v := a.(type) {
+	case []any:
+		return v
+	}
+	return nil
+}
+
+func AsMap(a any) map[string]any {
+	if a == nil {
+		return nil
+	}
+	switch v := a.(type) {
+	case map[string]any:
+		return v
+	default:
+		fmt.Println("not a map:", a)
+		panic("here")
+	}
+}
+
+func Get(a any, key string) any {
+	m := AsMap(a)
+	if a == nil {
+		return nil
+	}
+	return m[key]
+}
+
+func GetString(a any, key string) string {
+	v := Get(a, key)
+	if v == nil {
+		return ""
+	}
+	return AsString(v)
+}
+
+func GetMap(a any, key string) map[string]any {
+	v := Get(a, key)
+	if v == nil {
+		return nil
+	}
+	return AsMap(v)
+}
+
+func Put(a any, key string, val any) any {
+	m := AsMap(a)
+	if a == nil {
+		return nil
+	}
+	m[key] = val
+	return a
 }

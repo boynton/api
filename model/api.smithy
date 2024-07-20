@@ -16,7 +16,6 @@ enum BaseType {
     Blob
     String
     Timestamp
-    Value
     List
     Map
     Struct
@@ -145,7 +144,7 @@ structure OperationExample {
 }
 
 structure OperationErrorExample {
-	operationId: AbsoluteIdentifier
+	shapeId: AbsoluteIdentifier
 
 	entity: Document
 }

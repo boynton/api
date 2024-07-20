@@ -258,7 +258,7 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 			}
 			if ex.Error != nil {
 				smexerr := make(map[string]any, 0)
-				smexerr["shapeId"] = string(ex.Error.OperationId)
+				smexerr["shapeId"] = string(ex.Error.ShapeId)
 				smexerr["content"] = ex.Error.Entity
 				smex["error"] = smexerr
 				smex["allowConstraintErrors"] = true

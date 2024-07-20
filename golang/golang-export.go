@@ -38,9 +38,7 @@ type Generator struct {
 	decimalPrefix       string //derived from the decimalPackage
 	timestampPackage    string //use this package for the Timestamp implementation. If "", then generate one in this package
 	timestampPrefix     string
-	anyPackage          string //use this package for the Any type, if "", then generate one in this package
-	anyPrefix           string //derived from the anyPackage
-	prefixEnums         bool   //prefix enum symbols with the typename to avoid collisions
+	prefixEnums         bool //prefix enum symbols with the typename to avoid collisions
 }
 
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
@@ -63,11 +61,6 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	gen.prefixEnums = !config.GetBool("golang.noEnumPrefix")
 	gen.inlineSlicesAndMaps = config.GetBool("golang.inlineSlicesAndMaps")
 	gen.inlinePrimitives = config.GetBool("golang.inlinePrimitives")
-	gen.anyPackage = config.GetString("golang.anyPackage")
-	if gen.anyPackage == "" {
-		gen.anyPackage = "github.com/boynton/data"
-	}
-	gen.anyPrefix = path.Base(gen.anyPackage) + "."
 	gen.decimalPackage = config.GetString("golang.decimalPackage")
 	if gen.decimalPackage == "" {
 		gen.decimalPackage = "github.com/boynton/data"
@@ -202,7 +195,7 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
 	case "base#Timestamp":
 		return "*" + gen.timestampPrefix + "Timestamp"
 	case "base#Any":
-		return gen.anyPrefix + "Any"
+		return "any"
 	default:
 		//not a base type, but an operation input or output (looks like a Struct, but not declared as a type)
 		return "*" + stripNamespace(typeRef)
