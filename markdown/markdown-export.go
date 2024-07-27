@@ -387,6 +387,10 @@ func (gen *Generator) ensureResourceDiagram(rez *model.ResourceDef) error {
 	pumlGen.Begin()
 	pumlGen.GenerateHeader()
 	pumlGen.GenerateResource(rez)
+	for _, oid := range pumlGen.ResourceOperations(rez) {
+		od := rezSchema.GetOperationDef(oid)
+		pumlGen.GenerateOperation(od)
+	}
 	pumlGen.GenerateExceptions()
 	pumlGen.GenerateTypes()
 	pumlGen.GenerateFooter()
