@@ -21,7 +21,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/boynton/api/doc"
 	"github.com/boynton/api/golang"
 	"github.com/boynton/api/html"
 	"github.com/boynton/api/httptrace"
@@ -170,8 +169,6 @@ func Generator(genName string) (model.Generator, error) {
 		return new(model.SummaryGenerator), nil
 	case "api":
 		return new(model.ApiGenerator), nil
-	case "doc":
-		return new(doc.Generator), nil
 	case "markdown":
 		return new(markdown.Generator), nil
 	case "html":
