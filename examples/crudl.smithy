@@ -9,6 +9,8 @@ service CrudlService {
     ]
 }
 
+/// The Item resource is the primary entity this example service manages.
+/// It is identified by a single id that provided by the service at creation time.
 resource ItemResource {
     identifiers: { itemId: String }
     create: CreateItem
