@@ -120,67 +120,63 @@ func toCanonicalTypeName(name string) model.AbsoluteIdentifier {
 	}
 }
 
-func addOperationFromRef(schema *model.Schema, ast *AST, ref *ShapeRef, rez string, lifecycle string) error {
+func addOperationFromRef(schema *model.Schema, ast *AST, ref *ShapeRef) error {
 	if ref != nil {
 		shapeId := ref.Target
 		shape := ast.GetShape(shapeId)
-		return addOperation(schema, ast, shapeId, shape, rez, lifecycle)
+		return addOperation(schema, ast, shapeId, shape)
 	}
 	return nil
 }
 
-func addResourceOperationsFromRef(schema *model.Schema, ast *AST, resRef *ShapeRef, rez string) error {
+func addResourceOperationsFromRef(schema *model.Schema, ast *AST, resRef *ShapeRef) error {
 	shape := ast.GetShape(resRef.Target)
-	return addResourceOperations(schema, ast, resRef.Target, shape, rez)
+	return addResourceOperations(schema, ast, resRef.Target, shape)
 }
 
-func addResourceOperations(schema *model.Schema, ast *AST, shapeId string, shape *Shape, resource string) error {
-	rez := StripNamespace(shapeId)
-	if resource != "" {
-		rez = resource + "." + rez
-	}
+func addResourceOperations(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	var err error
 	if shape == nil {
 		return fmt.Errorf("Shape not found: %s", shapeId)
 	}
 	for _, ref := range shape.Operations {
-		err = addOperationFromRef(schema, ast, ref, rez, "")
+		err = addOperationFromRef(schema, ast, ref)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ref := range shape.Resources {
-		err = addResourceOperationsFromRef(schema, ast, ref, rez)
+		err = addResourceOperationsFromRef(schema, ast, ref)
 		if err != nil {
 			return err
 		}
 	}
-	err = addOperationFromRef(schema, ast, shape.Create, rez, "create")
+	err = addOperationFromRef(schema, ast, shape.Create)
 	if err != nil {
 		return err
 	}
-	err = addOperationFromRef(schema, ast, shape.Put, rez, "put")
+	err = addOperationFromRef(schema, ast, shape.Put)
 	if err != nil {
 		return err
 	}
-	err = addOperationFromRef(schema, ast, shape.Read, rez, "read")
+	err = addOperationFromRef(schema, ast, shape.Read)
 	if err != nil {
 		return err
 	}
-	err = addOperationFromRef(schema, ast, shape.Update, rez, "update")
+	err = addOperationFromRef(schema, ast, shape.Update)
 	if err != nil {
 		return err
 	}
-	err = addOperationFromRef(schema, ast, shape.Delete, rez, "delete")
+	err = addOperationFromRef(schema, ast, shape.Delete)
 	if err != nil {
 		return err
 	}
-	err = addOperationFromRef(schema, ast, shape.List, rez, "list")
+	err = addOperationFromRef(schema, ast, shape.List)
 	if err != nil {
 		return err
 	}
 	for _, ref := range shape.CollectionOperations {
-		err = addOperationFromRef(schema, ast, ref, rez, "collection")
+		err = addOperationFromRef(schema, ast, ref)
 		if err != nil {
 			return err
 		}
@@ -188,8 +184,39 @@ func addResourceOperations(schema *model.Schema, ast *AST, shapeId string, shape
 	return nil
 }
 
+func shapeRefToIdentifier(ref *ShapeRef) model.AbsoluteIdentifier {
+	var s model.AbsoluteIdentifier = ""
+	if ref != nil {
+		s = model.AbsoluteIdentifier(ref.Target)
+	}
+	return s
+}
+
+func shapeRefsToIdentifiers(refs []*ShapeRef) []model.AbsoluteIdentifier {
+	var ids []model.AbsoluteIdentifier
+	for _, ref := range refs {
+		if ref != nil {
+			ids = append(ids, model.AbsoluteIdentifier(ref.Target))
+		}
+	}
+	return ids
+}
+
 func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
-	return addResourceOperations(schema, ast, shapeId, shape, "")
+	id := model.AbsoluteIdentifier(shapeId)
+	rez := &model.ResourceDef{
+		Id:                   id,
+		Comment:              shape.GetStringTrait("smithy.api#documentation"),
+		Create:               shapeRefToIdentifier(shape.Create),
+		Read:                 shapeRefToIdentifier(shape.Read),
+		Update:               shapeRefToIdentifier(shape.Update),
+		Delete:               shapeRefToIdentifier(shape.Delete),
+		List:                 shapeRefToIdentifier(shape.List),
+		Operations:           shapeRefsToIdentifiers(shape.Operations),
+		CollectionOperations: shapeRefsToIdentifiers(shape.CollectionOperations),
+	}
+	schema.AddResourceDef(rez)
+	return nil
 }
 
 func addService(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
@@ -200,14 +227,16 @@ func addService(schema *model.Schema, ast *AST, shapeId string, shape *Shape) er
 	schema.Version = shape.Version
 	schema.Comment = shape.Traits.GetString("smithy.api#documentation")
 	//TBD: other metadata
-	for _, ref := range shape.Operations {
-		err := addOperationFromRef(schema, ast, ref, "", "")
+	for _, ref := range shape.Operations { //xxx
+		//		err := addOperationFromRef(schema, ast, ref, "", "")
+		err := addOperationFromRef(schema, ast, ref)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ref := range shape.Resources {
-		err := addResourceOperationsFromRef(schema, ast, ref, "")
+		//		err := addResourceOperationsFromRef(schema, ast, ref, "")
+		err := addResourceOperationsFromRef(schema, ast, ref)
 		if err != nil {
 			return err
 		}
@@ -396,26 +425,18 @@ func operationAlreadyAdded(schema *model.Schema, shapeId string) bool {
 	return false
 }
 
-func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape, resource string, lifecycle string) error {
+func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	//validate: that namespace is the same as the service we use (only one per model)
 	if shape == nil {
 		return fmt.Errorf("Operation shape not found: %s", shapeId)
 	}
 	id := model.AbsoluteIdentifier(shapeId)
 	if operationAlreadyAdded(schema, shapeId) {
-		prev := schema.GetOperationDef(id)
-		if prev != nil && resource != "" { //i.e. we added the op *not* from the resource first
-			prev.Resource = resource
-			prev.Lifecycle = lifecycle
-		}
 		return nil
 	}
-	//use tags for the resource and lifecycle, i.e. tags: [resource=ItemResource, lifecycle:Read]
 	op := model.OperationDef{
-		Id:        id,
-		Comment:   shape.GetStringTrait("smithy.api#documentation"),
-		Resource:  resource,
-		Lifecycle: lifecycle,
+		Id:      id,
+		Comment: shape.GetStringTrait("smithy.api#documentation"),
 	}
 	typesConsumed := make(map[model.AbsoluteIdentifier]bool, 0)
 	if shape.Input != nil && shape.Input.Target != "smithy.api#Unit" {
@@ -648,8 +669,7 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 	case "service":
 		return addService(schema, ast, shapeId, shape)
 	case "operation":
-		//the resource/lifecycle *could* be looked up. passing "" means we must also addResource to update it.
-		return addOperation(schema, ast, shapeId, shape, "", "")
+		return addOperation(schema, ast, shapeId, shape)
 	case "resource":
 		return addResource(schema, ast, shapeId, shape)
 	case "apply":

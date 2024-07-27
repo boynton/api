@@ -828,7 +828,11 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 		w.Emit("    %s\n", w.listOfShapeRefs("operations", "%s", tmp, true))
 	}
 	if len(shape.CollectionOperations) > 0 {
-		w.Emit("    %s\n", w.listOfShapeRefs("collectionOperations", "%s", shape.CollectionOperations, true))
+		var tmp []*ShapeRef
+		for _, id := range shape.CollectionOperations {
+			tmp = append(tmp, &ShapeRef{Target: w.stripNamespace(id.Target)})
+		}
+		w.Emit("    %s\n", w.listOfShapeRefs("collectionOperations", "%s", tmp, true))
 	}
 	w.Emit("}\n")
 }

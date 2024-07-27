@@ -26,6 +26,10 @@ func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) err
 	return gen.Write(model.Pretty(gen.ast), "model.json", "")
 }
 
+func (gen *AstGenerator) GenerateResource(op *model.ResourceDef) error {
+	return nil
+}
+
 func (gen *AstGenerator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
@@ -48,20 +52,27 @@ func SmithyAST(schema *model.Schema, sorted bool) (*AST, error) {
 func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.AbsoluteIdentifier]bool, error) {
 	resources := make(map[string]*Shape, 0)
 	operations := make(map[model.AbsoluteIdentifier]bool, 0)
-	for _, od := range gen.Schema.Operations {
-		if od.Resource != "" {
-			operations[od.Id] = true
-			rezId := strings.Split(string(od.Id), "#")[0] + "#" + od.Resource
-			var shape *Shape
-			if rez, ok := resources[rezId]; ok {
-				shape = rez
-			} else {
-				shape = &Shape{
-					Type: "resource",
-				}
-				resources[rezId] = shape
+	for _, rez := range gen.Schema.Resources {
+		shape := &Shape{
+			Type: "resource",
+		}
+		if rez.Comment != "" {
+			ensureShapeTraits(shape).Put("smithy.api#documentation", rez.Comment)
+		}
+		resources[string(rez.Id)] = shape
+		if rez.Create != "" {
+			operations[rez.Create] = true
+			shape.Create = &ShapeRef{
+				Target: string(rez.Create),
 			}
-			if od.Input != nil {
+		}
+		if rez.Read != "" {
+			operations[rez.Read] = true
+			shape.Read = &ShapeRef{
+				Target: string(rez.Read),
+			}
+			od := gen.Schema.GetOperationDef(rez.Read)
+			if od != nil && od.Input != nil {
 				for _, fd := range od.Input.Fields {
 					if fd.HttpPath {
 						if shape.Identifiers == nil {
@@ -74,26 +85,40 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 					}
 				}
 			}
-			ref := &ShapeRef{
-				Target: string(od.Id),
-			}
-			switch od.Lifecycle {
-			case "create":
-				shape.Create = ref
-			case "read":
-				shape.Read = ref
-			case "update":
-				shape.Update = ref
-			case "delete":
-				shape.Delete = ref
-			case "list":
-				shape.List = ref
-			case "collection":
-				shape.CollectionOperations = append(shape.CollectionOperations, ref)
-			default:
-				shape.Operations = append(shape.Operations, ref)
+		}
+		if rez.Update != "" {
+			operations[rez.Update] = true
+			shape.Update = &ShapeRef{
+				Target: string(rez.Update),
 			}
 		}
+		if rez.Delete != "" {
+			operations[rez.Delete] = true
+			shape.Delete = &ShapeRef{
+				Target: string(rez.Delete),
+			}
+		}
+		if rez.List != "" {
+			operations[rez.List] = true
+			shape.List = &ShapeRef{
+				Target: string(rez.List),
+			}
+		}
+		if len(rez.Operations) > 0 {
+			var refs []*ShapeRef
+			for _, oid := range rez.Operations {
+				refs = append(refs, &ShapeRef{Target: string(oid)})
+			}
+			shape.Operations = refs
+		}
+		if len(rez.CollectionOperations) > 0 {
+			var refs []*ShapeRef
+			for _, oid := range rez.CollectionOperations {
+				refs = append(refs, &ShapeRef{Target: string(oid)})
+			}
+			shape.CollectionOperations = refs
+		}
+		//to do: child resources
 	}
 	return resources, operations, nil
 }

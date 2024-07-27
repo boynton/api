@@ -141,6 +141,22 @@ type EnumElement struct {
 	Value   string     `json:"value,omitempty"`
 }
 
+// ResourceDef - describes a resource, and its operations and sub-resources
+type ResourceDef struct {
+	Comment              string                 `json:"comment,omitempty"`
+	Tags                 StringList             `json:"tags,omitempty"`
+	Id                   AbsoluteIdentifier     `json:"id"`
+	Create               AbsoluteIdentifier     `json:"create,omitempty"`
+	Read                 AbsoluteIdentifier     `json:"read,omitempty"`
+	Update               AbsoluteIdentifier     `json:"update,omitempty"`
+	Delete               AbsoluteIdentifier     `json:"delete,omitempty"`
+	List                 AbsoluteIdentifier     `json:"list,omitempty"`
+	Put                  AbsoluteIdentifier     `json:"put,omitempty"`
+	CollectionOperations AbsoluteIdentifierList `json:"collectionOperations,omitempty"`
+	Operations           AbsoluteIdentifierList `json:"operations,omitempty"`
+	Resources            AbsoluteIdentifierList `json:"resources,omitempty"`
+}
+
 // OperationDef - describes an operation, including its HTTP bindings
 type OperationDef struct {
 	Comment    string                 `json:"comment,omitempty"`
@@ -151,8 +167,6 @@ type OperationDef struct {
 	Input      *OperationInput        `json:"input,omitempty"`
 	Output     *OperationOutput       `json:"output,omitempty"`
 	Exceptions AbsoluteIdentifierList `json:"exceptions,omitempty"`
-	Resource   string                 `json:"resource,omitempty"`
-	Lifecycle  string                 `json:"lifecycle,omitempty"`
 	Examples   OperationExampleList   `json:"examples,omitempty"`
 }
 
@@ -242,6 +256,8 @@ type TypeDefList []*TypeDef
 
 type OperationDefList []*OperationDef
 
+type ResourceDefList []*ResourceDef
+
 // ServiceDef - the definition of a service, consisting of Types and Operations
 type ServiceDef struct {
 	Comment    string              `json:"comment,omitempty"`
@@ -250,6 +266,7 @@ type ServiceDef struct {
 	Version    string              `json:"version,omitempty"`
 	Base       string              `json:"base,omitempty"`
 	Types      TypeDefList         `json:"types,omitempty"`
+	Resources  ResourceDefList     `json:"resources,omitempty"`
 	Operations OperationDefList    `json:"operations,omitempty"`
 	Exceptions OperationOutputList `json:"exceptions,omitempty"`
 }

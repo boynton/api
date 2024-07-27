@@ -124,6 +124,8 @@ func (p *Parser) Parse() error {
 				err = p.parseNamespaceDirective(comment)
 			case "version":
 				err = p.parseVersionDirective(comment)
+			case "resource":
+				err = p.parseResourceDirective(comment)
 			case "type":
 				err = p.parseTypeDirective(comment)
 				//			case "example":
@@ -414,24 +416,9 @@ func (p *Parser) parseOperationOutput(op *OperationDef, comment string, isExcept
 func (p *Parser) parseException(comment string) error {
 	e, err := p.parseOperationOutput(nil, comment, true)
 	if err == nil {
-		p.schema.Exceptions = append(p.schema.Exceptions, e)
+		p.schema.AddExceptionDef(e)
 	}
 	return err
-	/*
-		//	xxx := p.parseOperatsionOutput(
-		eName, err := p.ExpectIdentifier()
-		if err != nil {
-			return err
-		}
-		e := &OperationOutput{
-			Id:      p.schema.Namespaced(eName),
-			Comment: comment,
-		}
-		//options.
-
-		p.schema.Exceptions = append(p.schema.Exceptions, e)
-		return nil
-	*/
 }
 
 func (p *Parser) getIdentifier() string {
@@ -455,57 +442,18 @@ func (p *Parser) parseOperation(comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("operation", []string{"method", "url", "resource", "lifecycle"})
+	options, err := p.ParseOptions("operation", []string{"method", "url"})
 	if err != nil {
 		return err
 	}
-	return p.finishOperation(name, options.Method, options.Url, options.Resource, options.Lifecycle, comment)
+	return p.finishOperation(name, options.Method, options.Url, comment)
 }
 
-/*
-func (p *Parser) parseHttp(comment string) error {
-	sym, err := p.ExpectIdentifier()
-	if err != nil {
-		return err
-	}
-
-	var method string
-	up := strings.ToUpper(sym)
-	switch up {
-	case "POST", "GET", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS":
-		method = up
-	default:
-		return p.Error(fmt.Sprintf("HTTP 'method' invalid: %s", sym))
-	}
-	pathTemplate, err := p.ExpectString()
-	if err != nil {
-		return err
-	}
-	options, err := p.ParseOptions("http", []string{"name"})
-	if err != nil {
-		return err
-	}
-	name := ""
-	if options.Name != "" {
-		name = options.Name
-	}
-	if name == "" {
-		panic("need to gues the operation name")
-		//Hmm. Would like the name to be required, not buried in an option
-		//operation CreateItem POST "/items" {...} -> looks a little wonky
-		//operation CreateItem (method="POST", path="/items") {...} -> no, those are also required
-	}
-	return p.finishOperation(name, method, pathTemplate, resource, comment)
-}
-*/
-
-func (p *Parser) finishOperation(name, method, pathTemplate, resource, lifecycle, comment string) error {
+func (p *Parser) finishOperation(name, method, pathTemplate, comment string) error {
 	op := &OperationDef{
 		Id:         p.schema.Namespaced(name),
 		HttpMethod: method,
 		HttpUri:    pathTemplate,
-		Resource:   resource,
-		Lifecycle:  lifecycle,
 		//Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -619,31 +567,73 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 	}
 }
 
-/*
-   func (p *Parser) parseExampleDirective(comment string) error {
-	target, err := p.ExpectCompoundIdentifier()
+func (p *Parser) parseResourceDirective(comment string) error {
+	rezName, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("Example", []string{"name"})
-	if err != nil {
-		return err
+	rd := &ResourceDef{
+		Id:      p.schema.Namespaced(rezName),
+		Comment: comment,
 	}
-	val, err := p.parseLiteralValue()
-	if err == nil {
-		ex := &ExampleDef{
-			Target:  target,
-			Example: val,
-			Comment: comment,
-		}
-		if options.Name != "" {
-			ex.Name = options.Name
-		}
-		p.schema.Examples = append(p.schema.Examples, ex)
+	tok := p.GetToken()
+	if tok.Type != OPEN_BRACE {
+		return p.SyntaxError()
 	}
-	return err
+	rd.Comment = p.ParseTrailingComment(rd.Comment)
+	tok = p.GetToken()
+	if tok == nil {
+		return p.SyntaxError()
+	}
+	if tok.Type != NEWLINE {
+		p.UngetToken()
+	}
+	tok = p.GetToken()
+	for tok != nil {
+		if tok.Type == CLOSE_BRACE {
+			p.schema.Resources = append(p.schema.Resources, rd)
+			return nil
+		} else if tok.Type == NEWLINE {
+			tok = p.GetToken()
+			if tok == nil {
+				return p.EndOfFileError()
+			}
+			continue
+		} else if tok.Type == LINE_COMMENT {
+			//no comments on resource "members", which in smithy are not really members
+		} else {
+			if tok.Type != SYMBOL {
+				return p.SyntaxError()
+			}
+			switch tok.Text {
+			case "create":
+				rd.Create, err = p.expectIdentifierAndMakeAbsolute()
+			case "read":
+				rd.Read, err = p.expectIdentifierAndMakeAbsolute()
+			case "update":
+				rd.Update, err = p.expectIdentifierAndMakeAbsolute()
+			case "delete":
+				rd.Delete, err = p.expectIdentifierAndMakeAbsolute()
+			case "list":
+				rd.List, err = p.expectIdentifierAndMakeAbsolute()
+				//case "put": //smithy
+			case "operations":
+				rd.Operations, err = p.expectIdentifierListAndMakeAbsolute()
+			case "collectionOperations":
+				rd.CollectionOperations, err = p.expectIdentifierListAndMakeAbsolute()
+			case "resources":
+				rd.Resources, err = p.expectIdentifierListAndMakeAbsolute()
+			default:
+				return p.SyntaxError()
+			}
+			if err != nil {
+				return err
+			}
+		}
+		tok = p.GetToken()
+	}
+	return p.EndOfFileError()
 }
-*/
 
 func (p *Parser) parseTypeDirective(comment string) error {
 	typeName, err := p.ExpectIdentifier()
@@ -957,6 +947,50 @@ func (p *Parser) expectEqualsString() (string, error) {
 	return p.ExpectString()
 }
 
+func (p *Parser) expectIdentifierAndMakeAbsolute() (AbsoluteIdentifier, error) {
+	s, err := p.ExpectIdentifier()
+	if err != nil {
+		return "", err
+	}
+	return p.schema.Namespaced(s), nil
+}
+
+func (p *Parser) expectIdentifierListAndMakeAbsolute() ([]AbsoluteIdentifier, error) {
+	lst, err := p.ExpectIdentifierList()
+	if err != nil {
+		return nil, err
+	}
+	var result []AbsoluteIdentifier
+	for _, s := range lst {
+		result = append(result, p.schema.Namespaced(s))
+	}
+	return result, nil
+}
+
+func (p *Parser) ExpectIdentifierList() ([]string, error) {
+	var lst []string
+	err := p.expect(OPEN_BRACKET)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return nil, p.SyntaxError()
+		}
+		if tok.Type == CLOSE_BRACKET {
+			return lst, nil
+		}
+		if tok.Type != SYMBOL {
+			//		s, err := p.ExpectIdentifier()
+			//		if err != nil {
+			//			return nil, err
+			return nil, p.SyntaxError()
+		}
+		lst = append(lst, tok.Text)
+	}
+}
+
 func (p *Parser) expectText() (string, error) {
 	tok := p.GetToken()
 	if tok == nil {
@@ -1115,7 +1149,6 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 				match := strings.ToLower(tok.Text)
 				if strings.HasPrefix(match, "x_") {
 					//options.Annotations, err = p.parseExtendedOption(options.Annotations, tok.Text)
-					fmt.Println("FIX ME: annotations")
 				} else if containsOption(acceptable, match) {
 					switch match {
 					case "min":

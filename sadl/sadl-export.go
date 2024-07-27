@@ -52,6 +52,10 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	return gen.Write(s, fname, "")
 }
 
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	return nil
+}
+
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }

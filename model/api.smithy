@@ -103,6 +103,31 @@ structure EnumElement with [GenericTraits] {
     // type: AbsoluteIdentifier //defaults to String. This is to accomodate IntEnums in Smithy?
 }
 
+/// ResourceDef - describes a resource, and its operations and sub-resources
+structure ResourceDef with [GenericTraits] {
+    @required
+    id: AbsoluteIdentifier
+
+    create: AbsoluteIdentifier
+
+    read: AbsoluteIdentifier
+
+    update: AbsoluteIdentifier
+
+    delete: AbsoluteIdentifier
+
+    list: AbsoluteIdentifier
+
+    put: AbsoluteIdentifier //in smithy, but do we use it?
+
+    collectionOperations: AbsoluteIdentifierList
+	
+    operations: AbsoluteIdentifierList
+
+    resources: AbsoluteIdentifierList
+}
+
+
 /// OperationDef - describes an operation, including its HTTP bindings
 structure OperationDef with [GenericTraits] {
     @required
@@ -117,10 +142,6 @@ structure OperationDef with [GenericTraits] {
     output: OperationOutput
 
     exceptions: AbsoluteIdentifierList
-
-    resource: String
-
-    lifecycle: String
 
 	examples: OperationExampleList
 }
@@ -212,6 +233,10 @@ list OperationDefList {
     member: OperationDef
 }
 
+list ResourceDefList {
+    member: ResourceDef
+}
+
 /// ServiceDef - the definition of a service, consisting of Types and Operations
 structure ServiceDef with [GenericTraits] {
     @required
@@ -223,6 +248,8 @@ structure ServiceDef with [GenericTraits] {
 
     types: TypeDefList
 
+	resources: ResourceDefList
+	
     operations: OperationDefList
 
     exceptions: OperationOutputList

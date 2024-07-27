@@ -20,7 +20,6 @@ import (
 	"strings"
 	
 	"github.com/boynton/api/model"
-	"github.com/boynton/api/smithy"
 	"github.com/boynton/data"
 )
 
@@ -43,7 +42,23 @@ type Generator struct {
 	name            string
 	detailGenerator string
 	generateExceptions bool
-	entities map[string]string
+	suppressService    bool
+	exceptionEntities map[model.AbsoluteIdentifier]bool
+}
+
+func (gen *Generator) Init(schema *model.Schema, config *data.Object) error {
+	err := gen.Configure(schema, config)
+	if err != nil {
+		return err
+	}
+	gen.generateExceptions = config.GetBool("generate-exceptions")
+	if !gen.generateExceptions {
+		gen.exceptionEntities = make(map[model.AbsoluteIdentifier]bool, 0)
+	}
+	gen.suppressService = config.GetBool("suppress-service")
+	gen.ns = string(schema.ServiceNamespace())
+	gen.name = string(schema.ServiceName())
+	return nil
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -51,87 +66,29 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	if err != nil {
 		return err
 	}
-	gen.generateExceptions = config.GetBool("generateExceptions")
+	gen.generateExceptions = config.GetBool("generate-exceptions")
+	if !gen.generateExceptions {
+		gen.exceptionEntities = make(map[model.AbsoluteIdentifier]bool, 0)
+	}
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
-	gen.entities = make(map[string]string, 0)
-	for _, op := range gen.Operations() {
-		//		if op.Resource != ""  && op.Lifecycle == "read" {
-		if op.HttpMethod == "GET" {
-			entityType := ""
-			for _, out := range op.Output.Fields {
-				if out.HttpPayload {
-					entityType = StripNamespace(out.Type)
-				}
-			}
-			idField := ""
-			if op.Input != nil {
-				for _, in := range op.Input.Fields {
-					if in.HttpPath {
-						idField = string(in.Name) 
-						break //fixme: more than one pathparam for a resource id
-					}
-				}
-			}
-			if idField == "" {
-				idField = "-"
-			}
-			gen.entities[entityType] = idField
-		}
-	}
+	gen.suppressService = config.GetBool("suppress-service")
 	gen.Begin()
 	gen.GenerateHeader()
-	//FIX gen.GenerateResources() //could use this metadata to determine whether Entity or Struct
+	gen.GenerateService()
+	gen.GenerateResources() //could use this metadata to determine whether Entity or Struct
 	gen.GenerateOperations()
-	if gen.generateExceptions {
-		gen.GenerateExceptions()
-	}
+	gen.GenerateExceptions()
 	gen.GenerateTypes()
 	gen.GenerateFooter()
 	s := gen.End()
-	fname := gen.FileName(gen.name, ".md")
+	if gen.name == "" {
+		gen.name = "model"
+	}
+	fname := gen.FileName(gen.name, ".puml")
 	err = gen.Write(s, fname, "")
 	return err
 }
-
-func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
-	var resources []model.AbsoluteIdentifier
-	ast, err := smithy.SmithyAST(gen.Schema, gen.Sort)
-	if err != nil {
-		return resources
-	}
-	for _, shapeId := range ast.Shapes.Keys() {
-		shape := ast.GetShape(shapeId)
-		if shape.Type == "resource" {
-			resources = append(resources, model.AbsoluteIdentifier(shapeId))
-		}
-	}
-	return resources
-}
-
-/*
-   func (gen *Generator) getDetailGenerator() model.Generator {
-	dec := model.Decorator{
-		BaseType: func(s string) string {
-			return fmt.Sprintf("<em><strong>%s</strong></em>", s)
-		},
-		UserType: func(s string) string {
-			return fmt.Sprintf("<em><strong><a href=\"#%s\">%s</a></strong></em>", strings.ToLower(s), s)
-		},
-	}
-	switch gen.detailGenerator {
-case "api":
-		g := new(model.ApiGenerator)
-		g.Decorator = &dec
-		return g
-default: //smithy
-		g := new(smithy.IdlGenerator)
-		g.Sort = gen.Sort
-		g.Decorator = &dec
-		return g
-	}
-    }
-*/
 
 func (gen *Generator) GenerateHeader() {
 	//	gen.Emitf("@startuml\nhide empty members\nset namespaceSeparator none\nskinparam linetype ortho\n\n")
@@ -151,19 +108,100 @@ func StripNamespace(target model.AbsoluteIdentifier) string {
 	return t[n+1:]
 }
 
+func (gen *Generator) ResourceOperations(rez *model.ResourceDef) []model.AbsoluteIdentifier {
+	var ops []model.AbsoluteIdentifier
+	if rez.Create != "" {
+		ops = append(ops, rez.Create)
+	}
+	if rez.Read != "" {
+		ops = append(ops, rez.Read)
+	}
+	if rez.Update != "" {
+		ops = append(ops, rez.Update)
+	}
+	if rez.Delete != "" {
+		ops = append(ops, rez.Delete)
+	}
+	if rez.List != "" {
+		ops = append(ops, rez.List)
+	}
+	if rez.Operations != nil {
+		for _, opId := range rez.Operations {
+			ops = append(ops, opId)
+		}
+	}
+	return ops
+}
 
-func (gen *Generator) GenerateResource(id model.AbsoluteIdentifier) error {
-	rezId := StripNamespace(id)
-	gen.Emitf("class %s<Resource> {\n", rezId)
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	rezId := StripNamespace(rez.Id)
+	connections := make(map[string]string, 0)
+	//gen.Emitf("class %s<Resource> << (R,CadetBlue) >> {\n", rezId)
+	gen.Emitf("class %s << (R,CadetBlue) >> {\n", rezId)
+	if rez.Create != "" {
+		dst := StripNamespace(rez.Create)
+		gen.Emitf("    {field} <b>create</b>: %s\n", rezId)
+		connections[dst] = rezId
+	}
+	if rez.Read != "" {
+		dst := StripNamespace(rez.Read)
+		gen.Emitf("    {field} <b>read</b>: %s\n", rezId)
+		connections[dst] = rezId
+	}
+	if rez.Update != "" {
+		dst := StripNamespace(rez.Update)
+		gen.Emitf("    {field} <b>update</b>: %s\n", rezId)
+		connections[dst] = rezId
+	}
+	if rez.Delete != "" {
+		dst := StripNamespace(rez.Delete)
+		gen.Emitf("    {field} <b>delete</b>: %s\n", rezId)
+		connections[dst] = rezId
+	}
+	if rez.List != "" {
+		dst := StripNamespace(rez.List)
+		gen.Emitf("    {field} <b>list</b>: %s\n", rezId)
+		connections[dst] = rezId
+	}
+	if rez.Operations != nil {
+		var stripped []string
+		for _, opId := range rez.Operations {
+			strippedId := StripNamespace(opId)
+			connections[strippedId] = rezId
+			stripped = append(stripped, strippedId)
+		}
+		gen.Emitf("    {field} <b>operations</b>: [%s]\n", strings.Join(stripped, ","))
+	}
 	gen.Emitf("}\n")
+	for dst, src := range connections {
+		gen.Emitf("%s ..> %s\n", src, dst)
+	}
+	/*
+	if gen.Schema.Id == "" {
+		for _, op := range gen.Operations() {
+			dst := StripNamespace(op.Id)
+			if _, ok := connections[dst]; ok {
+				panic("generate op from resource")
+				gen.GenerateOperation(op)
+			} else {
+				fmt.Println(connections)
+				panic("WTF?")
+			}
+		}
+	} else {
+		gen.GenerateOperations()
+		//		for _, op := range gen.Operations() {
+		//			gen.GenerateOperation(op)
+		//		}
+	}
+	*/
 	return nil
 }
 
-func (gen *Generator) GenerateResources() {
-	resourceIds := gen.ResourceIds()
-	if len(resourceIds) > 0 {
-		for _, id := range resourceIds {
-			gen.GenerateResource(id)
+func (gen *Generator) GenerateResources() {	
+	if len(gen.Schema.Resources) > 0 {
+		for _, rez := range gen.Schema.Resources {
+			gen.GenerateResource(rez)
 		}
 	}
 }
@@ -237,11 +275,20 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	
 	for _, eid := range op.Exceptions {
 		e := gen.Schema.GetExceptionDef(eid)
-		fref := StripNamespace(eid)
-		if gen.generateExceptions {
-			connections[fref] = opId
+		if e != nil {
+			fref := StripNamespace(eid)
+			if gen.generateExceptions {
+				connections[fref] = opId
+			} else {
+				//note the payload. If it only is used by an exception, the omit it (the structure) also
+				for _, f := range e.Fields {
+					if f.HttpPayload {
+						gen.exceptionEntities[f.Type] = true
+					}
+				}
+			}
+			gen.Emitf("    {field} %d: %s\n", e.HttpStatus, fref)
 		}
-		gen.Emitf("    {field} %d: %s\n", e.HttpStatus, fref)
 	}
 	gen.Emitf("}\n")
 	for link, s := range connections {
@@ -251,16 +298,42 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }
 
-func (gen *Generator) GenerateOperations() {
-	if len(gen.Schema.Operations) > 0 {
-		s := StripNamespace(gen.Schema.Id)
-		if s != "" {
-			//gen.Emitf("class %s<Service> << (S,khaki) >>\n", s)
-			gen.Emitf("interface %s<Service>\n", s)
-			for _, op := range gen.Operations() {
-				gen.Emitf("%s ..> %s\n", s, StripNamespace(op.Id))
+//if service has resources, iterate through those first, noting the ops that they handle
+//then, iterate through operations, adding at top level those that have not been added
+func (gen *Generator) GenerateService() {
+	if gen.suppressService || gen.Schema.Id == "" {
+		return
+	}
+	src := StripNamespace(gen.Schema.Id)
+	//gen.Emitf("interface %s<Service>\n", src)
+	gen.Emitf("interface %s\n", src)
+	targets := make(map[string]string, 0)
+	opTargets := make(map[model.AbsoluteIdentifier]string, 0)
+	if len(gen.Schema.Resources) > 0 {
+		if len(gen.Schema.Resources) > 0 {
+			for _, rez := range gen.Schema.Resources {
+				dst := StripNamespace(rez.Id)
+				if _, ok := targets[dst]; !ok {
+					targets[dst] = src
+				}
+				for _, oid := range gen.ResourceOperations(rez) {
+					opTargets[oid] = StripNamespace(oid)
+				}
 			}
 		}
+	}
+	for _, op := range gen.Operations() {
+		if _, ok := opTargets[op.Id]; !ok {
+			targets[StripNamespace(op.Id)] = src
+		}
+	}
+	for dst, src := range targets {
+		gen.Emitf("%s ..> %s\n", src, dst)
+	}
+}
+
+func (gen *Generator) GenerateOperations() {
+	if len(gen.Schema.Operations) > 0 {
 		for _, op := range gen.Operations() {
 			gen.GenerateOperation(op)
 		}
@@ -311,20 +384,17 @@ func (gen *Generator) GenerateTypeRef(ref model.AbsoluteIdentifier) (string, str
 }
 
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
+	if gen.exceptionEntities != nil {
+		if _, ok := gen.exceptionEntities[td.Id]; ok {
+			return nil
+		}
+	}
     s := StripNamespace(td.Id)
 	connections := make(map[string]string, 0)
 	targets := make(map[string]string, 0)
-	entityIdField := ""
-	if eid, ok := gen.entities[s]; ok {
-		entityIdField = eid
-	}
     switch td.Base {
     case model.BaseType_Struct:
-		if entityIdField != "" {
-			gen.Emitf("class %s << (R,CadetBlue) >> {\n", s)
-		} else {
-			gen.Emitf("class %s {\n", s)
-		}
+		gen.Emitf("class %s {\n", s)
 		for _, f := range td.Fields {
             fname := string(f.Name)
             fref, link := gen.GenerateTypeRef(f.Type)
@@ -381,10 +451,12 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 }
 
 func (gen *Generator) GenerateExceptions() {
-	lst := gen.Exceptions()
-	if len(lst) > 0 {
-		for _, edef := range lst {
-			gen.GenerateException(edef)
+	if gen.generateExceptions {
+		lst := gen.Exceptions()
+		if len(lst) > 0 {
+			for _, edef := range lst {
+				gen.GenerateException(edef)
+			}
 		}
 	}
 }

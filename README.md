@@ -14,6 +14,18 @@ The current executables are also available as assets in the current [GitHub Rele
 
 To install from source, clone this repo and type "make". The build requires [Go](https://golang.org).
 
+If the resource diagram feature of markdown generation is to be used, you also will need to install plantuml:
+
+    $ brew install plantuml
+
+Then, this invocation will include resource diagrams in the specified subdirectory. Normally you need to specify
+an output directory, also:
+
+    $ api -g markdown -o /tmp/docs -a diagrams-folder=images examples/crudl.smithy
+
+This creates a markdown (.md) file in /tmp/docs/, and also creates a subdirectory with the image(s) that the markdown
+document will reference in /tmp/docs/images.
+
 ## Usage
 
 Invoked with no arguments, `api` shows basic usage:
@@ -27,7 +39,7 @@ usage: api [-vlfhpq] [-w warnlev] [-ns namespace] [-e entityid] [-d outdir] [-g 
         The directory to generate output into (defaults to none, i.e. echo to stdout)
   -e string
         Show the specified entity.
-  -f    Force overwrite if output file exists
+  -f    Force overwrite if output files exist
   -g string
         The generator for output (default "api")
   -h    Show more help information

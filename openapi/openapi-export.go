@@ -238,6 +238,10 @@ func (gen *Generator) GenerateOperationOutput(operation *Operation, op *model.Op
 	return nil
 }
 
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	return nil
+}
+
 func (gen *Generator) GenerateException(op *model.OperationOutput) error {
 	return nil
 }

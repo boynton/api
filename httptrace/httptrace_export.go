@@ -22,7 +22,7 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	}
 	for _, op := range gen.Operations() {
 		for _, example := range op.Examples {
-			snippet, err := gen.emitHttpTrace(op, example)
+			snippet, err := gen.EmitHttpTrace(op, example)
 			if err != nil {
 				fmt.Println("*** Error:", err)
 				os.Exit(1)
@@ -34,6 +34,10 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 }
 
 func (gen *Generator) GenerateType(td *model.TypeDef) error {
+	return nil
+}
+
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
 	return nil
 }
 
@@ -52,7 +56,7 @@ func stringValue(s interface{}) string {
 	return fmt.Sprint(s)
 }
 
-func (gen *Generator) emitHttpTrace(op *model.OperationDef, example *model.OperationExample) (string, error) {
+func (gen *Generator) EmitHttpTrace(op *model.OperationDef, example *model.OperationExample) (string, error) {
 	body := "#\n# " + example.Title + "\n#\n"
 	method := op.HttpMethod
 	path := op.HttpUri

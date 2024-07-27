@@ -30,6 +30,7 @@ type Schema struct {
 	typeIndex map[AbsoluteIdentifier]*TypeDef
 	opIndex   map[AbsoluteIdentifier]*OperationDef
 	excIndex  map[AbsoluteIdentifier]*OperationOutput
+	rezIndex  map[AbsoluteIdentifier]*ResourceDef
 	//Metadata *data.Object `json:"metadata,omitempty"`
 }
 
@@ -135,6 +136,15 @@ func (schema *Schema) GetExceptionDef(id AbsoluteIdentifier) *OperationOutput {
 		}
 	}
 	return schema.excIndex[id]
+}
+
+func (schema *Schema) AddExceptionDef(ed *OperationOutput) error {
+	if schema.GetExceptionDef(ed.Id) != nil {
+		return fmt.Errorf("Duplicate exception definition (merge NYI): %s", ed.Id)
+	}
+	schema.Exceptions = append(schema.Exceptions, ed)
+	schema.excIndex[ed.Id] = ed
+	return nil
 }
 
 func (schema *Schema) EnsureExceptionDef(e *OperationOutput) error {
@@ -245,6 +255,15 @@ func (schema *Schema) AddOperationDef(op *OperationDef) error {
 	return nil
 }
 
+func (schema *Schema) AddResourceDef(rez *ResourceDef) error {
+	if schema.GetResourceDef(rez.Id) != nil {
+		return fmt.Errorf("Duplicate resource definition (merge NYI): %s", rez.Id)
+	}
+	schema.Resources = append(schema.Resources, rez)
+	schema.rezIndex[rez.Id] = rez
+	return nil
+}
+
 func (schema *Schema) Merge(another *Schema) error {
 	if schema.Id == "" {
 		*schema = *another
@@ -295,6 +314,156 @@ func (schema *Schema) Namespaced(name string) AbsoluteIdentifier {
 		}
 	}
 	return AbsoluteIdentifier(string(schema.Namespace) + "#" + name)
+}
+
+func (schema *Schema) GetResourceDef(rezId AbsoluteIdentifier) *ResourceDef {
+	if schema.rezIndex == nil {
+		schema.rezIndex = make(map[AbsoluteIdentifier]*ResourceDef, 0)
+		for _, rdef := range schema.Resources {
+			schema.rezIndex[rdef.Id] = rdef
+		}
+	}
+	return schema.rezIndex[rezId]
+}
+
+// filter out all but what the given resource depends on. A new Schema is returned
+func (schema *Schema) ShakeResourceTree(rezId AbsoluteIdentifier, includeExceptions bool) *Schema {
+	rez := schema.GetResourceDef(rezId)
+	if rez == nil {
+		return nil
+	}
+	newSchema := NewSchema()
+	newSchema.Namespace = schema.Namespace
+	newSchema.AddResourceDef(rez)
+	for _, oid := range schema.ResourceOperations(rez) {
+		op := schema.GetOperationDef(oid)
+		newSchema.AddOperationDef(op)
+		for _, tid := range schema.OperationTypes(op, includeExceptions) {
+			if !schema.IsBaseType(tid) {
+				td := schema.GetTypeDef(tid)
+				newSchema.AddTypeDef(td)
+			}
+		}
+		for _, eid := range op.Exceptions {
+			e := schema.GetExceptionDef(eid)
+			newSchema.AddExceptionDef(e)
+		}
+	}
+	return newSchema
+}
+
+func (schema *Schema) ResourceOperations(rez *ResourceDef) []AbsoluteIdentifier {
+	var ops []AbsoluteIdentifier
+	if rez.Create != "" {
+		ops = append(ops, rez.Create)
+	}
+	if rez.Read != "" {
+		ops = append(ops, rez.Read)
+	}
+	if rez.Update != "" {
+		ops = append(ops, rez.Update)
+	}
+	if rez.Delete != "" {
+		ops = append(ops, rez.Delete)
+	}
+	if rez.List != "" {
+		ops = append(ops, rez.List)
+	}
+	if rez.Operations != nil {
+		for _, opId := range rez.Operations {
+			ops = append(ops, opId)
+		}
+	}
+	return ops
+}
+
+func (schema *Schema) typeReferences(tid AbsoluteIdentifier, referenced map[AbsoluteIdentifier]bool) {
+	if !schema.IsBaseType(tid) {
+		td := schema.GetTypeDef(tid)
+		referenced[td.Id] = true
+		if td.Items != "" {
+			schema.typeReferences(td.Items, referenced)
+		}
+		if td.Keys != "" {
+			schema.typeReferences(td.Keys, referenced)
+		}
+		if td.Items != "" {
+			schema.typeReferences(td.Items, referenced)
+		}
+		if td.Fields != nil {
+			for _, fd := range td.Fields {
+				schema.fieldReferences(fd, referenced)
+			}
+		}
+	}
+}
+
+func (schema *Schema) fieldReferences(fd *FieldDef, referenced map[AbsoluteIdentifier]bool) {
+	referenced[fd.Type] = true
+	if fd.Items != "" {
+		schema.typeReferences(fd.Items, referenced)
+	}
+	if fd.Keys != "" {
+		schema.typeReferences(fd.Keys, referenced)
+	}
+	if fd.Items != "" {
+		schema.typeReferences(fd.Items, referenced)
+	}
+}
+
+func (schema *Schema) inputReferences(fields []*OperationInputField, referenced map[AbsoluteIdentifier]bool) {
+	for _, f := range fields {
+		schema.typeReferences(f.Type, referenced)
+		if f.Items != "" {
+			schema.typeReferences(f.Items, referenced)
+		}
+		if f.Keys != "" {
+			schema.typeReferences(f.Keys, referenced)
+		}
+		if f.Fields != nil {
+			for _, fd := range f.Fields {
+				schema.fieldReferences(fd, referenced)
+			}
+		}
+	}
+}
+
+func (schema *Schema) outputReferences(fields []*OperationOutputField, referenced map[AbsoluteIdentifier]bool) {
+	for _, f := range fields {
+		schema.typeReferences(f.Type, referenced)
+		if f.Items != "" {
+			schema.typeReferences(f.Items, referenced)
+		}
+		if f.Keys != "" {
+			schema.typeReferences(f.Keys, referenced)
+		}
+		if f.Fields != nil {
+			for _, fd := range f.Fields {
+				schema.fieldReferences(fd, referenced)
+			}
+		}
+	}
+}
+
+func (schema *Schema) OperationTypes(op *OperationDef, includeExceptions bool) AbsoluteIdentifierList {
+	referenced := make(map[AbsoluteIdentifier]bool, 0)
+	if op.Input != nil {
+		schema.inputReferences(op.Input.Fields, referenced)
+	}
+	if op.Output != nil {
+		schema.outputReferences(op.Output.Fields, referenced)
+	}
+	if op.Exceptions != nil && includeExceptions {
+		for _, eid := range op.Exceptions {
+			e := schema.GetExceptionDef(eid)
+			schema.outputReferences(e.Fields, referenced)
+		}
+	}
+	var result AbsoluteIdentifierList
+	for k := range referenced {
+		result = append(result, k)
+	}
+	return result
 }
 
 func (schema *Schema) Filter(tags []string) {

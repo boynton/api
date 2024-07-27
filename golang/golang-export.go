@@ -41,6 +41,10 @@ type Generator struct {
 	prefixEnums         bool //prefix enum symbols with the typename to avoid collisions
 }
 
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	return nil
+}
+
 func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	return nil
 }

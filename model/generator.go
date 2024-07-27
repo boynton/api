@@ -30,6 +30,7 @@ import (
 type Generator interface {
 	Configure(schema *Schema, conf *data.Object) error
 	Generate(schema *Schema, config *data.Object) error
+	GenerateResource(op *ResourceDef) error
 	GenerateOperation(op *OperationDef) error
 	GenerateException(exc *OperationOutput) error
 	GenerateType(td *TypeDef) error
@@ -87,7 +88,8 @@ func (gen *BaseGenerator) SortedOperations() []*OperationDef {
 
 func (gen *BaseGenerator) Exceptions() []*OperationOutput {
 	if gen.Sort {
-		return gen.SortedExceptions()
+		lst := gen.SortedExceptions()
+		return lst
 	}
 	return gen.Schema.Exceptions
 }
@@ -176,6 +178,8 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 	}
 	f, err := os.Create(path)
 	if err != nil {
+		fmt.Printf("cannot create %q\n", path)
+		panic("ere")
 		gen.Err = err
 		return err
 	}
@@ -198,21 +202,33 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 }
 */
 
+func (gen *BaseGenerator) EnsureDir(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return os.MkdirAll(path, 0755)
+	}
+	return nil
+}
+
 func (gen *BaseGenerator) Write(text string, filename string, separator string) error {
 	if gen.Err != nil {
 		return gen.Err
 	}
-	if gen.OutDir == "" {
+	if strings.HasPrefix(filename, "/") || strings.HasPrefix(filename, ".") {
+		gen.Err = gen.WriteFile(filename, text)
+	} else if gen.OutDir == "" {
 		if separator != "" {
 			fmt.Print(separator)
 		}
 		fmt.Print(text)
 		gen.Err = nil
 	} else {
-		fpath := filepath.Join(gen.OutDir, filename)
-		gen.Err = gen.WriteFile(fpath, text)
+		gen.Err = gen.EnsureDir(gen.OutDir)
+		if gen.Err == nil {
+			fpath := filepath.Join(gen.OutDir, filename)
+			gen.Err = gen.WriteFile(fpath, text)
+		}
 	}
-	return nil
+	return gen.Err
 }
 
 func (gen *BaseGenerator) accumulateDependenciesById(deps map[AbsoluteIdentifier]bool, id AbsoluteIdentifier) {

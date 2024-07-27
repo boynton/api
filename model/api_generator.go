@@ -53,6 +53,7 @@ func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
 	gen.name = string(schema.ServiceName())
 	gen.Begin()
 	gen.GenerateSummary()
+	gen.GenerateResources()
 	gen.GenerateOperations()
 	gen.GenerateExceptions()
 	gen.GenerateTypes()
@@ -85,6 +86,13 @@ func (gen *ApiGenerator) GenerateSummary() {
 	gen.Emit("\n")
 }
 
+func (gen *ApiGenerator) GenerateResources() {
+	for _, rez := range gen.Schema.Resources {
+		gen.GenerateResource(rez)
+		gen.Emit("\n")
+	}
+}
+
 func (gen *ApiGenerator) GenerateOperations() {
 	for _, op := range gen.Schema.Operations {
 		gen.GenerateOperation(op)
@@ -100,23 +108,55 @@ func (gen *ApiGenerator) GenerateExceptions() {
 
 func (gen *ApiGenerator) GenerateException(edef *OperationOutput) error {
 	gen.GenerateBlockComment(edef.Comment, "")
-	ename := gen.decorateType(StripNamespace(edef.Id))
+	ename := gen.decorateReference(StripNamespace(edef.Id))
 	gen.Emitf("exception %s (status=%d) {\n", ename, edef.HttpStatus)
 	gen.GenerateOperationOutputFields(edef, "    ")
 	gen.Emitf("}\n\n")
 	return nil
 }
 
+func (gen *ApiGenerator) GenerateResource(rez *ResourceDef) error {
+	gen.GenerateBlockComment(rez.Comment, "")
+	rezId := StripNamespace(rez.Id)
+	gen.Emitf("resource %s {\n", rezId)
+	if rez.Create != "" {
+		gen.Emitf("    create %s\n", gen.decorateReference(StripNamespace(rez.Create)))
+	}
+	if rez.Read != "" {
+		gen.Emitf("    read %s\n", gen.decorateReference(StripNamespace(rez.Read)))
+	}
+	if rez.Update != "" {
+		gen.Emitf("    update %s\n", gen.decorateReference(StripNamespace(rez.Update)))
+	}
+	if rez.Delete != "" {
+		gen.Emitf("    delete %s\n", gen.decorateReference(StripNamespace(rez.Delete)))
+	}
+	if rez.List != "" {
+		gen.Emitf("    list %s\n", gen.decorateReference(StripNamespace(rez.List)))
+	}
+	if len(rez.Operations) > 0 {
+		var ops []string
+		for _, op := range rez.Operations {
+			s := gen.decorateReference(StripNamespace(op))
+			ops = append(ops, s)
+		}
+		gen.Emitf("    operations [%s]\n", strings.Join(ops, ", "))
+	}
+	if len(rez.CollectionOperations) > 0 {
+		var ops []string
+		for _, op := range rez.CollectionOperations {
+			s := gen.decorateReference(StripNamespace(op))
+			ops = append(ops, s)
+		}
+		gen.Emitf("    collectionOperations [%s]\n", strings.Join(ops, ", "))
+	}
+	gen.Emit("}\n")
+	return nil
+}
+
 func (gen *ApiGenerator) GenerateOperation(op *OperationDef) error {
 	gen.GenerateBlockComment(op.Comment, "")
-	rez := ""
-	if op.Resource != "" {
-		rez = ", resource=" + op.Resource
-		if op.Lifecycle != "" {
-			rez = rez + ", lifecycle=" + op.Lifecycle
-		}
-	}
-	gen.Emitf("operation %s (method=%s, url=%q%s) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri, rez)
+	gen.Emitf("operation %s (method=%s, url=%q) {\n", StripNamespace(op.Id), op.HttpMethod, op.HttpUri)
 	gen.GenerateOperationInput(op)
 	gen.GenerateOperationOutput(op)
 	gen.GenerateOperationExceptionRefs(op)
@@ -185,7 +225,7 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 					comm = " // " + f.Comment
 				}
 			}
-			tname := gen.decorateType(StripNamespace(f.Type))
+			tname := gen.decorateReference(StripNamespace(f.Type))
 			if commentHeaders {
 
 				gen.Emitf("%s%s%s%s %s%s%s\n", firstPad, pcomm, indent, f.Name, tname, sopts, comm)
@@ -198,7 +238,7 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 	}
 }
 
-func (gen *ApiGenerator) decorateType(tname string) string {
+func (gen *ApiGenerator) decorateReference(tname string) string {
 	if gen.Decorator != nil {
 		//user defined types:
 		switch tname {
@@ -244,7 +284,7 @@ func (gen *ApiGenerator) GenerateOperationOutputFields(out *OperationOutput, ind
 				comm = " // " + f.Comment
 			}
 		}
-		tname := gen.decorateType(StripNamespace(f.Type))
+		tname := gen.decorateReference(StripNamespace(f.Type))
 		if commentHeaders {
 			gen.Emitf("%s%s%s%s %s%s%s\n", firstPad, pcomm, indent, f.Name, tname, sopts, comm)
 		} else {
@@ -258,7 +298,7 @@ func (gen *ApiGenerator) GenerateOperationOutput(op *OperationDef) {
 	if op.Output != nil {
 		opts := fmt.Sprintf("(status=%d", op.Output.HttpStatus)
 		if op.Output.Id != "" && op.Output.Id != (op.Id+"Output") {
-			opts = opts + ", name=" + gen.decorateType(StripNamespace(op.Output.Id))
+			opts = opts + ", name=" + gen.decorateReference(StripNamespace(op.Output.Id))
 		}
 		opts = opts + ") "
 		gen.Emitf("    output %s{\n", opts)
@@ -271,7 +311,7 @@ func (gen *ApiGenerator) GenerateOperationExceptionRefs(op *OperationDef) {
 	if len(op.Exceptions) > 0 {
 		exceptions := make([]string, 0)
 		for _, errid := range op.Exceptions {
-			errname := gen.decorateType(StripNamespace(errid))
+			errname := gen.decorateReference(StripNamespace(errid))
 			exceptions = append(exceptions, errname)
 		}
 		gen.Emitf("    exceptions [%s]\n", strings.Join(exceptions, ", "))
@@ -378,7 +418,7 @@ func (gen *ApiGenerator) GenerateFields(fields []*FieldDef, indent string) {
 				comm = " // " + f.Comment
 			}
 		}
-		tname := gen.decorateType(StripNamespace(f.Type))
+		tname := gen.decorateReference(StripNamespace(f.Type))
 		if commentHeaders {
 			gen.Emitf("\n%s%s%s %s%s%s\n", pcomm, indent, f.Name, tname, sopts, comm)
 		} else {
@@ -428,9 +468,9 @@ func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 		gen.GenerateFields(td.Fields, "    ")
 		gen.Emitf("}\n")
 	case BaseType_List:
-		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Items)))
+		gen.Emitf("type %s List[%s]\n", StripNamespace(td.Id), gen.decorateReference(StripNamespace(td.Items)))
 	case BaseType_Map:
-		gen.Emitf("type %s Map[%s,%s]\n", StripNamespace(td.Id), gen.decorateType(StripNamespace(td.Keys)), gen.decorateType(StripNamespace(td.Items)))
+		gen.Emitf("type %s Map[%s,%s]\n", StripNamespace(td.Id), gen.decorateReference(StripNamespace(td.Keys)), gen.decorateReference(StripNamespace(td.Items)))
 	case BaseType_Enum:
 		sopt := ""
 		//for _, el := range td.Elements {

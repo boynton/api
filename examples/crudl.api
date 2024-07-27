@@ -5,9 +5,21 @@ namespace example
 service CrudlService
 
 // 
+// The Item resource is the primary entity this example service manages. It is
+// identified by a single id that provided by the service at creation time.
+// 
+resource ItemResource {
+    create CreateItem
+    read GetItem
+    update UpdateItem
+    delete DeleteItem
+    list ListItems
+}
+
+// 
 // Create an item
 // 
-operation CreateItem (method=POST, url="/items", resource=ItemResource, lifecycle=create) {
+operation CreateItem (method=POST, url="/items") {
     input {
         data ItemData (required, payload)
     }
@@ -20,7 +32,7 @@ operation CreateItem (method=POST, url="/items", resource=ItemResource, lifecycl
 // 
 // Get an existing item
 // 
-operation GetItem (method=GET, url="/items/{itemId}", resource=ItemResource, lifecycle=read) {
+operation GetItem (method=GET, url="/items/{itemId}") {
     input {
         itemId String (required, path)
     }
@@ -33,7 +45,7 @@ operation GetItem (method=GET, url="/items/{itemId}", resource=ItemResource, lif
 // 
 // Update an existing item
 // 
-operation UpdateItem (method=PUT, url="/items/{itemId}", resource=ItemResource, lifecycle=update) {
+operation UpdateItem (method=PUT, url="/items/{itemId}") {
     input {
         itemId String (required, path)
         item Item (required, payload)
@@ -47,7 +59,7 @@ operation UpdateItem (method=PUT, url="/items/{itemId}", resource=ItemResource, 
 // 
 // Delete an existing item
 // 
-operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResource, lifecycle=delete) {
+operation DeleteItem (method=DELETE, url="/items/{itemId}") {
     input {
         itemId String (required, path)
     }
@@ -59,7 +71,7 @@ operation DeleteItem (method=DELETE, url="/items/{itemId}", resource=ItemResourc
 // 
 // List existing items
 // 
-operation ListItems (method=GET, url="/items", resource=ItemResource, lifecycle=list) {
+operation ListItems (method=GET, url="/items") {
     input {
         limit Int32 (query="limit")
         skip String (query="skip")

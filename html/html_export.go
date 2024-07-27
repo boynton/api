@@ -17,10 +17,14 @@ package html
 
 import (
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/smithy"
+	"github.com/boynton/api/plantuml"
+	"github.com/boynton/api/httptrace"
 	"github.com/boynton/data"
 )
 
@@ -31,6 +35,8 @@ type Generator struct {
 	ns              string
 	name            string
 	detailGenerator string
+	diagramsFolder     string
+	showExamples    bool
 }
 
 func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
@@ -44,6 +50,8 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	if gen.detailGenerator == "" {
 		gen.detailGenerator = "smithy"
 	}
+	gen.diagramsFolder = config.GetString("diagrams-folder")
+	gen.showExamples = config.GetBool("show-examples")
 	gen.Begin()
 	gen.GenerateHeader()
 	gen.GenerateSummary()
@@ -55,10 +63,22 @@ func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error 
 	s := gen.End()
 	fname := gen.FileName(gen.name, ".html")
 	err = gen.Write(s, fname, "")
+	if err != nil {
+		return err
+	}
+	if gen.diagramsFolder != "" {
+		for _, rez := range gen.Schema.Resources {
+			err = gen.ensureResourceDiagram(rez)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
-func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
+/*
+   func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
 	var resources []model.AbsoluteIdentifier
 	if gen.detailGenerator == "smithy" {
 		ast, err := smithy.SmithyAST(gen.Schema, gen.Sort)
@@ -74,6 +94,7 @@ func (gen *Generator) ResourceIds() []model.AbsoluteIdentifier {
 	}
 	return resources
 }
+*/
 
 func (gen *Generator) getDetailGenerator() model.Generator {
 	dec := model.Decorator{
@@ -130,19 +151,19 @@ func (gen *Generator) GenerateSummary() {
 		gen.Emitf("  <li><strong>Namespace</strong>: &ldquo;%s&rdquo;</li>\n", gen.Schema.Base)
 	}
 	gen.Emitf("</ul>\n")
-	rezIds := gen.ResourceIds()
-	if len(rezIds) > 0 {
-		gen.Emitf("<h3 id=\"resources\">Resources</h3>\n")
+	rezs := gen.Schema.Resources
+	if len(rezs) > 0 {
+		gen.Emitf("<h3 id=\"resources\">Resource Index</h3>\n")
 		gen.Emitf("<ul>\n")
-		for _, id := range rezIds {
-			s := StripNamespace(id)
-			gen.Emitf("  <li><a href=\"#%s\">%s</a></li>\n", strings.ToLower(s), s)
+		for _, rez := range rezs {
+			s := StripNamespace(rez.Id)
+			gen.Emitf("  <li><a href=\"#%s\"><b>%s</b></a></li>\n", strings.ToLower(s), s)
 		}
 		gen.Emitf("</ul>\n")
 	}
 	opIds := gen.Operations()
 	if len(opIds) > 0 {
-		gen.Emitf("<h3 id=\"operations\">Operations</h3>\n")
+		gen.Emitf("<h3 id=\"operations\">Operation Index</h3>\n")
 		gen.Emitf("<ul>\n")
 		for _, op := range opIds {
 			sum := summarySignature(op)
@@ -151,17 +172,31 @@ func (gen *Generator) GenerateSummary() {
 		}
 		gen.Emitf("</ul>\n")
 	}
-	gen.Emitf("<h3 id=\"types\">Types</h3>\n")
-	gen.Emitf("<ul>\n")
-	for _, td := range gen.Types() {
-		//check if a type has input or output trait, if so, omit it here.
-		if strings.HasPrefix(string(td.Id), "aws.protocols#") || strings.HasPrefix(string(td.Id), "smithy.api#"){
-			continue
+	excs := gen.Exceptions()
+	if len(excs) > 0 {
+		gen.Emitf("<h3 id=\"types\">Exception Index</h3>\n")
+		gen.Emitf("<ul>\n")
+		for _, exc := range excs {
+			s := StripNamespace(exc.Id)
+			gen.Emitf("  <li><a href=\"#%s\"><b>%s</b></a></li>\n", strings.ToLower(s), s)
 		}
-		s := StripNamespace(td.Id)
-		gen.Emitf("  <li><a href=\"#%s\">%s</a> → <em>%s</em></li>\n", strings.ToLower(s), s, td.Base)
+		gen.Emit("</ul>\n")
 	}
-	gen.Emit("</ul>\n\n")
+	types := gen.Types()
+	if len(types) > 0 {
+		gen.Emitf("<h3 id=\"types\">Type Index</h3>\n")
+		gen.Emitf("<ul>\n")
+		for _, td := range types {
+			//check if a type has input or output trait, if so, omit it here.
+			if strings.HasPrefix(string(td.Id), "aws.protocols#") || strings.HasPrefix(string(td.Id), "smithy.api#"){
+				continue
+			}
+			s := StripNamespace(td.Id)
+			gen.Emitf("  <li><a href=\"#%s\"><b>%s</b></a> → <em>%s</em></li>\n", strings.ToLower(s), s, td.Base)
+		}
+		gen.Emit("</ul>\n")
+	}
+	gen.Emit("\n")
 }
 
 func StripNamespace(target model.AbsoluteIdentifier) string {
@@ -201,41 +236,39 @@ func summarySignature(op *model.OperationDef) string {
 	return fmt.Sprintf("<b>%s</b>(%s) → (%s)", s, in, out)
 }
 
-func (gen *Generator) generateApiResource(sg *smithy.IdlGenerator, id model.AbsoluteIdentifier) string {
-	sg.Begin()
-	sg.GenerateResource(string(id))
-	s := sg.End()
+func (gen *Generator) generateApiResource(g model.Generator, rez *model.ResourceDef) string {
+	g.Begin()
+	g.GenerateResource(rez)
+	s := g.End()
 	return s
 }
 
-func (gen *Generator) GenerateResource(sg *smithy.IdlGenerator, id model.AbsoluteIdentifier) error {
-	rezId := StripNamespace(id)
+func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	g := gen.getDetailGenerator()
+	conf := data.NewObject()
+	conf.Put("sort", gen.Sort)
+	err := g.Configure(gen.Schema, conf)
+	if err != nil {
+		return err
+	}
+	rezId := StripNamespace(rez.Id)
 	gen.Emitf("<h3 id=%q>%s</h3>\n", strings.ToLower(rezId), rezId)
 	gen.Emitf("<pre class=\"mknohighlight\"><code>\n")
-	gen.Emitf("%s\n\n", gen.generateApiResource(sg, id))
+	gen.Emitf("%s\n\n", gen.generateApiResource(g, rez))
 	gen.Emitf("</code></pre>\n")
+	if gen.diagramsFolder != "" {
+		gen.Emitf("<img src=\"%s/%s.svg\" alt=\"%s\">\n", gen.diagramsFolder, rezId, rezId)
+	}
 	return nil
 }
 
 func (gen *Generator) GenerateResources() {
-	if gen.detailGenerator == "smithy" {
-		resourceIds := gen.ResourceIds()
-		if len(resourceIds) > 0 {
-			g := gen.getDetailGenerator()
-			conf := data.NewObject()
-			conf.Put("sort", gen.Sort)
-			err := g.Configure(gen.Schema, conf)
-			if err != nil {
-				return
-			}
-			if sg, ok := g.(*smithy.IdlGenerator); ok {
-				gen.Emitf("<h2 id=\"resources\">Resources</h2>\n")
-				for _, id := range resourceIds {
-					gen.GenerateResource(sg, id)
-				}
-				gen.Emit("\n")
-			}
+	if len(gen.Schema.Resources) > 0 {
+		gen.Emitf("<h2 id=\"resources\">Resources</h2>\n")
+		for _, rez := range gen.Schema.Resources {
+			gen.GenerateResource(rez)
 		}
+		gen.Emit("\n")
 	}
 }
 
@@ -258,6 +291,18 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	gen.Emitf("<pre class=\"mknohighlight\"><code>\n")
 	gen.Emitf("%s\n\n", gen.generateApiOperation(op))
 	gen.Emitf("</code></pre>\n")
+	if gen.showExamples && len(op.Examples) > 0 {
+		gen.Emitf("\n<h4>%s Examples</h4>\n", opId)
+		hgen := new(httptrace.Generator)
+		hgen.Configure(gen.Schema, nil)
+		for _, ex := range op.Examples {
+			snippet, err := hgen.EmitHttpTrace(op, ex)
+			if err != nil {
+				return err
+			}
+			gen.Emitf("<pre class=\"mknohighlight\"><code>%s</code></pre>\n", snippet)
+		}
+	}
 	return nil
 }
 
@@ -367,3 +412,49 @@ var htmlStyle string = `
 #mkreplaced-toc{list-style-position:inside;padding:0;margin:0 0 0 1rem;list-style-type:none}#mkreplaced-toc li::before{content:''}#mkreplaced-toc li{font-size:1rem;line-height:1.25;font-weight:normal}#mkreplaced-toc li ul{font-size:1.3rem;font-weight:300;padding:.5rem 0;margin:0 0 0 1rem}#mkreplaced-toc li.missing{list-style-type:none !important}#mkreplaced-toc.max-1 ul,#mkreplaced-toc.max1 ul{display:none}#mkreplaced-toc.max-2 ul ul,#mkreplaced-toc.max2 ul ul{display:none}#mkreplaced-toc.max-3 ul ul ul,#mkreplaced-toc.max3 ul ul ul{display:none}#mkreplaced-toc.max-4 ul ul ul ul,#mkreplaced-toc.max4 ul ul ul ul{display:none}#mkreplaced-toc.max-5 ul ul ul ul ul,#mkreplaced-toc.max5 ul ul ul ul ul{display:none}.mk-rtl{direction:rtl;text-align:right}body.mkkatex-number-equations{counter-reset:eqnum}body.mkkatex-number-equations .katex-display{position:relative}body.mkkatex-number-equations .katex-display::after{counter-increment:eqnum;content:"(" counter(eqnum) ")";position:absolute;left:0;top:25%}body.mkkatex-number-equations.mkkatex-number-equations-right .katex-display::after{right:0;left:auto}.mkprinting,.mkprinting #wrapper{height:auto;margin-bottom:0;padding-bottom:0}.hideProgress #generated-toc,.hideProgress #firstdiff,.hideProgress #toc-title,.hideProgress #mkdocumentprogress,.hideProgress #mkincludechart,.hideProgress #mkprogressbar1,.hideProgress #mkprogressbar2,.hideProgress b.bookmark,.hideProgress .mkscrollmeter,.hideProgress #alllinks,.hideProgress #criticnav,.hideProgress .popup,.hideProgress #progressindicator,.hideProgress #mkautoscroll,.mkprinting #generated-toc,.mkprinting #firstdiff,.mkprinting #toc-title,.mkprinting #mkdocumentprogress,.mkprinting #mkincludechart,.mkprinting #mkprogressbar1,.mkprinting #mkprogressbar2,.mkprinting b.bookmark,.mkprinting .mkscrollmeter,.mkprinting #alllinks,.mkprinting #criticnav,.mkprinting .popup,.mkprinting #progressindicator,.mkprinting #mkautoscroll{display:none !important}.hideProgress .mkstyledtag,.mkprinting .mkstyledtag{display:none}.mkcolor-grammar-error,.mkcolor-spell-error{background:none;border-bottom:none}.mkprinting.mkshowcomments .mkstyledtag{display:inline;background:#ccc;padding:3px 9px;border-radius:20px;font-size:1}@media print{body{background:white;line-height:1.4}html,body,#wrapper{-moz-box-shadow:none;-webkit-box-shadow:none;box-shadow:none;-webkit-perspective:none !important;-webkit-text-size-adjust:none;border:0;box-sizing:border-box;float:none;margin:0;max-width:100%;padding:0;margin-top:0;width:auto}.critic #wrapper mark.crit{background-color:#fffd38 !important;text-decoration:none;color:#000}h1,h2,h3,h4,h5,h6{page-break-after:avoid}p,h2,h3{orphans:3;widows:3}section{page-break-before:avoid}pre>code{white-space:pre;word-break:break-word}#generated-toc,#firstdiff,#toc-title,#mkdocumentprogress,#mkincludechart,#mkprogressbar1,#mkprogressbar2,.mkscrollmeter,#alllinks,.popup{display:none !important}.suppressprintlinks a{border-bottom:none !important;color:inherit !important;cursor:default !important;text-decoration:none !important}.hrefafterlinktext #wrapper a:link:after,.hrefafterlinktext #wrapper a:visited:after{content:" (" attr(href) ") ";font-size:90%;opacity:.9}.nocodebreak pre{page-break-inside:avoid}img,table,figure{page-break-inside:avoid}.breakfootnotes .footnotes{page-break-before:always}.breakfootnotes .footnotes hr{display:none}#mktoctitle{display:block}#print-title{border-bottom:solid 1px #666;display:block}#wrapper pre{white-space:pre;white-space:pre-wrap;word-wrap:break-word}#wrapper #generated-toc-clone,#wrapper #mkreplaced-toc{display:block}.task-list{padding-left:3.3rem}.mkstyle--ink .task-list,.mkstyle--swiss .task-list{padding-left:3.3rem !important}.mkstyle--upstandingcitizen .task-list,.mkstyle--github .task-list{padding-left:3.6rem !important}.mkstyle--manuscript .task-list{padding-left:2.4rem !important}.mkstyle--amblin .task-list{padding-left:2.1rem !important}.mkstyle--grump .task-list{padding-left:1rem !important}.mkstyle--grump .task-list .task-list-item-checkbox{left:0 !important}.task-list .task-list-item{list-style-type:none !important;left:auto}.task-list .task-list-item .task-list-item-checkbox{-webkit-appearance:none;position:relative;left:auto}.task-list .task-list-item .task-list-item-checkbox:before{border:solid 1px #aaa;border-radius:2px;color:white;content:' ';display:block;font-weight:bold;height:1em;left:-1rem;line-height:1;position:absolute;text-align:center;top:-.75em;width:1em}.task-list .gh-complete.task-list-item .task-list-item-checkbox:before{background:#838387;content:'\2713'}}
 #wrapper #generated-toc-clone,#wrapper #mkreplaced-toc,#wrapper #generated-toc-clone ul,#wrapper #mkreplaced-toc ul{list-style-position:inside}#wrapper #generated-toc-clone li.missing,#wrapper #mkreplaced-toc li.missing{list-style-type: none!important}#wrapper #generated-toc-clone ul,#wrapper #mkreplaced-toc ul{list-style-type: upper-roman}#wrapper #generated-toc-clone>ul>li>ul,#wrapper #mkreplaced-toc>li>ul {list-style-type: decimal}#wrapper #generated-toc-clone>ul>li>ul>li>ul,#wrapper #mkreplaced-toc>li>ul>li>ul{list-style-type: decimal-leading-zero}#wrapper #generated-toc-clone>ul>li>ul>li>ul>li>ul,#wrapper #mkreplaced-toc>li>ul>li>ul>li>ul{list-style-type: lower-greek}#wrapper #generated-toc-clone>ul>li>ul>li>ul>li>ul>li>ul,#wrapper #mkreplaced-toc>li>ul>li>ul>li>ul>li>ul{list-style-type: disc}#wrapper #generated-toc-clone>ul>li>ul>li>ul>li>ul>li>ul>li>ul,#wrapper #mkreplaced-toc>li>ul>li>ul>li>ul>li>ul>li>ul{list-style-type: square}#wrapper #generated-toc-clone,#wrapper #mkreplaced-toc{}
 `
+
+func (gen *Generator) ensureResourceDiagram(rez *model.ResourceDef) error {
+	if gen.OutDir == "" {
+		return nil
+	}
+	rezId := StripNamespace(rez.Id)
+	rezSchema := gen.Schema.ShakeResourceTree(rez.Id, true)
+	imgdir := ""
+	if gen.diagramsFolder != "." {
+		imgdir = gen.diagramsFolder
+		gen.EnsureDir(filepath.Join(gen.OutDir, imgdir))
+	}
+	pumlPath := fmt.Sprintf("%s/%s.puml", imgdir, rezId)
+	pumlConf := data.NewObject()
+	pumlConf.Put("force", true)
+	pumlConf.Put("outdir", gen.OutDir)
+	pumlConf.Put("generate-exceptions", gen.Config.GetBool("generate-exceptions"))
+	pumlConf.Put("suppress-service", true)
+	//pumlConf.Put("generate-exceptions", true)
+	pumlGen := new(plantuml.Generator)
+	err := pumlGen.Init(rezSchema, pumlConf)
+	if err != nil {
+		return err
+	}
+	pumlGen.Begin()
+	pumlGen.GenerateHeader()
+	pumlGen.GenerateResource(rez)
+	for _, oid := range pumlGen.ResourceOperations(rez) {
+		od := rezSchema.GetOperationDef(oid)
+		pumlGen.GenerateOperation(od)
+	}
+	pumlGen.GenerateExceptions()
+	pumlGen.GenerateTypes()
+	pumlGen.GenerateFooter()
+	s := pumlGen.End()
+	err = pumlGen.Write(s, pumlPath, "")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("plantuml", "-tsvg", filepath.Join(gen.OutDir, pumlPath))
+	err = cmd.Run()
+	if err != nil {
+		err = fmt.Errorf("Cannot exec `plantuml`. Please install it and try again")
+	}
+	return err
+}

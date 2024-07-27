@@ -16,8 +16,8 @@ resource ItemResource {
     create: CreateItem
     read: GetItem
     update: UpdateItem
-    delete: DeleteItem
-    list: ListItems
+    operations: [DeleteItem]
+    collectionOperations: [ListItems]
 }
 
 /// Create an item

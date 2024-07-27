@@ -177,3 +177,18 @@ func (gen *SummaryGenerator) GenerateTypes() {
 		gen.Emit("\n")
 	}
 }
+
+func (gen *SummaryGenerator) GenerateResource(rd *ResourceDef) error {
+	gen.Emitf("resource %s\n", StripNamespace(rd.Id))
+	return nil
+}
+
+func (gen *SummaryGenerator) GenerateResources() {
+	rds := gen.Schema.Resources
+	if len(rds) > 0 {
+		for _, rd := range rds {
+			gen.GenerateResource(rd)
+		}
+		gen.Emit("\n")
+	}
+}
