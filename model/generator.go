@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/boynton/data"
 )
@@ -178,8 +179,6 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 	}
 	f, err := os.Create(path)
 	if err != nil {
-		fmt.Printf("cannot create %q\n", path)
-		panic("ere")
 		gen.Err = err
 		return err
 	}
@@ -188,6 +187,27 @@ func (gen *BaseGenerator) WriteFile(path string, content string) error {
 	_, gen.Err = writer.WriteString(content)
 	writer.Flush()
 	return gen.Err
+}
+
+func (gen *BaseGenerator) EmitTemplate(name string, tmplSource string, data interface{}, funcMap template.FuncMap) {
+	if gen.Err != nil {
+		fmt.Println("EmitTemplate("+name+"): already have an error, do not continue:", gen.Err)
+		return
+	}
+	var b bytes.Buffer
+	writer := bufio.NewWriter(&b)
+	tmpl, err := template.New(name).Funcs(funcMap).Parse(tmplSource)
+	if err != nil {
+		gen.Err = err
+		return
+	}
+	err = tmpl.Execute(writer, data)
+	if err != nil {
+		gen.Err = err
+		return
+	}
+	writer.Flush()
+	gen.Emit(b.String())
 }
 
 /*

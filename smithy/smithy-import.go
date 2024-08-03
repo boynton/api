@@ -62,9 +62,6 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
 		return importShape(schema, ast, shapeId, shape)
 	})
-	if err != nil {
-		return nil, err
-	}
 	return schema, err
 }
 
