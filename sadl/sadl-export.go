@@ -20,6 +20,7 @@ import (
 	//	"bytes"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/boynton/api/model"
 	"github.com/boynton/data"
@@ -81,7 +82,8 @@ func (gen *Generator) ToSadl() string {
 		for _, op := range gen.Schema.Operations {
 			opts := gen.opAnnotations(op)
 			gen.EmitOperation(op, opts)
-			emitted[op.Name()] = true
+			opName := op.Name()
+			emitted[opName] = true
 			if op.Input != nil {
 				if td := gen.Schema.GetTypeDef(op.Input.Id); td != nil {
 					emitted[td.Name()] = true
@@ -100,6 +102,11 @@ func (gen *Generator) ToSadl() string {
 						gen.EmitException(e)
 						emitted[ename] = true
 					}
+				}
+			}
+			if len(op.Examples) > 0 {
+				for _, ex := range op.Examples {
+					gen.EmitExample(ex, opName)
 				}
 			}
 		}
@@ -297,6 +304,49 @@ func (gen *Generator) EmitOperation(op *model.OperationDef, opts []string) {
 	gen.Emit("}\n")
 }
 
+func makeIdentifier(title string) string {
+	makeUpper := true
+	identifier := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			makeUpper = true
+			return r
+		}
+		if r == '_' {
+			makeUpper = true
+			return r
+		}
+		if r >= 'a' && r <= 'z' {
+			if makeUpper {
+				r = unicode.ToUpper(r)
+				makeUpper = false
+			}
+			return r
+		}
+		if r >= 'A' && r <= 'Z' {
+			makeUpper = false
+			return r
+		}
+		makeUpper = true
+		return -1
+
+	}, title)
+	return identifier
+}
+
+func (gen *Generator) EmitExample(e *model.OperationExample, opName string) {
+	//Uncapitalize(opName)
+	reqName := opName + "Request"
+	resName := opName + "Response"
+	exName := makeIdentifier(e.Title)
+	gen.Emitf("example %s (name=%s) %s\n\n", reqName, exName, model.Pretty(e.Input))
+	if e.Output != nil {
+		gen.Emitf("example %s (name=%s) %s\n\n", resName, exName, model.Pretty(e.Output))
+	} else {
+		errName := gen.stripNamespace(string(e.Error.ShapeId))
+		gen.Emitf("example %s (name=%s) %s\n\n", errName, exName, model.Pretty(e.Error.Output))
+	}
+}
+
 func (gen *Generator) EmitException(e *model.OperationOutput) {
 	gen.EmitComment(e.Comment)
 	gen.Emitf("type %s Struct {\n", e.Name())
@@ -370,8 +420,7 @@ func (gen *Generator) EmitOperationOutputFields(fields []*model.OperationOutputF
 	}
 }
 
-/*
-   func (w *SadlWriter) EmitExample(shape *smithy.Shape, obj *data.Document) {
+/*func (w *SadlWriter) EmitExample(shape *smithy.Shape, obj *data.Document) {
 	opName := obj.GetString("title")
 	if obj.Has("input") {
 		reqType := gen.stripNamespace(shape.Input.Target)
