@@ -730,21 +730,26 @@ func Assemble(paths []string) (*AST, error) {
 			if err != nil {
 				return nil, err
 			}
-			assembly.Merge(ast)
+			err = assembly.Merge(ast)
+			if err != nil {
+				return nil, err
+			}
 		case ".json":
 			ast, err := LoadAST(path)
 			if err != nil {
 				return nil, err
 			}
-			assembly.Merge(ast)
+			err = assembly.Merge(ast)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	assembly.ExpandMixins()
 	for _, k := range assembly.Shapes.Keys() {
 		if tmp := assembly.GetShape(k); tmp != nil {
 			if tmp.Type == "apply" {
-				assembly.Apply(k, tmp.Traits)
-				assembly.Shapes.Delete(k)
+				return nil, fmt.Errorf("Cannot apply traits to %s: target shape not found", k)
 			}
 		}
 	}
@@ -816,13 +821,9 @@ func (ast *AST) Merge(src *AST) error {
 		for _, k := range src.Shapes.Keys() {
 			srcShape := src.GetShape(k)
 			curShape := ast.GetShape(k)
-			if curShape == nil {
-				ast.PutShape(k, srcShape)
-			} else {
-				err := ast.mergeShape(k, curShape, srcShape)
-				if err != nil {
-					return err
-				}
+			err := ast.mergeShape(k, curShape, srcShape)
+			if err != nil {
+				return err
 			}
 		}
 	}
