@@ -45,7 +45,7 @@ func main() {
 	pEntity := flag.String("e", "", "Show the specified entity.")
 	pForce := flag.Bool("f", false, "Force overwrite if output file exists")
 	pParseOnly := flag.Bool("p", false, "Parse input, display parse tree, and exit")
-	pGen := flag.String("g", "api", "The generator for output")
+	pGen := flag.String("g", "smithy", "The generator for output")
 	pNs := flag.String("ns", "", "The namespace to force if absent. Also used by the api generator to flatten to a single namespace")
 	pOutdir := flag.String("o", "", "The directory to generate output into (defaults to stdout)")
 	pWarn := flag.String("w", "show", "Warnings. 'show' or 'suppress' or 'error'. Default is 'show'")
