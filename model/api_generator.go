@@ -200,10 +200,10 @@ func (gen *ApiGenerator) GenerateOperationInput(op *OperationDef) {
 				opts = append(opts, fmt.Sprintf("header=%q", f.HttpHeader))
 			}
 			if f.MinValue != nil {
-				opts = append(opts, fmt.Sprintf("minvalue=%v", f.MinValue))
+				opts = append(opts, fmt.Sprintf("min=%v", f.MinValue))
 			}
 			if f.MaxValue != nil {
-				opts = append(opts, fmt.Sprintf("maxvalue=%v", f.MaxValue))
+				opts = append(opts, fmt.Sprintf("max=%v", f.MaxValue))
 			}
 			if f.MinSize != 0 {
 				opts = append(opts, fmt.Sprintf("minsize=%d", f.MinSize))

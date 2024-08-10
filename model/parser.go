@@ -284,7 +284,7 @@ func (p *Parser) parseOperationInput(op *OperationDef, comment string) (*Operati
 				return nil, p.SyntaxError()
 			}
 			in.Type = p.schema.Namespaced(tok.Text)
-			options, err := p.ParseOptions("operation.input."+string(in.Name), []string{"path", "query", "header", "payload", "required", "default"})
+			options, err := p.ParseOptions("operation.input."+string(in.Name), []string{"path", "query", "header", "payload", "required", "default", "min", "max", "minsize", "maxsize"})
 			if err != nil {
 				return nil, err
 			}
@@ -619,6 +619,10 @@ func (p *Parser) parseResourceDirective(comment string) error {
 				//case "put": //smithy
 			case "operations":
 				rd.Operations, err = p.expectIdentifierListAndMakeAbsolute()
+				if err != nil {
+					fmt.Println("rd.Operations, err:", rd.Operations, err)
+					panic("ok!")
+				}
 			case "collectionOperations":
 				rd.CollectionOperations, err = p.expectIdentifierListAndMakeAbsolute()
 			case "resources":
@@ -981,6 +985,9 @@ func (p *Parser) ExpectIdentifierList() ([]string, error) {
 		if tok.Type == CLOSE_BRACKET {
 			return lst, nil
 		}
+		if tok.Type == COMMA {
+			continue
+		}
 		if tok.Type != SYMBOL {
 			//		s, err := p.ExpectIdentifier()
 			//		if err != nil {
@@ -1198,6 +1205,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 					}
 				} else {
 					err = p.Error(fmt.Sprintf("Unrecognized option for %s: %s", typeName, tok.Text))
+					fmt.Println("err:", err)
+					panic("whoa")
 				}
 				if err != nil {
 					return nil, err
