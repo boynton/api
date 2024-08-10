@@ -23,30 +23,6 @@ func (ast *AST) overrideNamespace(ns string, sid string) string {
 	return ns + "#" + name
 }
 
-/*
-func (ast *AST) overrideRefNamespace(ns string, ref *ShapeRef) {
-	if ref != nil {
-		ref.Target = ast.overrideNamespace(ns, ref.Target)
-	}
-}
-
-func (ast *AST) overrideOperationNamespace(ns string, op *Shape) {
-	ast.overrideRefNamespace(ns, op.Input)
-	ast.overrideRefNamespace(ns, op.Output)
-
-	for _, ex := range op.Errors {
-		ast.overrideRefNamespace(ns, ex)
-	}
-}
-
-func (ast *AST) overrideStructureNamespace(ns string, op *Shape) {
-	for _, memName := range op.Members.Keys() {
-		mem := op.Members.Get(memName)
-		mem.Target = ast.overrideNamespace(ns, mem.Target)
-	}
-}
-*/
-
 func (ast *AST) overrideNamespaces(ns string, sid string) (string, *Shape) {
 	shape := ast.Shapes.Get(sid)
 	if ns == "" {

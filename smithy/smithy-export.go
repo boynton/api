@@ -89,30 +89,6 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 	return nil
 }
 
-/*
-   func (ast *AST) flatten(id string, ns string) (string, *Shape) {
-	shape := ast.GetShape(id)
-	sid := ast.forceNamespace(id, ns)
-	fmt.Print("flatten this:", pretty(shape))
-	panic("here")
-	switch shape.Type {
-	case "service":
-		for _, op := range shape.Operations {
-			op.Target = ast.forceNamespace(op.Target, ns)
-		}
-		for _, rez := range shape.Resources {
-			rez.Target = ast.forceNamespace(rez.Target, ns)
-		}
-	case "structure":
-		for _, k := range shape.Members.Keys() {
-			m := shape.Members.Get(k)
-			fmt.Println("fix this:", m)
-		}
-	}
-	return sid, shape
-}
-*/
-
 func (ast *AST) forceNamespace(id model.AbsoluteIdentifier, ns string) string {
 	sid := string(id)
 	if ns == "" {
@@ -121,16 +97,3 @@ func (ast *AST) forceNamespace(id model.AbsoluteIdentifier, ns string) string {
 	name := stripNamespace(sid)
 	return ns + "#" + name
 }
-
-/*
-   func (ast *AST) FlattenNamespacesTo(ns string) error {
-	newShapes := NewMap[*Shape]()
-	for _, shapeId := range ast.Shapes.Keys() {
-		sid, shape := ast.flatten(shapeId, ns)
-		newShapes.Put(sid, shape)
-	}
-	ast.Shapes = newShapes
-	return nil
-
-}
-*/
