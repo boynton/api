@@ -15,7 +15,7 @@ type IdlGenerator struct {
 
 func (gen *IdlGenerator) GenerateResource(rez *model.ResourceDef) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema, gen.Sort)
+		ast, err := SmithyAST(gen.Schema, gen.Sort, "")
 		if err != nil {
 			return err
 		}
@@ -27,7 +27,7 @@ func (gen *IdlGenerator) GenerateResource(rez *model.ResourceDef) error {
 
 func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema, gen.Sort)
+		ast, err := SmithyAST(gen.Schema, gen.Sort, "")
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func (gen *IdlGenerator) GenerateOperation(op *model.OperationDef) error {
 
 func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema, gen.Sort)
+		ast, err := SmithyAST(gen.Schema, gen.Sort, "")
 		if err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (gen *IdlGenerator) GenerateType(op *model.TypeDef) error {
 
 func (gen *IdlGenerator) GenerateException(op *model.OperationOutput) error {
 	if gen.ast == nil {
-		ast, err := SmithyAST(gen.Schema, gen.Sort)
+		ast, err := SmithyAST(gen.Schema, gen.Sort, "")
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 		return err
 	}
 
-	ast, err := SmithyAST(schema, gen.Sort)
+	ast, err := SmithyAST(schema, gen.Sort, config.GetString("namespace"))
 	if err != nil {
 		return err
 	}
@@ -88,3 +88,49 @@ func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) err
 	}
 	return nil
 }
+
+/*
+   func (ast *AST) flatten(id string, ns string) (string, *Shape) {
+	shape := ast.GetShape(id)
+	sid := ast.forceNamespace(id, ns)
+	fmt.Print("flatten this:", pretty(shape))
+	panic("here")
+	switch shape.Type {
+	case "service":
+		for _, op := range shape.Operations {
+			op.Target = ast.forceNamespace(op.Target, ns)
+		}
+		for _, rez := range shape.Resources {
+			rez.Target = ast.forceNamespace(rez.Target, ns)
+		}
+	case "structure":
+		for _, k := range shape.Members.Keys() {
+			m := shape.Members.Get(k)
+			fmt.Println("fix this:", m)
+		}
+	}
+	return sid, shape
+}
+*/
+
+func (ast *AST) forceNamespace(id model.AbsoluteIdentifier, ns string) string {
+	sid := string(id)
+	if ns == "" {
+		return sid
+	}
+	name := stripNamespace(sid)
+	return ns + "#" + name
+}
+
+/*
+   func (ast *AST) FlattenNamespacesTo(ns string) error {
+	newShapes := NewMap[*Shape]()
+	for _, shapeId := range ast.Shapes.Keys() {
+		sid, shape := ast.flatten(shapeId, ns)
+		newShapes.Put(sid, shape)
+	}
+	ast.Shapes = newShapes
+	return nil
+
+}
+*/

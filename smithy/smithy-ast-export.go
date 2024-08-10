@@ -12,6 +12,126 @@ import (
 type AstGenerator struct {
 	model.BaseGenerator
 	ast *AST
+	ns  string
+}
+
+func (ast *AST) overrideNamespace(ns string, sid string) string {
+	if ns == "" || sid == "" || strings.HasPrefix(sid, "smithy.api#") {
+		return sid
+	}
+	name := stripNamespace(sid)
+	return ns + "#" + name
+}
+
+/*
+func (ast *AST) overrideRefNamespace(ns string, ref *ShapeRef) {
+	if ref != nil {
+		ref.Target = ast.overrideNamespace(ns, ref.Target)
+	}
+}
+
+func (ast *AST) overrideOperationNamespace(ns string, op *Shape) {
+	ast.overrideRefNamespace(ns, op.Input)
+	ast.overrideRefNamespace(ns, op.Output)
+
+	for _, ex := range op.Errors {
+		ast.overrideRefNamespace(ns, ex)
+	}
+}
+
+func (ast *AST) overrideStructureNamespace(ns string, op *Shape) {
+	for _, memName := range op.Members.Keys() {
+		mem := op.Members.Get(memName)
+		mem.Target = ast.overrideNamespace(ns, mem.Target)
+	}
+}
+*/
+
+func (ast *AST) overrideNamespaces(ns string, sid string) (string, *Shape) {
+	shape := ast.Shapes.Get(sid)
+	if ns == "" {
+		return sid, shape
+	}
+	newShape := cloneShape(shape)
+	if newShape.Members != nil {
+		for _, memName := range newShape.Members.Keys() {
+			mem := newShape.Members.Get(memName)
+			mem.Target = ast.overrideNamespace(ns, mem.Target)
+		}
+	}
+	if newShape.Member != nil {
+		newShape.Member.Target = ast.overrideNamespace(ns, newShape.Member.Target)
+	}
+	if newShape.Key != nil {
+		newShape.Key.Target = ast.overrideNamespace(ns, newShape.Key.Target)
+	}
+	if newShape.Value != nil {
+		newShape.Value.Target = ast.overrideNamespace(ns, newShape.Value.Target)
+	}
+	for _, mi := range newShape.Mixins {
+		mi.Target = ast.overrideNamespace(ns, mi.Target)
+	}
+	if newShape.Identifiers != nil {
+		for _, ik := range newShape.Identifiers.Keys() {
+			iv := newShape.Identifiers.Get(ik)
+			iv.Target = ast.overrideNamespace(ns, iv.Target)
+		}
+	}
+	if newShape.Create != nil {
+		newShape.Create.Target = ast.overrideNamespace(ns, newShape.Create.Target)
+	}
+	if newShape.Put != nil {
+		newShape.Put.Target = ast.overrideNamespace(ns, newShape.Put.Target)
+	}
+	if newShape.Read != nil {
+		newShape.Read.Target = ast.overrideNamespace(ns, newShape.Read.Target)
+	}
+	if newShape.Update != nil {
+		newShape.Update.Target = ast.overrideNamespace(ns, newShape.Update.Target)
+	}
+	if newShape.Delete != nil {
+		newShape.Delete.Target = ast.overrideNamespace(ns, newShape.Delete.Target)
+	}
+	if newShape.List != nil {
+		newShape.List.Target = ast.overrideNamespace(ns, newShape.List.Target)
+	}
+	for _, op := range newShape.Operations {
+		op.Target = ast.overrideNamespace(ns, op.Target)
+	}
+	for _, op := range newShape.CollectionOperations {
+		op.Target = ast.overrideNamespace(ns, op.Target)
+	}
+	for _, op := range newShape.Resources {
+		op.Target = ast.overrideNamespace(ns, op.Target)
+	}
+	if newShape.Input != nil {
+		newShape.Input.Target = ast.overrideNamespace(ns, newShape.Input.Target)
+	}
+	if newShape.Output != nil {
+		newShape.Output.Target = ast.overrideNamespace(ns, newShape.Output.Target)
+	}
+	for _, er := range newShape.Errors {
+		er.Target = ast.overrideNamespace(ns, er.Target)
+	}
+
+	name := stripNamespace(sid)
+	return ns + "#" + name, newShape
+}
+
+func (ast *AST) forceNamespaceIfSet(ns string) *AST {
+	if ns == "" {
+		return ast
+	}
+	newAst := &AST{
+		Smithy: ast.Smithy,
+		//metadata?
+	}
+	for _, shapeId := range ast.Shapes.Keys() {
+		shape := ast.GetShape(shapeId)
+		sid, shape := ast.overrideNamespaces(ns, shapeId)
+		newAst.PutShape(sid, shape)
+	}
+	return newAst
 }
 
 func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) error {
@@ -23,7 +143,8 @@ func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) err
 	if err != nil {
 		return err
 	}
-	return gen.Write(model.Pretty(gen.ast), "model.json", "")
+	ast := gen.ast.forceNamespaceIfSet(config.GetString("namespace"))
+	return gen.Write(model.Pretty(ast), "model.json", "")
 }
 
 func (gen *AstGenerator) GenerateResource(op *model.ResourceDef) error {
@@ -42,11 +163,13 @@ func (gen *AstGenerator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
 
-func SmithyAST(schema *model.Schema, sorted bool) (*AST, error) {
+func SmithyAST(schema *model.Schema, sorted bool, ns string) (*AST, error) {
 	gen := &AstGenerator{}
 	gen.Configure(schema, data.NewObject())
 	gen.Sort = sorted
-	return gen.ToAST()
+	ast, err := gen.ToAST()
+	ast = ast.forceNamespaceIfSet(ns)
+	return ast, err
 }
 
 func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.AbsoluteIdentifier]bool, error) {
