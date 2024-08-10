@@ -378,6 +378,10 @@ func (schema *Schema) ResourceOperations(rez *ResourceDef) []AbsoluteIdentifier 
 }
 
 func (schema *Schema) typeReferences(tid AbsoluteIdentifier, referenced map[AbsoluteIdentifier]bool) {
+	if _, ok := referenced[tid]; ok {
+		return
+	}
+	referenced[tid] = true
 	if !schema.IsBaseType(tid) {
 		td := schema.GetTypeDef(tid)
 		referenced[td.Id] = true
@@ -399,15 +403,12 @@ func (schema *Schema) typeReferences(tid AbsoluteIdentifier, referenced map[Abso
 }
 
 func (schema *Schema) fieldReferences(fd *FieldDef, referenced map[AbsoluteIdentifier]bool) {
-	referenced[fd.Type] = true
+	schema.typeReferences(fd.Type, referenced)
 	if fd.Items != "" {
 		schema.typeReferences(fd.Items, referenced)
 	}
 	if fd.Keys != "" {
 		schema.typeReferences(fd.Keys, referenced)
-	}
-	if fd.Items != "" {
-		schema.typeReferences(fd.Items, referenced)
 	}
 }
 
