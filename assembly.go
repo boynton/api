@@ -125,9 +125,6 @@ func AssembleModel(paths []string, tags []string, ns string, parseOnly bool, noV
 	if format == "" {
 		return nil, fmt.Errorf("Cannot determine acceptable input file format")
 	}
-	if ns == "" {
-		ns = "unspecified"
-	}
 	var schema *model.Schema
 	switch format {
 	case "api":

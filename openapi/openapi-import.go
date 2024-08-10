@@ -25,6 +25,9 @@ import (
 )
 
 func Import(paths []string, tags []string, ns string) (*model.Schema, error) {
+	if ns == "" {
+		ns = "unspecified"
+	}
 	if len(paths) != 1 {
 		return nil, fmt.Errorf("Openapi import can aonly accept a single file")
 	}
