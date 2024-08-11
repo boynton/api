@@ -206,6 +206,7 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 		if len(rez.Operations) > 0 {
 			var refs []*ShapeRef
 			for _, oid := range rez.Operations {
+				operations[oid] = true
 				refs = append(refs, &ShapeRef{Target: string(oid)})
 			}
 			shape.Operations = refs
@@ -213,6 +214,7 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 		if len(rez.CollectionOperations) > 0 {
 			var refs []*ShapeRef
 			for _, oid := range rez.CollectionOperations {
+				operations[oid] = true
 				refs = append(refs, &ShapeRef{Target: string(oid)})
 			}
 			shape.CollectionOperations = refs
