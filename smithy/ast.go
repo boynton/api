@@ -348,6 +348,12 @@ func (ast *AST) AssemblyVersion() int {
 	return 2
 }
 
+func (ast *AST) DeleteShape(id string) {
+	if ast.Shapes != nil {
+		ast.Shapes.Delete(id)
+	}
+}
+
 func (ast *AST) PutShape(id string, shape *Shape) {
 	if ast.Shapes == nil {
 		ast.Shapes = NewMap[*Shape]()
@@ -746,12 +752,21 @@ func Assemble(paths []string) (*AST, error) {
 		}
 	}
 	assembly.ExpandMixins()
+	var toDelete []string
 	for _, k := range assembly.Shapes.Keys() {
 		if tmp := assembly.GetShape(k); tmp != nil {
 			if tmp.Type == "apply" {
-				return nil, fmt.Errorf("Cannot apply traits to %s: target shape not found", k)
+				if strings.Index(k, "$") > 0 {
+					assembly.Apply(k, tmp.Traits)
+					toDelete = append(toDelete, k)
+				} else {
+					return nil, fmt.Errorf("Cannot apply traits to %s: target shape not found", k)
+				}
 			}
 		}
+	}
+	for _, k := range toDelete {
+		assembly.DeleteShape(k)
 	}
 	return assembly, nil
 }
