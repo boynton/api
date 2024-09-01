@@ -5,7 +5,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/boynton/data"
 )
 
 // BaseType - All other types are derived from these.
@@ -101,8 +100,8 @@ type EnumElementList []*EnumElement
 type TypeDef struct {
 	Comment  string             `json:"comment,omitempty"`
 	Tags     StringList         `json:"tags,omitempty"`
-	MinValue *data.Decimal      `json:"minValue,omitempty"`
-	MaxValue *data.Decimal      `json:"maxValue,omitempty"`
+	MinValue *Decimal           `json:"minValue,omitempty"`
+	MaxValue *Decimal           `json:"maxValue,omitempty"`
 	MinSize  int64              `json:"minSize,omitempty"`
 	MaxSize  int64              `json:"maxSize,omitempty"`
 	Required bool               `json:"required,omitempty"`
@@ -119,8 +118,8 @@ type TypeDef struct {
 type FieldDef struct {
 	Comment  string             `json:"comment,omitempty"`
 	Tags     StringList         `json:"tags,omitempty"`
-	MinValue *data.Decimal      `json:"minValue,omitempty"`
-	MaxValue *data.Decimal      `json:"maxValue,omitempty"`
+	MinValue *Decimal           `json:"minValue,omitempty"`
+	MaxValue *Decimal           `json:"maxValue,omitempty"`
 	MinSize  int64              `json:"minSize,omitempty"`
 	MaxSize  int64              `json:"maxSize,omitempty"`
 	Required bool               `json:"required,omitempty"`
@@ -201,8 +200,8 @@ type OperationInputFieldList []*OperationInputField
 type OperationInputField struct {
 	Comment     string             `json:"comment,omitempty"`
 	Tags        StringList         `json:"tags,omitempty"`
-	MinValue    *data.Decimal      `json:"minValue,omitempty"`
-	MaxValue    *data.Decimal      `json:"maxValue,omitempty"`
+	MinValue    *Decimal           `json:"minValue,omitempty"`
+	MaxValue    *Decimal           `json:"maxValue,omitempty"`
 	MinSize     int64              `json:"minSize,omitempty"`
 	MaxSize     int64              `json:"maxSize,omitempty"`
 	Required    bool               `json:"required,omitempty"`
@@ -236,8 +235,8 @@ type OperationOutputFieldList []*OperationOutputField
 type OperationOutputField struct {
 	Comment     string             `json:"comment,omitempty"`
 	Tags        StringList         `json:"tags,omitempty"`
-	MinValue    *data.Decimal      `json:"minValue,omitempty"`
-	MaxValue    *data.Decimal      `json:"maxValue,omitempty"`
+	MinValue    *Decimal           `json:"minValue,omitempty"`
+	MaxValue    *Decimal           `json:"maxValue,omitempty"`
 	MinSize     int64              `json:"minSize,omitempty"`
 	MaxSize     int64              `json:"maxSize,omitempty"`
 	Required    bool               `json:"required,omitempty"`

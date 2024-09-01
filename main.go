@@ -21,6 +21,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/boynton/api/conf"
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/golang"
 	"github.com/boynton/api/html"
 	"github.com/boynton/api/httptrace"
@@ -31,13 +33,12 @@ import (
 	"github.com/boynton/api/rdl"
 	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
-	"github.com/boynton/data"
+	"github.com/boynton/api/swagger"
 )
 
 var Version string = "development version"
 
 func main() {
-	conf := data.NewObject()
 	pNoValidate := flag.Bool("v", false, "Suppress validation of the assembled model")
 	pQuiet := flag.Bool("q", false, "Quiet tool output, make it less verbose")
 	pHelp := flag.Bool("h", false, "Show more help information")
@@ -99,7 +100,6 @@ func main() {
 		os.Exit(0)
 	} else if *pEntity != "" {
 		eid := model.AbsoluteIdentifier(*pEntity)
-		fmt.Println(">>>>>>>", eid, "<<<<<<")
 		td := schema.GetTypeDef(eid)
 		if td != nil {
 			fmt.Println(td)
@@ -135,7 +135,7 @@ func main() {
 	}
 	generator, err := Generator(gen)
 	if err == nil {
-		err = generator.Generate(schema, conf)
+		err = generator.Generate(schema)
 	}
 	if err != nil {
 		fmt.Printf("*** %v\n", err)
@@ -169,29 +169,28 @@ func Generator(genName string) (model.Generator, error) {
 		return new(model.SummaryGenerator), nil
 	case "api":
 		return new(model.ApiGenerator), nil
-	case "markdown":
-		return new(markdown.Generator), nil
 	case "html":
 		return new(html.Generator), nil
+	case "markdown":
+		return new(markdown.Generator), nil
 	case "smithy-ast":
 		return new(smithy.AstGenerator), nil
 	case "smithy":
 		return new(smithy.IdlGenerator), nil
-	case "sadl":
-		return new(sadl.Generator), nil
-	case "rdl":
-		return new(rdl.Generator), nil
-	case "openapi":
-		return new(openapi.Generator), nil
 	case "go", "golang":
 		return new(golang.Generator), nil
 	case "httptrace":
 		return new(httptrace.Generator), nil
 	case "plantuml":
 		return new(plantuml.Generator), nil
-	//case "swagger":
-	//case "swagger-ui":
-	//case "ts":
+	case "openapi":
+		return new(openapi.Generator), nil
+	case "swagger":
+		return new(swagger.Generator), nil
+	case "sadl":
+		return new(sadl.Generator), nil
+	case "rdl":
+		return new(rdl.Generator), nil
 	default:
 		return nil, fmt.Errorf("Unknown generator: %q", genName)
 	}

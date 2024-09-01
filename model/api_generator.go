@@ -19,7 +19,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/data"
+	"github.com/boynton/api/conf"
+	"github.com/boynton/api/data"
 )
 
 type DecoratorFunc func(string) string
@@ -40,13 +41,13 @@ type ApiGenerator struct {
 	name      string
 }
 
-func (gen *ApiGenerator) Generate(schema *Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *ApiGenerator) Generate(schema *Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
 	gen.indent = "    "
-	gen.ns = config.GetString("namespace")
+	gen.ns = conf.GetString("namespace")
 	if gen.ns == "" {
 		gen.ns = string(schema.ServiceNamespace())
 	}
@@ -242,7 +243,7 @@ func (gen *ApiGenerator) decorateReference(tname string) string {
 	if gen.Decorator != nil {
 		//user defined types:
 		switch tname {
-		case "Int32", "String", "Int16", "Int8", "Int64", "Float64", "Float32", "Decimal", "Integer":
+		case "String", "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Integer", "Decimal":
 			return gen.Decorator.BaseType(tname)
 		case "Timestamp":
 			return gen.Decorator.BaseType(tname)
@@ -494,7 +495,10 @@ func (gen *ApiGenerator) GenerateType(td *TypeDef) error {
 	case BaseType_Timestamp:
 		sopts := ""
 		gen.Emitf("type %s Timestamp%s\n", StripNamespace(td.Id), sopts)
-	case BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64, BaseType_Integer, BaseType_Decimal:
+	case BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64:
+		sopts := ""
+		gen.Emitf("type %s %s%s\n", StripNamespace(td.Id), td.Base.String(), sopts)
+	case BaseType_Integer, BaseType_Decimal:
 		sopts := ""
 		gen.Emitf("type %s %s%s\n", StripNamespace(td.Id), td.Base.String(), sopts)
 	case BaseType_Bool:

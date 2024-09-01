@@ -22,8 +22,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
@@ -41,8 +41,8 @@ type Generator struct {
 	name string
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}

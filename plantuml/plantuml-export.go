@@ -20,7 +20,8 @@ import (
 	"strings"
 	
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
+	"github.com/boynton/api/conf"
+	//	"github.com/boynton/api/data"
 )
 
 const IndentAmount = "    "
@@ -46,33 +47,33 @@ type Generator struct {
 	exceptionEntities map[model.AbsoluteIdentifier]bool
 }
 
-func (gen *Generator) Init(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Init(schema *model.Schema) error {
+	err := gen.BaseGenerator.Init(schema)
 	if err != nil {
 		return err
 	}
-	gen.generateExceptions = config.GetBool("generate-exceptions")
+	gen.generateExceptions = conf.GetBool("generate-exceptions")
 	if !gen.generateExceptions {
 		gen.exceptionEntities = make(map[model.AbsoluteIdentifier]bool, 0)
 	}
-	gen.suppressService = config.GetBool("suppress-service")
+	gen.suppressService = conf.GetBool("suppress-service")
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
 	return nil
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
-	gen.generateExceptions = config.GetBool("generate-exceptions")
+	gen.generateExceptions = conf.GetBool("generate-exceptions")
 	if !gen.generateExceptions {
 		gen.exceptionEntities = make(map[model.AbsoluteIdentifier]bool, 0)
 	}
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
-	gen.suppressService = config.GetBool("suppress-service")
+	gen.suppressService = conf.GetBool("suppress-service")
 	gen.Begin()
 	gen.GenerateHeader()
 	gen.GenerateService()

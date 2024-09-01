@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boynton/data"
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/model"
 )
 
@@ -15,8 +15,8 @@ type Generator struct {
 	model.BaseGenerator
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (gen *Generator) EmitHttpTrace(op *model.OperationDef, example *model.Opera
 	bodyExample := ""
 	headers := ""
 	query := ""
-	reqExample := data.AsObject(example.Input)
+	reqExample := data.NewValue(example.Input) //data.AsObject(example.Input)
 	for _, in := range op.Input.Fields {
 		inName := string(in.Name)
 		ex := reqExample.Get(string(inName))
@@ -111,7 +111,7 @@ func (gen *Generator) EmitHttpTrace(op *model.OperationDef, example *model.Opera
 	headers = "Content-Type: application/json; charset=utf-8\n"
 	headers = headers + "Date: " + dateHeader() + "\n"
 	respMessage := fmt.Sprintf("HTTP/1.1 %d %s\n", status, http.StatusText(int(status)))
-	respExample := data.AsObject(exout)
+	respExample := data.NewValue(exout) //data.AsObject(exout)
 	for _, o := range out.Fields {
 		oName := string(o.Name)
 		ex := respExample.Get(string(oName))

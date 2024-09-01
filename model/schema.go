@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	//	"github.com/boynton/data"
 )
 
 // Q: do I want to *require* a service? I think not. I use codegen for types all the time.
@@ -192,10 +191,10 @@ func (schema *Schema) BaseType(id AbsoluteIdentifier) BaseType {
 		return BaseType_Float32
 	case "base#Float64":
 		return BaseType_Float64
-	case "base#Decimal":
-		return BaseType_Decimal
 	case "base#Integer":
 		return BaseType_Integer
+	case "base#Decimal":
+		return BaseType_Decimal
 	case "base#Timestamp":
 		return BaseType_Timestamp
 	}
@@ -545,8 +544,8 @@ func (schema *Schema) IsStringType(id AbsoluteIdentifier) bool {
 
 func (schema *Schema) IsNumericType(id AbsoluteIdentifier) bool {
 	bt := schema.BaseType(id)
-	return bt == BaseType_Int32 || bt == BaseType_Int64 || bt == BaseType_Int16 || bt == BaseType_Int8 ||
-		bt == BaseType_Float64 || bt == BaseType_Float32 //not decimal, it is an object
+	return bt == BaseType_Int8 || bt == BaseType_Int16 || bt == BaseType_Int32 || bt == BaseType_Int64 ||
+		bt == BaseType_Float32 || bt == BaseType_Float64 || bt == BaseType_Integer || bt == BaseType_Decimal
 }
 
 func (schema *Schema) IsBaseType(id AbsoluteIdentifier) bool {

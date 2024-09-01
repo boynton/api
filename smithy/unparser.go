@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
@@ -216,7 +216,7 @@ func (ast *AST) ExternalRefs(ns string) []string {
 	return res
 }
 
-func (ast *AST) noteExternalTraitRefs(match string, traits *NodeValue, refs map[string]bool) {
+func (ast *AST) noteExternalTraitRefs(match string, traits *data.Value, refs map[string]bool) {
 	if traits != nil {
 		for _, tk := range traits.Keys() {
 			if !strings.HasPrefix(tk, "smithy.api#") && (match != "" && !strings.HasPrefix(tk, match)) {
@@ -358,8 +358,8 @@ func (w *IdlWriter) EmitDocumentation(doc, indent string) {
 	}
 }
 
-func (w *IdlWriter) EmitBooleanTrait(b bool, tname, indent string) {
-	if b {
+func (w *IdlWriter) EmitBooleanTrait(v *data.Value, tname, indent string) {
+	if v != nil {
 		w.Emit("%s@%s\n", indent, tname)
 	}
 }
@@ -375,7 +375,7 @@ func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
 }
 
 func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
-	if nv, ok := v.(*NodeValue); ok {
+	if nv, ok := v.(*data.Value); ok {
 		min := nv.Get("min")
 		max := nv.Get("max")
 		if min != nil && max != nil {
@@ -389,7 +389,7 @@ func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
 }
 
 func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
-	if r, ok := v.(*NodeValue); ok {
+	if r, ok := v.(*data.Value); ok {
 		min := r.Get("min")
 		max := r.Get("max")
 		if min != nil && max != nil {
@@ -402,15 +402,14 @@ func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
 	}
 }
 
-func (w *IdlWriter) EmitTraitTrait(v interface{}) {
-	l := data.AsMap(v)
-	if l != nil {
+func (w *IdlWriter) EmitTraitTrait(v *data.Value) {
+	if v != nil {
 		var lst []string
-		selector := data.GetString(l, "selector")
+		selector := v.GetString("selector")
 		if selector != "" {
 			lst = append(lst, fmt.Sprintf("selector: %q", selector))
 		}
-		conflicts := data.GetStringSlice(l, "conflicts")
+		conflicts := v.GetStringSlice("conflicts")
 		if conflicts != nil {
 			s := "["
 			for _, e := range conflicts {
@@ -422,7 +421,7 @@ func (w *IdlWriter) EmitTraitTrait(v interface{}) {
 			s = s + "]"
 			lst = append(lst, fmt.Sprintf("conflicts: %s", s))
 		}
-		structurallyExclusive := data.GetString(l, "structurallyExclusive")
+		structurallyExclusive := v.GetString("structurallyExclusive")
 		if structurallyExclusive != "" {
 			lst = append(lst, fmt.Sprintf("selector: %q", structurallyExclusive))
 		}
@@ -434,14 +433,15 @@ func (w *IdlWriter) EmitTraitTrait(v interface{}) {
 	w.Emit("@trait\n")
 }
 
-func (w *IdlWriter) EmitTagsTrait(v interface{}, indent string) {
-	if sa, ok := v.([]string); ok {
+func (w *IdlWriter) EmitTagsTrait(v *data.Value, indent string) {
+	sa := v.AsStringSlice()
+	if sa != nil {
 		w.Emit("@tags(%v)\n", listOfStrings("", "%q", sa))
 	}
 }
 
-func (w *IdlWriter) EmitDeprecatedTrait(dep *NodeValue, indent string) {
-	if dep != nil && dep.value != nil {
+func (w *IdlWriter) EmitDeprecatedTrait(dep *data.Value, indent string) {
+	if dep != nil {
 		s := indent + "@deprecated"
 		hasMessage := false
 		if dep.Has("message") {
@@ -461,21 +461,10 @@ func (w *IdlWriter) EmitDeprecatedTrait(dep *NodeValue, indent string) {
 	}
 }
 
-func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
-	var method, uri string
-	code := 0
-	switch v := rv.(type) {
-	case map[string]interface{}:
-		method = data.GetString(v, "method")
-		uri = data.GetString(v, "uri")
-		code = data.GetInt(v, "code")
-	case *NodeValue:
-		method = v.GetString("method")
-		uri = v.GetString("uri")
-		code = v.GetInt("code", 0)
-	default:
-		panic("What?!")
-	}
+func (w *IdlWriter) EmitHttpTrait(v *data.Value, indent string) {
+	method := v.GetString("method")
+	uri := v.GetString("uri")
+	code := v.GetInt("code", 200)
 	s := fmt.Sprintf("method: %q, uri: %q", method, uri)
 	if code != 0 {
 		s = s + fmt.Sprintf(", code: %d", code)
@@ -572,10 +561,10 @@ func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 		eqval := ""
 		if val := mem.Traits.Get("smithy.api#enumValue"); val != nil {
 			if enumType == "intEnum" {
-				dval := data.AsInt(val)
+				dval := val.AsInt()
 				eqval = fmt.Sprintf(" = %d", dval)
 			} else {
-				sval := fmt.Sprintf("%s", val) //data.AsString(val)
+				sval := fmt.Sprintf("%v", val)
 				if sval != fname {
 					eqval = fmt.Sprintf(" = %q", sval)
 				}
@@ -593,7 +582,7 @@ func (w *IdlWriter) EmitEnumShape(enumType string, name string, shape *Shape) {
 	w.Emit("}\n")
 }
 
-func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
+func (w *IdlWriter) EmitTraits(traits *data.Value, indent string) {
 	//note: @documentation is an alternate for ("///"+comment), but then must be before other traits.
 	if traits == nil {
 		return
@@ -611,9 +600,9 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 		case "smithy.api#documentation", "smithy.api#examples", "smithy.api#enumValue":
 			//do nothing, handled elsewhere
 		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
-			w.EmitBooleanTrait(v.AsBool(), w.stripNamespace(k), indent)
+			w.EmitBooleanTrait(v, w.stripNamespace(k), indent)
 		case "smithy.api#httpLabel", "smithy.api#httpPayload":
-			w.EmitBooleanTrait(v.AsBool(), w.stripNamespace(k), indent)
+			w.EmitBooleanTrait(v, w.stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader", "smithy.api#timestampFormat":
 			w.EmitStringTrait(v.AsString(), w.stripNamespace(k), indent)
 		case "smithy.api#deprecated":
@@ -653,7 +642,7 @@ func (w *IdlWriter) EmitTraits(traits *NodeValue, indent string) {
 
 func (w *IdlWriter) EmitCustomTrait(k string, v interface{}, indent string) {
 	args := ""
-	if m, ok := v.(*NodeValue); ok {
+	if m, ok := v.(*data.Value); ok {
 		if m.Length() > 0 {
 			var lst []string
 			for _, ak := range m.Keys() {

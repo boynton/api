@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 type Generator struct {
@@ -29,8 +28,8 @@ type Generator struct {
 	openapi *OpenAPI
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}

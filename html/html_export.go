@@ -25,7 +25,7 @@ import (
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/api/plantuml"
 	"github.com/boynton/api/httptrace"
-	"github.com/boynton/data"
+	"github.com/boynton/api/conf"
 )
 
 const IndentAmount = "    "
@@ -39,19 +39,19 @@ type Generator struct {
 	showExamples    bool
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
 	gen.ns = string(schema.ServiceNamespace())
 	gen.name = string(schema.ServiceName())
-	gen.detailGenerator = config.GetString("detail-generator") //should be either "smithy" or "
+	gen.detailGenerator = conf.GetString("detail-generator") //should be either "smithy" or "
 	if gen.detailGenerator == "" {
 		gen.detailGenerator = "smithy"
 	}
-	gen.diagramsFolder = config.GetString("diagrams-folder")
-	gen.showExamples = config.GetBool("show-examples")
+	gen.diagramsFolder = conf.GetString("diagrams-folder")
+	gen.showExamples = conf.GetBool("show-examples")
 	gen.Begin()
 	gen.GenerateHeader()
 	gen.GenerateSummary()
@@ -245,9 +245,10 @@ func (gen *Generator) generateApiResource(g model.Generator, rez *model.Resource
 
 func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
 	g := gen.getDetailGenerator()
-	conf := data.NewObject()
+	prevConf := conf.ClearConf()
+	defer conf.SetConf(prevConf)
 	conf.Put("sort", gen.Sort)
-	err := g.Configure(gen.Schema, conf)
+	err := g.Init(gen.Schema)
 	if err != nil {
 		return err
 	}
@@ -274,8 +275,9 @@ func (gen *Generator) GenerateResources() {
 
 func (gen *Generator) generateApiOperation(op *model.OperationDef) string {
 	g := gen.getDetailGenerator()
-	conf := data.NewObject()
-	err := g.Configure(gen.Schema, conf)
+	prevConf := conf.ClearConf()
+	defer conf.SetConf(prevConf)
+	err := g.Init(gen.Schema)
 	if err != nil {
 		return "Whoops: " + err.Error()
 	}
@@ -294,7 +296,9 @@ func (gen *Generator) GenerateOperation(op *model.OperationDef) error {
 	if gen.showExamples && len(op.Examples) > 0 {
 		gen.Emitf("\n<h4>%s Examples</h4>\n", opId)
 		hgen := new(httptrace.Generator)
-		hgen.Configure(gen.Schema, nil)
+		prevConf := conf.ClearConf()
+		defer conf.SetConf(prevConf)
+		hgen.Init(gen.Schema)
 		for _, ex := range op.Examples {
 			snippet, err := hgen.EmitHttpTrace(op, ex)
 			if err != nil {
@@ -328,8 +332,9 @@ func (gen *Generator) GenerateException(exc *model.OperationOutput) error {
 
 func (gen *Generator) generateExceptionType(exc *model.OperationOutput) string {
 	g := gen.getDetailGenerator()
-	conf := data.NewObject()
-	err := g.Configure(gen.Schema, conf)
+	prevConf := conf.ClearConf()
+	defer conf.SetConf(prevConf)
+	err := g.Init(gen.Schema)
 	if err != nil {
 		return "Whoops: " + err.Error()
 	}
@@ -350,11 +355,12 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 
 func (gen *Generator) generateApiType(op *model.TypeDef) string {
 	g := gen.getDetailGenerator()
-	conf := data.NewObject()
+	prevConf := conf.ClearConf()
+	defer conf.SetConf(prevConf)
 	if g.Sorted() {
 		conf.Put("sort", true) //!
 	}
-	err := g.Configure(gen.Schema, conf)
+	err := g.Init(gen.Schema)
 	if err != nil {
 		return "Whoops: " + err.Error()
 	}
@@ -425,14 +431,16 @@ func (gen *Generator) ensureResourceDiagram(rez *model.ResourceDef) error {
 		gen.EnsureDir(filepath.Join(gen.OutDir, imgdir))
 	}
 	pumlPath := fmt.Sprintf("%s/%s.puml", imgdir, rezId)
-	pumlConf := data.NewObject()
-	pumlConf.Put("force", true)
-	pumlConf.Put("outdir", gen.OutDir)
-	pumlConf.Put("generate-exceptions", gen.Config.GetBool("generate-exceptions"))
-	pumlConf.Put("suppress-service", true)
+	genExceptions := conf.GetBool("generate-exceptions")
+	prevConf := conf.ClearConf()
+	defer conf.SetConf(prevConf)
+	conf.Put("force", true)
+	conf.Put("outdir", gen.OutDir)
+	conf.Put("generate-exceptions", genExceptions)
+	conf.Put("suppress-service", true)
 	//pumlConf.Put("generate-exceptions", true)
 	pumlGen := new(plantuml.Generator)
-	err := pumlGen.Init(rezSchema, pumlConf)
+	err := pumlGen.Init(rezSchema)
 	if err != nil {
 		return err
 	}

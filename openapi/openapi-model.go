@@ -19,10 +19,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	//"path/filepath"
 	"strings"
-
-	"github.com/ghodss/yaml"
+	//	"github.com/ghodss/yaml"
 )
 
 func IsValidFile(path string) bool {
@@ -36,12 +35,12 @@ func Load(path string) (*OpenAPI, error) {
 		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
 	}
 	v3 := &OpenAPI{}
-	ext := filepath.Ext(path)
-	if ext == ".yaml" {
-		err = yaml.Unmarshal(data, &v3)
-	} else {
-		err = json.Unmarshal(data, &v3)
-	}
+	//ext := filepath.Ext(path)
+	//	if ext == ".yaml" {
+	//		err = yaml.Unmarshal(data, &v3)
+	//} else {
+	err = json.Unmarshal(data, &v3)
+	//}
 	if err != nil {
 		return nil, err
 	}

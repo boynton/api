@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/data" //for Pretty
+	"github.com/boynton/api/data" //for Pretty
 )
 
 var Verbose bool

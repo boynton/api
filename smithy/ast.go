@@ -24,7 +24,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/boynton/data" //for Decimal
+	"github.com/boynton/api/data"
 )
 
 const UnspecifiedNamespace = "example"
@@ -32,7 +32,7 @@ const UnspecifiedVersion = "0.0"
 
 type AST struct {
 	Smithy   string       `json:"smithy"`
-	Metadata *NodeValue   `json:"metadata,omitempty"`
+	Metadata *data.Value  `json:"metadata,omitempty"`
 	Shapes   *Map[*Shape] `json:"shapes,omitempty"`
 }
 
@@ -59,286 +59,8 @@ func clone(o interface{}) interface{} {
 	return jsonDecode(jsonEncode(o))
 }
 
-type NodeValue struct {
-	value interface{}
-}
-
-func NewNodeValue() *NodeValue {
-	return &NodeValue{value: make(map[string]interface{}, 0)}
-}
-
-func AsNodeValue(v interface{}) *NodeValue {
-	if nv, ok := v.(*NodeValue); ok {
-		return nv
-	}
-	return &NodeValue{value: v}
-}
-
-func (node NodeValue) MarshalJSON() ([]byte, error) {
-	return json.Marshal(node.value)
-}
-
-func (node *NodeValue) UnmarshalJSON(b []byte) error {
-	var v interface{}
-	err := json.Unmarshal(b, &v)
-	if err == nil {
-		node.value = v
-	}
-	return err
-}
-
-func (node *NodeValue) Clone() *NodeValue {
-	if node.value == nil {
-		return &NodeValue{}
-	}
-	return &NodeValue{value: clone(node.value)}
-}
-
-func cloneNodeValue(node *NodeValue) *NodeValue {
-	if node == nil {
-		return nil
-	}
-	return node.Clone()
-}
-
-func (node *NodeValue) RawValue() interface{} {
-	return node.value
-}
-
-func (node *NodeValue) String() string {
-	return fmt.Sprint(node.value)
-}
-
-func (node *NodeValue) IsObject() bool {
-	switch node.value.(type) {
-	case map[string]interface{}:
-		return true
-	case *data.Object:
-		return true
-	}
-	return false
-}
-
-func (node *NodeValue) Keys() []string {
-	switch val := node.value.(type) {
-	case *data.Object:
-		return val.Keys()
-	case map[string]interface{}:
-		var keys []string
-		for k := range val {
-			keys = append(keys, k)
-		}
-		return keys
-	default:
-		panic("Whoa, Keys()")
-	}
-}
-
-func (node *NodeValue) Has(key string) bool {
-	if node != nil && node.value != nil {
-		switch m := node.value.(type) {
-		case map[string]interface{}:
-			if _, ok := m[key]; ok {
-				return true
-			}
-		case *data.Object:
-			return m.Has(key)
-		}
-	}
-	return false
-}
-
-func (node *NodeValue) Get(key string) *NodeValue {
-	if node == nil {
-		return nil
-	}
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		if tmp, ok := m[key]; ok {
-			return AsNodeValue(tmp)
-		}
-		return nil
-	case *data.Object:
-		return AsNodeValue(m.Get(key))
-	case *NodeValue:
-		return m.Get(key)
-	default:
-		return nil
-	}
-}
-
-func (node *NodeValue) AsString() string {
-	if node == nil || node.value == nil {
-		return ""
-	}
-	switch s := node.value.(type) {
-	case string:
-		return s
-	}
-	return ""
-}
-
-func (node *NodeValue) GetBool(key string) bool {
-	return node.Get(key).AsBool()
-}
-
-func (node *NodeValue) AsBool() bool {
-	if node == nil {
-		return false
-	}
-	if node.value != nil {
-		switch b := node.value.(type) {
-		case bool:
-			return b
-		case *bool:
-			return *b
-		default:
-			return true
-		}
-	}
-	return false
-}
-
-func (node *NodeValue) GetString(key string) string {
-	return node.Get(key).AsString()
-}
-
-func (node *NodeValue) AsInt() int {
-	return int(node.AsInt64())
-}
-
-func (node *NodeValue) AsInt64() int64 {
-	if node.value != nil {
-		switch n := node.value.(type) {
-		case int:
-			return int64(n)
-		case *int:
-			return int64(*n)
-		case int64:
-			return n
-		case *int64:
-			return *n
-		case float64:
-			return int64(n)
-		case *float64:
-			return int64(*n)
-		case *data.Integer:
-			return n.AsInt64()
-		case *data.Decimal:
-			return n.AsInt64()
-		case *NodeValue:
-			panic("double NodeValue wrapper, oops")
-		}
-	}
-	return 0
-}
-
 func Kind(v interface{}) string {
 	return fmt.Sprintf("%v", reflect.ValueOf(v).Kind())
-}
-
-func (node *NodeValue) GetInt(key string, def int) int {
-	n := node.Get(key)
-	if n == nil {
-		return def
-	}
-	return n.AsInt()
-}
-
-func (node *NodeValue) GetInt64(key string, def int64) int64 {
-	n := node.Get(key)
-	if n == nil {
-		return def
-	}
-	return n.AsInt64()
-}
-
-func (node *NodeValue) GetDecimal(key string, def *data.Decimal) *data.Decimal {
-	n := node.Get(key)
-	if n == nil {
-		return def
-	}
-	return n.AsDecimal()
-}
-
-func (node *NodeValue) AsDecimal() *data.Decimal {
-	if node == nil {
-		return nil
-	}
-	if node.value != nil {
-		switch n := node.value.(type) {
-		case *data.Decimal:
-			return n
-		case data.Decimal:
-			return &n
-		case float64:
-			return data.DecimalFromFloat64(n)
-		case *NodeValue:
-			panic("ooops, double wrapoper")
-		}
-	}
-	return nil
-}
-
-func (node *NodeValue) GetSlice(key string) []interface{} {
-	n := node.Get(key)
-	if n == nil {
-		return nil
-	}
-	switch v := n.value.(type) {
-	case []interface{}:
-		return v
-	default:
-		panic("Whoa, GetSlice()")
-	}
-}
-
-func (node *NodeValue) GetStringSlice(key string) []string {
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		if tmp, ok := m[key]; ok {
-			if a, ok := tmp.([]interface{}); ok {
-				var vals []string
-				for _, v := range a {
-					switch s := v.(type) {
-					case string:
-						vals = append(vals, s)
-					default:
-						panic("Whoa, not string in slice")
-					}
-				}
-				return vals
-			}
-		}
-		return nil
-	default:
-		panic("Whoa, GetStringSlice()")
-	}
-}
-
-func (node *NodeValue) Length() int {
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		return len(m)
-	case []interface{}:
-		return len(m)
-	case *data.Object:
-		return len(m.Bindings())
-	default:
-		return -1
-	}
-}
-
-func (node *NodeValue) Put(key string, val interface{}) *NodeValue {
-	switch m := node.value.(type) {
-	case map[string]interface{}:
-		m[key] = val
-	case *data.Object:
-		m.Put(key, val)
-	default:
-		panic("Whoa, Put()")
-	}
-	return node
 }
 
 func (ast *AST) AssemblyVersion() int {
@@ -407,7 +129,7 @@ func cloneShape(shape *Shape) *Shape {
 		Input:                cloneShapeRef(shape.Input),
 		Output:               cloneShapeRef(shape.Output),
 		Errors:               cloneShapeRefs(shape.Errors),
-		Traits:               cloneNodeValue(shape.Traits),
+		Traits:               shape.Traits.Copy(),
 	}
 	if shape.Identifiers != nil {
 		m := NewMap[*ShapeRef]()
@@ -441,7 +163,7 @@ func cloneMember(member *Member) *Member {
 	if member != nil {
 		return &Member{
 			Target: member.Target,
-			Traits: cloneNodeValue(member.Traits),
+			Traits: member.Traits.Copy(),
 		}
 	}
 	return nil
@@ -496,10 +218,10 @@ type Shape struct {
 	Output *ShapeRef   `json:"output,omitempty"`
 	Errors []*ShapeRef `json:"errors,omitempty"`
 
-	Traits *NodeValue `json:"traits,omitempty"` //service, resource, operation, apply
+	Traits *data.Value `json:"traits,omitempty"` //service, resource, operation, apply
 }
 
-func (shape *Shape) GetTrait(id string) *NodeValue {
+func (shape *Shape) GetTrait(id string) *data.Value {
 	if shape.Traits != nil {
 		return shape.Traits.Get(id)
 	}
@@ -518,8 +240,8 @@ type ShapeRef struct {
 }
 
 type Member struct {
-	Target string     `json:"target"`
-	Traits *NodeValue `json:"traits,omitempty"`
+	Target string      `json:"target"`
+	Traits *data.Value `json:"traits,omitempty"`
 }
 
 func (mem *Member) GetStringTrait(id string) string {
@@ -771,7 +493,7 @@ func Assemble(paths []string) (*AST, error) {
 	return assembly, nil
 }
 
-func (ast *AST) Apply(sftarget string, traits *NodeValue) error {
+func (ast *AST) Apply(sftarget string, traits *data.Value) error {
 	target := sftarget
 	lst := strings.Split(target, "$")
 	field := ""
@@ -787,15 +509,15 @@ func (ast *AST) Apply(sftarget string, traits *NodeValue) error {
 				shape.Members.Put(field, m)
 			}
 			if m.Traits == nil {
-				m.Traits = NewNodeValue()
+				m.Traits = data.NewObject()
 			}
 			for _, k := range traits.Keys() {
-				m.Traits.Put(k, cloneNodeValue(traits.Get(k)))
+				m.Traits.Put(k, traits.Get(k).Copy())
 			}
 		} else {
 			t := ensureShapeTraits(shape)
 			for _, k := range traits.Keys() {
-				t.Put(k, cloneNodeValue(traits.Get(k)))
+				t.Put(k, traits.Get(k).Copy())
 			}
 		}
 		return nil
@@ -845,7 +567,7 @@ func (ast *AST) Merge(src *AST) error {
 	return nil
 }
 
-func (ast *AST) mergeTraits(t1 *NodeValue, t2 *NodeValue) (*NodeValue, error) {
+func (ast *AST) mergeTraits(t1 *data.Value, t2 *data.Value) (*data.Value, error) {
 	for _, tk := range t2.Keys() {
 		tv := t2.Get(tk)
 		if t1.Get(tk) == nil {
@@ -934,10 +656,10 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 			}
 			//note: `@private @mixin(localTraits: [private])`, which is a way to not propagate a trait on a mixin, is NYI
 			if mixin.Traits != nil && mixin.Traits.Length() > 1 {
-				newTraits := NewNodeValue()
+				newTraits := data.NewObject()
 				for _, trait := range mixin.Traits.Keys() {
 					if trait != "smithy.api#mixin" && trait != "smithy.api#trait" {
-						newTraits.Put(trait, cloneNodeValue(mixin.Traits.Get(trait)))
+						newTraits.Put(trait, mixin.Traits.Get(trait).Copy())
 					}
 				}
 				if shape.Traits != nil {

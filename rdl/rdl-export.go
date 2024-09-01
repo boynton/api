@@ -15,6 +15,11 @@ limitations under the License.
 */
 package rdl
 
+//bugs:
+// no forward references in rdl! Outch. Need to order output to make it parseable by rdl.
+// exceptions and ResourceError - specify the entity type
+//
+
 import (
 	//	"bufio"
 	//	"bytes"
@@ -22,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
@@ -40,8 +44,8 @@ type Generator struct {
 	name string
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
@@ -131,6 +135,10 @@ func (gen *Generator) opAnnotations(op *model.OperationDef) []string {
 }
 
 func (gen *Generator) EmitType(td *model.TypeDef) {
+	if gen.HasEmitted(td.Id) {
+		return
+	}
+	gen.Emitted(td.Id)
 	switch td.Base {
 	case model.BaseType_Bool:
 		gen.EmitBooleanType(td)
@@ -157,7 +165,7 @@ func (gen *Generator) EmitType(td *model.TypeDef) {
 		//	case "resource":
 		//no equivalent in RDL at the moment
 	default:
-		panic("fix: type " + td.Name() + " with base " + data.Pretty(td))
+		panic("fix: type " + td.Name() + " with base " + model.Pretty(td))
 	}
 }
 
@@ -218,6 +226,10 @@ func (gen *Generator) EmitBlobType(td *model.TypeDef) {
 }
 
 func (gen *Generator) EmitListType(td *model.TypeDef) {
+	itd := gen.Schema.GetTypeDef(td.Items)
+	if itd != nil {
+		gen.EmitType(itd)
+	}
 	var opts []string
 	if td.MinSize != 0 {
 		opts = append(opts, fmt.Sprintf("minsize=%v", td.MinSize))
@@ -227,7 +239,7 @@ func (gen *Generator) EmitListType(td *model.TypeDef) {
 	}
 	sopts := gen.annotationString(opts)
 	gen.EmitComment(td.Comment)
-	gen.Emitf("type %s List<%s>%s\n", td.Name(), model.StripNamespace(td.Items), sopts)
+	gen.Emitf("type %s Array<%s>%s\n\n", td.Name(), model.StripNamespace(td.Items), sopts)
 }
 
 func (gen *Generator) EmitMapType(td *model.TypeDef) {
@@ -244,6 +256,12 @@ func (gen *Generator) EmitMapType(td *model.TypeDef) {
 */
 
 func (gen *Generator) EmitStructType(td *model.TypeDef) {
+	for _, f := range td.Fields {
+		ftd := gen.Schema.GetTypeDef(f.Type)
+		if ftd != nil {
+			gen.EmitType(ftd)
+		}
+	}
 	//	sopts := gen.annotationString(opts)
 	sopts := ""
 	gen.EmitComment(td.Comment)
@@ -251,9 +269,9 @@ func (gen *Generator) EmitStructType(td *model.TypeDef) {
 	for _, f := range td.Fields {
 		tref := gen.stripNamespace(gen.rdlTypeRef(f.Type))
 		sopts := "" //gen.traitsAsAnnotationString(v.Traits)
-		gen.Emitf("%s%s %s%s\n", IndentAmount, f.Name, tref, sopts)
+		gen.Emitf("%s%s %s%s\n", IndentAmount, tref, f.Name, sopts)
 	}
-	gen.Emit("}\n")
+	gen.Emit("}\n\n")
 }
 
 func (gen *Generator) EmitUnionType(td *model.TypeDef) {
@@ -318,20 +336,21 @@ func (gen *Generator) EmitOperation(op *model.OperationDef, opts []string) {
 		for _, eid := range op.Exceptions {
 			e := gen.Schema.GetExceptionDef(eid)
 			errCode := e.HttpStatus
+			//FIX: use the right entity type
 			if errCode != 0 {
 				gen.Emitf("        ResourceError %s;\n", gen.httpStatusString(errCode))
 			}
 		}
 		gen.Emitf("    }\n")
 	}
-	gen.Emit("}\n")
+	gen.Emit("}\n\n")
 }
 
 func (gen *Generator) EmitException(e *model.OperationOutput) {
 	gen.EmitComment(e.Comment)
 	gen.Emitf("type %s Struct {\n", e.Name())
 	gen.EmitOperationOutputFields(e.Fields, "")
-	gen.Emit("}\n")
+	gen.Emit("}\n\n")
 }
 
 func (gen *Generator) EmitOperationInputFields(fields []*model.OperationInputField) {
@@ -345,7 +364,7 @@ func (gen *Generator) EmitOperationInputFields(fields []*model.OperationInputFie
 				//default?
 			} else {
 				if f.HttpPath {
-					mopts = append(mopts, "required")
+					//mopts = append(mopts, "required")
 				} else {
 					s := f.HttpHeader
 					if s != "" {
@@ -396,7 +415,7 @@ func (gen *Generator) EmitOperationOutputFields(fields []*model.OperationOutputF
 			sopts = " (" + strings.Join(mopts, ", ") + ")"
 		}
 		tref := gen.stripNamespace(gen.rdlTypeRef(f.Type))
-		gen.Emitf(indent+"    %s %s%s\n", f.Name, tref, sopts)
+		gen.Emitf(indent+"    %s %s%s\n", tref, f.Name, sopts)
 	}
 }
 

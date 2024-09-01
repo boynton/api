@@ -25,12 +25,12 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/boynton/data"
+	"github.com/boynton/api/conf"
 )
 
 type Generator interface {
-	Configure(schema *Schema, conf *data.Object) error
-	Generate(schema *Schema, config *data.Object) error
+	Init(schema *Schema) error
+	Generate(schema *Schema) error
 	GenerateResource(op *ResourceDef) error
 	GenerateOperation(op *OperationDef) error
 	GenerateException(exc *OperationOutput) error
@@ -42,7 +42,6 @@ type Generator interface {
 
 type BaseGenerator struct {
 	Schema         *Schema
-	Config         *data.Object
 	OutDir         string
 	ForceOverwrite bool
 	buf            bytes.Buffer
@@ -56,11 +55,10 @@ func (gen *BaseGenerator) Sorted() bool {
 	return gen.Sort
 }
 
-func (gen *BaseGenerator) Configure(schema *Schema, conf *data.Object) error {
+func (gen *BaseGenerator) Init(schema *Schema) error {
 	gen.Schema = schema
 	gen.typesEmitted = make(map[AbsoluteIdentifier]bool, 0)
 	//validate the config
-	gen.Config = conf
 	gen.OutDir = conf.GetString("outdir")
 	gen.Sort = conf.GetBool("sort")
 	gen.ForceOverwrite = conf.GetBool("force")
@@ -167,6 +165,9 @@ func (gen *BaseGenerator) FileExists(path string) bool {
 }
 
 func (gen *BaseGenerator) FileName(ns string, suffix string) string {
+	if ns == "" {
+		return ns
+	}
 	return strings.ReplaceAll(ns, ".", "-") + suffix
 }
 
@@ -255,7 +256,7 @@ func (gen *BaseGenerator) accumulateDependenciesById(deps map[AbsoluteIdentifier
 	switch id {
 	case "base#Bool", "base#Int8", "base#Int16", "base#Int32", "base#Int64", "base#Float32", "base#Float64", "base#Bytes", "base#String", "base#Enum":
 		return
-	case "base#Timestamp", "base#Decimal":
+	case "base#Timestamp", "base#Integer", "base#Decimal":
 		deps[id] = true
 	}
 	td := gen.Schema.GetTypeDef(id)
@@ -274,9 +275,11 @@ func (gen *BaseGenerator) accumulateDependencies(deps map[AbsoluteIdentifier]boo
 	}
 	deps[td.Id] = true
 	switch td.Base {
-	case BaseType_Bool, BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64:
+	case BaseType_Bool, BaseType_Blob, BaseType_String, BaseType_Timestamp, BaseType_Enum:
 		return
-	case BaseType_Decimal, BaseType_Blob, BaseType_String, BaseType_Timestamp, BaseType_Enum:
+	case BaseType_Int8, BaseType_Int16, BaseType_Int32, BaseType_Int64, BaseType_Float32, BaseType_Float64:
+		return
+	case BaseType_Integer, BaseType_Decimal:
 		return
 	case BaseType_List:
 		gen.accumulateDependenciesById(deps, td.Items)

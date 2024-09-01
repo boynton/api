@@ -17,8 +17,6 @@ package model
 
 import (
 	"strings"
-
-	"github.com/boynton/data"
 )
 
 type SummaryGenerator struct {
@@ -28,8 +26,8 @@ type SummaryGenerator struct {
 	name   string
 }
 
-func (gen *SummaryGenerator) Generate(schema *Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *SummaryGenerator) Generate(schema *Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}

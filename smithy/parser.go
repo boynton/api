@@ -21,6 +21,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/boynton/api/data"
 )
 
 var AnnotateSources bool = false
@@ -62,7 +64,7 @@ type Parser struct {
 
 func (p *Parser) Parse() error {
 	var comment string
-	var traits *NodeValue
+	var traits *data.Value
 	p.ast = &AST{
 		Smithy: "2",
 	}
@@ -495,12 +497,13 @@ func (p *Parser) parseMetadata() error {
 	if err != nil {
 		return err
 	}
-	val, err := p.parseLiteralValue()
+	rval, err := p.parseLiteralValue()
 	if err != nil {
 		return err
 	}
+	val := data.NewValue(rval)
 	if p.ast.Metadata == nil {
-		p.ast.Metadata = NewNodeValue()
+		p.ast.Metadata = data.NewObject()
 	}
 	p.ast.Metadata.Put(key, val)
 	return nil
@@ -650,7 +653,7 @@ func (p *Parser) addShapeDefinition(name string, shape *Shape) error {
 	return nil
 }
 
-func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
+func (p *Parser) parseSimpleTypeDef(typeName string, traits *data.Value) error {
 	tname, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -658,7 +661,7 @@ func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
 	enumItems := traits.GetSlice("smithy.api#enum")
 	if enumItems != nil {
 		//convert to enum shape
-		var tr *NodeValue
+		var tr *data.Value
 		for _, k := range traits.Keys() {
 			if k != "smithy.api#enum" {
 				tr = withTrait(tr, k, traits.Get(k))
@@ -674,8 +677,8 @@ func (p *Parser) parseSimpleTypeDef(typeName string, traits *NodeValue) error {
 		}
 		mems := NewMap[*Member]()
 		for _, e := range enumItems {
-			var mtraits *NodeValue
-			d := AsNodeValue(e)
+			var mtraits *data.Value
+			d := e
 			name := d.GetString("name") //optional
 			if enumShapeName == "intEnum" {
 				ivalue := d.GetInt("value", 0) //required
@@ -754,7 +757,7 @@ func (p *Parser) optionalMixinsOrResource() ([]string, *Shape, error) {
 	return mixins, resource, nil
 }
 
-func (p *Parser) parseList(traits *NodeValue) error {
+func (p *Parser) parseList(traits *data.Value) error {
 	sname := "list"
 	name, err := p.ExpectIdentifier()
 	if err != nil {
@@ -771,7 +774,7 @@ func (p *Parser) parseList(traits *NodeValue) error {
 		Type:   sname,
 		Traits: traits,
 	}
-	var mtraits *NodeValue
+	var mtraits *data.Value
 	comment := ""
 	for {
 		tok := p.GetToken()
@@ -828,7 +831,7 @@ func (p *Parser) parseList(traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseMap(sname string, traits *NodeValue) error {
+func (p *Parser) parseMap(sname string, traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -844,7 +847,7 @@ func (p *Parser) parseMap(sname string, traits *NodeValue) error {
 		Type:   sname,
 		Traits: traits,
 	}
-	var mtraits *NodeValue
+	var mtraits *data.Value
 	comment := ""
 	for {
 		tok := p.GetToken()
@@ -914,7 +917,7 @@ func (p *Parser) parseMap(sname string, traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseStructureBody(name string, traits *NodeValue) (*Shape, error) {
+func (p *Parser) parseStructureBody(name string, traits *data.Value) (*Shape, error) {
 	shape := &Shape{
 		Type:   "structure",
 		Traits: traits,
@@ -935,7 +938,7 @@ func (p *Parser) parseStructureBody(name string, traits *NodeValue) (*Shape, err
 	}
 	mems := NewMap[*Member]()
 	comment := ""
-	var mtraits *NodeValue
+	var mtraits *data.Value
 	for {
 		tok := p.GetToken()
 		if tok == nil {
@@ -1028,7 +1031,7 @@ func (p *Parser) parseStructureBody(name string, traits *NodeValue) (*Shape, err
 	return shape, nil
 }
 
-func (p *Parser) parseStructure(traits *NodeValue) error {
+func (p *Parser) parseStructure(traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1042,9 +1045,9 @@ func (p *Parser) parseStructure(traits *NodeValue) error {
 			mem := body.Members.Get(fname)
 			query := mem.Traits.GetString("smithy.api#httpQuery")
 			header := mem.Traits.GetString("smithy.api#httpHeader")
-			path := mem.Traits.GetBool("smithy.api#httpLabel")
-			payload := mem.Traits.GetBool("smithy.api#httpPayload")
-			if !payload && !path && query == "" && header == "" {
+			path := mem.Traits.Get("smithy.api#httpLabel")
+			payload := mem.Traits.Get("smithy.api#httpPayload")
+			if payload == nil && path == nil && query == "" && header == "" {
 				p.Warning("smithy Structure tagged with @httpError should have a payload specified: " + name)
 			}
 		}
@@ -1052,7 +1055,7 @@ func (p *Parser) parseStructure(traits *NodeValue) error {
 	return p.addShapeDefinition(name, body)
 }
 
-func (p *Parser) parseUnion(traits *NodeValue) error {
+func (p *Parser) parseUnion(traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1069,7 +1072,7 @@ func (p *Parser) parseUnion(traits *NodeValue) error {
 		Traits: traits,
 	}
 	mems := NewMap[*Member]()
-	var mtraits *NodeValue
+	var mtraits *data.Value
 	for {
 		comment := ""
 		tok := p.GetToken()
@@ -1119,7 +1122,7 @@ func (p *Parser) parseUnion(traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseEnum(traits *NodeValue, intEnum bool) error {
+func (p *Parser) parseEnum(traits *data.Value, intEnum bool) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1140,7 +1143,7 @@ func (p *Parser) parseEnum(traits *NodeValue, intEnum bool) error {
 		Traits: traits,
 	}
 	mems := NewMap[*Member]()
-	var mtraits *NodeValue
+	var mtraits *data.Value
 	comment := ""
 	for {
 		tok := p.GetToken()
@@ -1206,7 +1209,7 @@ func (p *Parser) parseEnum(traits *NodeValue, intEnum bool) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseOperation(traits *NodeValue) error {
+func (p *Parser) parseOperation(traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1258,7 +1261,7 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 					err = p.SyntaxError()
 				} else {
 					inName := name + "Input"
-					traits = NewNodeValue().Put("smithy.api#input", NewNodeValue())
+					traits = data.NewObject().Put("smithy.api#input", data.NewObject())
 					body, err := p.parseStructureBody(inName, traits)
 					if err != nil {
 						return err
@@ -1267,10 +1270,9 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 						mem := body.Members.Get(fname)
 						query := mem.Traits.GetString("smithy.api#httpQuery")
 						header := mem.Traits.GetString("smithy.api#httpHeader")
-						path := mem.Traits.GetBool("smithy.api#httpLabel")
-						payload := mem.Traits.GetBool("smithy.api#httpPayload")
-						if !payload && !path && query == "" && header == "" {
-							fmt.Println("WHOOPS2: unannotated inputs detected!")
+						path := mem.Traits.Get("smithy.api#httpLabel")
+						payload := mem.Traits.Get("smithy.api#httpPayload")
+						if payload == nil && path == nil && query == "" && header == "" {
 							p.SyntaxError()
 						}
 					}
@@ -1291,7 +1293,7 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 					err = p.SyntaxError()
 				} else {
 					outName := name + "Output"
-					traits = NewNodeValue().Put("smithy.api#output", NewNodeValue())
+					traits = data.NewObject().Put("smithy.api#output", data.NewObject())
 					body, err := p.parseStructureBody(outName, traits)
 					if err != nil {
 						return err
@@ -1300,10 +1302,9 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 						mem := body.Members.Get(fname)
 						query := mem.Traits.GetString("smithy.api#httpQuery")
 						header := mem.Traits.GetString("smithy.api#httpHeader")
-						path := mem.Traits.GetBool("smithy.api#httpLabel")
-						payload := mem.Traits.GetBool("smithy.api#httpPayload")
-						if !payload && !path && query == "" && header == "" {
-							fmt.Println("WHOOPS3: unannotated inputs detected!")
+						path := mem.Traits.Get("smithy.api#httpLabel")
+						payload := mem.Traits.Get("smithy.api#httpPayload")
+						if payload == nil && path == nil && query == "" && header == "" {
 							p.SyntaxError()
 						}
 					}
@@ -1330,7 +1331,7 @@ func (p *Parser) parseOperation(traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseService(traits *NodeValue) error {
+func (p *Parser) parseService(traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1389,7 +1390,7 @@ func (p *Parser) parseService(traits *NodeValue) error {
 	return p.addShapeDefinition(name, shape)
 }
 
-func (p *Parser) parseResource(traits *NodeValue) error {
+func (p *Parser) parseResource(traits *data.Value) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -1541,9 +1542,9 @@ func (p *Parser) expectShapeRef() (*ShapeRef, error) {
 	return ref, nil
 }
 
-func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
+func (p *Parser) parseTraitArgs() (*data.Value, interface{}, error) {
 	var err error
-	args := NewNodeValue()
+	args := data.NewObject()
 	var literal interface{}
 	tok := p.GetToken()
 	if tok == nil {
@@ -1596,7 +1597,6 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 				}
 				literal = val
 				args = nil
-				//args = AsNodeValue(val)
 			} else {
 				return nil, nil, p.SyntaxError()
 			}
@@ -1607,14 +1607,14 @@ func (p *Parser) parseTraitArgs() (*NodeValue, interface{}, error) {
 	}
 }
 
-func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
+func (p *Parser) parseTrait(traits *data.Value) (*data.Value, error) {
 	tname, err := p.expectShapeId()
 	if err != nil {
 		return traits, err
 	}
 	switch tname {
 	case "idempotent", "required", "httpLabel", "httpPayload", "readonly", "box", "sensitive", "input", "output", "httpResponseCode", "mixin":
-		return withTrait(traits, "smithy.api#"+tname, NewNodeValue()), nil
+		return withTrait(traits, "smithy.api#"+tname, data.NewObject()), nil
 	case "documentation":
 		err := p.expect(OPEN_PAREN)
 		if err != nil {
@@ -1733,7 +1733,7 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 			return withTrait(traits, "smithy.api#trait", lit), nil
 		}
 		if args.Length() == 0 {
-			return withTrait(traits, "smithy.api#trait", NewNodeValue()), nil
+			return withTrait(traits, "smithy.api#trait", data.NewObject()), nil
 		}
 		return withTrait(traits, "smithy.api#trait", args), nil
 	default:
@@ -1749,17 +1749,17 @@ func (p *Parser) parseTrait(traits *NodeValue) (*NodeValue, error) {
 	}
 }
 
-func withTrait(traits *NodeValue, key string, val interface{}) *NodeValue {
+func withTrait(traits *data.Value, key string, val interface{}) *data.Value {
 	if val != nil {
 		if traits == nil {
-			traits = NewNodeValue()
+			traits = data.NewObject()
 		}
-		traits.Put(key, val)
+		traits.Put(key, data.NewValue(val))
 	}
 	return traits
 }
 
-func withCommentTrait(traits *NodeValue, val string) *NodeValue {
+func withCommentTrait(traits *data.Value, val string) *data.Value {
 	if val != "" {
 		val = TrimSpace(val)
 		traits = withTrait(traits, "smithy.api#documentation", val)

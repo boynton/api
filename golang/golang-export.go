@@ -19,11 +19,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"path"
 	"strings"
 
+	"github.com/boynton/api/conf"
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 const IndentAmount = "    "
@@ -32,13 +31,9 @@ type Generator struct {
 	model.BaseGenerator
 	ns                  model.Namespace
 	pkg                 string
-	inlineSlicesAndMaps bool   //more idiomatic, but prevents validating constraints (i.e. list.maxLength)
-	inlinePrimitives    bool   //more idomatic, but prevents validating constraints (i.e. string.Pattern)
-	decimalPackage      string //use this package for the Decimal implementation. If "", then generate one in this package
-	decimalPrefix       string //derived from the decimalPackage
-	timestampPackage    string //use this package for the Timestamp implementation. If "", then generate one in this package
-	timestampPrefix     string
-	prefixEnums         bool //prefix enum symbols with the typename to avoid collisions
+	inlineSlicesAndMaps bool // more idiomatic, but prevents validating constraints (i.e. list.maxLength)
+	inlinePrimitives    bool // more idomatic, but prevents validating constraints (i.e. string.Pattern)
+	prefixEnums         bool // prefix enum symbols with the typename to avoid collisions
 }
 
 func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
@@ -57,24 +52,15 @@ func (gen *Generator) GenerateType(td *model.TypeDef) error {
 	return nil
 }
 
-func (gen *Generator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *Generator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
-	gen.prefixEnums = !config.GetBool("golang.noEnumPrefix")
-	gen.inlineSlicesAndMaps = config.GetBool("golang.inlineSlicesAndMaps")
-	gen.inlinePrimitives = config.GetBool("golang.inlinePrimitives")
-	gen.decimalPackage = config.GetString("golang.decimalPackage")
-	if gen.decimalPackage == "" {
-		gen.decimalPackage = "github.com/boynton/data"
-	}
-	gen.decimalPrefix = path.Base(gen.decimalPackage) + "."
-	gen.timestampPackage = config.GetString("golang.timestampPackage")
-	if gen.timestampPackage != "" {
-		gen.timestampPrefix = path.Base(gen.timestampPackage) + "."
-	}
-	gen.ns = model.Namespace(config.GetString("namespace"))
+	gen.prefixEnums = !conf.GetBool("golang.noEnumPrefix")
+	gen.inlineSlicesAndMaps = conf.GetBool("golang.inlineSlicesAndMaps")
+	gen.inlinePrimitives = conf.GetBool("golang.inlinePrimitives")
+	gen.ns = model.Namespace(conf.GetString("namespace"))
 	if gen.ns == "" {
 		gen.ns = schema.ServiceNamespace()
 		if gen.ns == "" {
@@ -138,36 +124,36 @@ type GolangWriter struct {
 	gen    *Generator
 }
 
-func (gen *Generator) golangBaseTypeName(bt model.BaseType) string {
-	switch bt {
+func (gen *Generator) golangBaseTypeName(td *model.TypeDef) string {
+	switch td.Base {
 	case model.BaseType_Bool:
 		return "bool"
 	case model.BaseType_Int8:
 		return "int8"
 	case model.BaseType_Int16:
-		return "int16"
+		return "int8"
 	case model.BaseType_Int32:
-		return "int" //!
+		return "int32"
 	case model.BaseType_Int64:
 		return "int64"
 	case model.BaseType_Float32:
 		return "float32"
 	case model.BaseType_Float64:
 		return "float64"
+	case model.BaseType_Integer:
+		return "" //big.Int?
+	case model.BaseType_Decimal:
+		return "*Decimal"
 	case model.BaseType_Blob:
 		return "[]byte"
 	case model.BaseType_String:
 		return "string"
-	case model.BaseType_Integer:
-		return "*" + gen.decimalPrefix + "Integer"
-	case model.BaseType_Decimal:
-		return "*" + gen.decimalPrefix + "Decimal"
 	case model.BaseType_Timestamp:
-		return "*" + gen.timestampPrefix + "Timestamp"
+		return "Timestamp"
 	case model.BaseType_Any:
-		return "any"
+		return "any" //Hmm. Or data.Value?
 	default:
-		fmt.Println("bt:", bt)
+		fmt.Println("td:", td.Id)
 		panic("not concrete")
 	}
 }
@@ -192,12 +178,12 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
 		return "float32"
 	case "base#Float64":
 		return "float64"
-	case "base#Decimal":
-		return "*" + gen.decimalPrefix + "Decimal"
 	case "base#Integer":
-		return "*" + gen.decimalPrefix + "Integer"
+		return "*Integer"
+	case "base#Decimal":
+		return "*Decimal"
 	case "base#Timestamp":
-		return "*" + gen.timestampPrefix + "Timestamp"
+		return "Timestamp"
 	case "base#Any":
 		return "any"
 	default:
@@ -233,14 +219,8 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 		if gen.inlinePrimitives {
 			return "int64"
 		}
-	case model.BaseType_Float32:
-		if gen.inlinePrimitives {
-			return "float32"
-		}
-	case model.BaseType_Float64:
-		if gen.inlinePrimitives {
-			return "float64"
-		}
+	case model.BaseType_Integer, model.BaseType_Decimal:
+		//always a wrapper
 	case model.BaseType_String:
 		if gen.inlinePrimitives {
 			return "string"
@@ -249,21 +229,8 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 		if gen.inlinePrimitives {
 			return "[]byte"
 		}
-	case model.BaseType_Integer:
-		if gen.inlinePrimitives {
-			return "*data.Integer"
-		}
-		indirect = "*"
-	case model.BaseType_Decimal:
-		if gen.inlinePrimitives {
-			return "*data.Decimal"
-		}
-		indirect = "*"
 	case model.BaseType_Timestamp:
-		if gen.inlinePrimitives {
-			return "*data.Timestamp"
-		}
-		indirect = "*"
+		return "Timestamp"
 	case model.BaseType_List:
 		if gen.inlineSlicesAndMaps {
 			return "[]" + gen.golangTypeRef(td.Items)
@@ -302,10 +269,10 @@ func (gen *Generator) golangTypeName(typeRef model.AbsoluteIdentifier) string {
 		return "float32"
 	case "base#Float64":
 		return "float64"
-	case "base#Decimal":
-		return "*data.Decimal"
+	case "base#Number":
+		return "Number"
 	case "base#Timestamp":
-		return "*data.Timestamp"
+		return "Timestamp"
 	default:
 		return stripNamespace(typeRef)
 	}
@@ -317,22 +284,20 @@ func (gen *Generator) goImports(forDef bool) map[string]bool {
 	for _, dep := range deps {
 		bt := gen.Schema.BaseType(dep)
 		switch bt {
-		case model.BaseType_Decimal: //if expanded, then ["fmt", "math/big"]
-			if gen.decimalPackage != "" {
-				includes[gen.decimalPackage] = true
-			} else {
-				includes["fmt"] = true
-				includes["math/big"] = true
-			}
 		case model.BaseType_Enum:
 			if forDef {
 				includes["encoding/json"] = true
 				includes["fmt"] = true
 			}
+		case model.BaseType_Decimal, model.BaseType_Integer:
+			includes["math/big"] = true
+			includes["strconv"] = true
 		case model.BaseType_Timestamp:
-			if gen.timestampPackage != "" {
-				includes[gen.timestampPackage] = true //if expanded, then ["encoding/json","fmt","strings","time"]
-			}
+			includes["encoding/json"] = true
+			includes["fmt"] = true
+			includes["net/http"] = true
+			includes["strings"] = true
+			includes["time"] = true
 		}
 	}
 	return includes
@@ -357,15 +322,6 @@ func stripLocalNamespace(trait model.AbsoluteIdentifier, ns model.Namespace) str
 		return t[n+1:]
 	}
 	return t
-}
-
-func (w *GolangWriter) xgolangTypeRef(typeRef model.AbsoluteIdentifier, required bool) string {
-	bt := w.gen.Schema.BaseType(typeRef)
-	switch bt {
-	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_String:
-		return stripLocalNamespace(typeRef, w.gen.ns)
-	}
-	return w.gen.golangTypeRef(typeRef)
 }
 
 func (gen *Generator) generateTypeComment(td *model.TypeDef, w *GolangWriter) {
@@ -433,13 +389,21 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("    }\n")
 		w.Emitf("    return nil\n")
 		w.Emitf("}\n")
-	case model.BaseType_String, model.BaseType_Bool, model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64:
+	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64:
 		if !gen.inlinePrimitives {
 			gen.generateTypeComment(td, w)
-			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td.Base))
+			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td))
 		}
-		//    case model.BaseTypeTimestamp:
-		//		return comment + "type " + gname + " *data.Timestamp\n"
+	case model.BaseType_String, model.BaseType_Bool, model.BaseType_Integer, model.BaseType_Decimal:
+		if !gen.inlinePrimitives {
+			gen.generateTypeComment(td, w)
+			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td))
+		}
+	case model.BaseType_Timestamp:
+		if !gen.inlinePrimitives {
+			gen.generateTypeComment(td, w)
+			w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td))
+		}
 	case model.BaseType_List:
 		if !gen.inlineSlicesAndMaps {
 			gen.generateTypeComment(td, w)
@@ -488,14 +452,14 @@ func (gen *Generator) generateType(td *model.TypeDef, w *GolangWriter) {
 		w.Emitf("}\n\n")
 	default:
 		gen.generateTypeComment(td, w)
-		w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td.Base))
+		w.Emitf("type %s %s\n", gen.golangTypeName(td.Id), gen.golangBaseTypeName(td))
 	}
 }
 
 func (gen *Generator) indirectOp(id model.AbsoluteIdentifier) string {
 	indirect := ""
 	switch gen.Schema.BaseType(id) {
-	case model.BaseType_Bool, model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_String:
+	case model.BaseType_Bool, model.BaseType_Integer, model.BaseType_Decimal, model.BaseType_String:
 		indirect = "*"
 	}
 	return indirect
@@ -514,6 +478,12 @@ func (gen *Generator) GenerateTypes() string {
 	}
 	for _, td := range gen.Schema.Types {
 		gen.generateType(td, w)
+	}
+	if _, ok := imports["time"]; ok {
+		w.Emitf("%s\n", timestampSource)
+	}
+	if _, ok := imports["math/big"]; ok {
+		w.Emitf("%s\n", decimalSource)
 	}
 	return w.End()
 }
@@ -553,15 +523,18 @@ func (gen *Generator) baseConverter(typeref model.AbsoluteIdentifier, def interf
 	s := gen.golangTypeRef(typeref) //this expands to primitives. Still need a typecast if golang.inlinePrimitives=false
 	switch s {
 	case "int8", "int16", "int32", "int64":
-		r := fmt.Sprintf("intParam(%s, %d)", body, data.AsInt64(def))
+		//r := fmt.Sprintf("intParam(%s, %d)", body, AsInt64(def))
+		r := fmt.Sprintf("intParam(%s, %v)", body, def)
 		if s != "int64" {
 			r = s + "(" + r + ")"
 		}
 		return r
-	case "*data.Timestamp":
-		return fmt.Sprintf("timestampParam(%s, %q)", body, data.AsString(def))
+	case "*Timestamp":
+		//return fmt.Sprintf("timestampParam(%s, %q)", body, AsString(def))
+		return fmt.Sprintf("timestampParam(%s, %q)", body, fmt.Sprint(def))
 	default:
-		return fmt.Sprintf("stringParam(%s, %q)", body, data.AsString(def))
+		//return fmt.Sprintf("stringParam(%s, %q)", body, AsString(def))
+		return fmt.Sprintf("stringParam(%s, %q)", body, fmt.Sprint(def))
 	}
 }
 
@@ -590,7 +563,7 @@ func (gen *Generator) GenerateServer() string {
 		w.Emit(declareImports(imports))
 	}
 
-	w.Emit("var _ = data.ParseTimestamp\n\n")
+	w.Emit("var _ = ParseTimestamp\n\n")
 	adaptorName := model.Uncapitalize(serviceName) + "Adaptor"
 	w.Emitf("type %s struct {\n", adaptorName)
 	w.Emitf("    impl %s\n", serviceName)
@@ -835,7 +808,7 @@ func (w *GolangWriter) EmitServiceInterface() error {
 var serverUtilSource = `func jsonResponse(w http.ResponseWriter, status int, entity interface{}) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)
-    io.WriteString(w, data.Pretty(entity))
+    io.WriteString(w, Pretty(entity))
 }
 
 func param(r *http.Request, name string) string {
@@ -853,14 +826,14 @@ func stringParam(val string, def string) string {
     return val
 }
 
-func timestampParam(val string, def string) *data.Timestamp {
+func timestampParam(val string, def string) *Timestamp {
     if val != "" {
-        ts, err := data.ParseTimestamp(val)
+        ts, err := ParseTimestamp(val)
         if err != nil {
             return &ts
         }
     }
-    ts, err := data.ParseTimestamp(def)
+    ts, err := ParseTimestamp(def)
     if err != nil {
         return &ts
     }
@@ -879,7 +852,7 @@ func intParam(val string, def int64) int64 {
 
 func normalizeHeaderValue(key string, value interface{}) string {
     switch v := value.(type) {
-    case *data.Timestamp:
+    case *Timestamp:
         return v.ToRfc2616String()
     case string:
         return v
@@ -916,5 +889,141 @@ func WebLog(h http.Handler) http.Handler {
 
 func AllowCors(next http.Handler, host string) http.Handler {
    return handlers.CORS(handlers.AllowedOrigins([]string{"*"}), handlers.AllowedHeaders([]string{"Content-Type", "api_key", "Authorization"}), handlers.AllowedMethods([]string{"GET","PUT","DELETE","POST","OPTIONS"}))(next)
+}
+`
+
+// this requires 'math/big' and 'strconv'
+var decimalSource = `
+type Decimal struct {
+	repr string
+}
+
+type Integer Decimal
+
+func NewDecimal(s string) Decimal {
+	return Decimal{
+		repr: s,
+	}
+}
+
+func NewInteger(s string) Integer {
+	return Integer{
+		repr: s,
+	}
+}
+
+func (n Decimal) MarshalJSON() ([]byte, error) {
+	return []byte(n.repr), nil
+}
+
+func (n *Decimal) UnmarshalJSON(b []byte) error {
+	if n == nil {
+		*n = Decimal{}
+	}
+	n.repr = string(b)
+	return nil
+}
+
+func (n Decimal) String() string {
+	return n.repr
+}
+
+func (n Decimal) AsInt() int {
+	return int(n.AsInt64())
+}
+
+func (n Decimal) AsInt64() int64 {
+	f, err := strconv.ParseInt(n.repr, 10, 64)
+	if err == nil {
+		return f
+	}
+	return 0
+}
+
+func (n Decimal) AsFloat64() float64 {
+	f, err := strconv.ParseFloat(n.repr, 64)
+	if err == nil {
+		return f
+	}
+	return 0
+}
+
+func (n Decimal) AsBigInt() *big.Int {
+	if i, ok := new(big.Int).SetString(n.repr, 10); ok {
+		return i
+	}
+	return nil
+}
+
+const DecimalPrecision = uint(250)
+
+func (n Decimal) AsBigFloat() *big.Float {
+	f, _, err := big.ParseFloat(n.repr, 10, DecimalPrecision, big.ToNearestEven)
+	if err != nil {
+		return f
+	}
+	return nil
+}
+`
+
+var timestampSource = `
+
+type Timestamp struct {
+	time.Time
+}
+
+func Now() Timestamp {
+	now := time.Now()
+	return Timestamp{Time: now}
+}
+
+const RFC3339Milli = "%d-%02d-%02dT%02d:%02d:%02d.%03dZ"
+
+func (ts Timestamp) String() string {
+	if ts.IsZero() {
+		return ""
+	}
+	return fmt.Sprintf(RFC3339Milli, ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond()/1000000)
+}
+
+func (ts Timestamp) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + ts.String() + "\""), nil
+}
+
+func (ts *Timestamp) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err == nil {
+		var tsp Timestamp
+		tsp, err = ParseTimestamp(string(j))
+		if err == nil {
+			*ts = tsp
+		}
+	}
+	return err
+}
+
+func ParseTimestamp(s string) (Timestamp, error) {
+	layout := "2006-01-02T15:04:05.999Z" //derive this from the spec used for output?
+	t, e := time.Parse(layout, s)
+	if e != nil {
+		if strings.HasSuffix(s, "+00:00") || strings.HasSuffix(s, "-00:00") {
+			t, e = time.Parse(layout, s[:len(s)-6]+"Z")
+		} else if strings.HasSuffix(s, "+0000") || strings.HasSuffix(s, "-0000") {
+			t, e = time.Parse(layout, s[:len(s)-5]+"Z")
+		}
+		if e != nil {
+			var ts Timestamp
+			return ts, fmt.Errorf("Bad Timestamp: %q", s)
+		}
+	}
+	return Timestamp{t}, nil
+}
+
+func (ts Timestamp) ToRfc2616String() string {
+	if ts.IsZero() {
+		return ""
+	}
+	return ts.UTC().Format(http.TimeFormat)
 }
 `

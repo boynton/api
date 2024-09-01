@@ -7,6 +7,8 @@ import (
 	"github.com/boynton/api/model"
 )
 
+// BUG:
+// - for Items as a number type, the format is lost.
 func Warning(format string, a ...any) {
 	model.Warning(format, a...)
 }
@@ -33,7 +35,7 @@ func isTagged(shape *Shape, tags []string) bool {
 	shapeTags := shape.Traits.GetSlice("smithy.api#tags")
 	for _, stag := range shapeTags {
 		for _, tag := range tags {
-			if stag == tag {
+			if stag.AsString() == tag {
 				return true
 			}
 		}
@@ -260,23 +262,24 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 		}
 		query := mem.Traits.GetString("smithy.api#httpQuery")
 		header := mem.Traits.GetString("smithy.api#httpHeader")
-		path := mem.Traits.GetBool("smithy.api#httpLabel")
-		payload := mem.Traits.GetBool("smithy.api#httpPayload")
-		if payload {
+		hasPath := mem.Traits.Get("smithy.api#httpLabel") != nil
+		payload := mem.Traits.Get("smithy.api#httpPayload")
+		if payload != nil {
 			hasPayload = true
 		}
-		if query == "" && header == "" && !path && !payload {
+		memType := toCanonicalTypeName(mem.Target)
+		if query == "" && header == "" && hasPath && payload != nil {
 			structField := &model.FieldDef{
 				Comment:  "",
 				Name:     model.Identifier(k),
-				Type:     toCanonicalTypeName(mem.Target),
+				Type:     memType,
 				Required: mem.Traits.GetBool("smithy.api#required"),
 			}
 			payloadContentFields = append(payloadContentFields, structField)
 		} else {
 			f := &model.OperationInputField{
 				Name:     model.Identifier(k),
-				Type:     toCanonicalTypeName(mem.Target),
+				Type:     memType,
 				Required: mem.Traits.GetBool("smithy.api#required"),
 			}
 			if query != "" {
@@ -285,14 +288,14 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 			if header != "" {
 				f.HttpHeader = header
 			}
-			f.HttpPath = path
-			f.HttpPayload = payload
+			f.HttpPath = hasPath
+			f.HttpPayload = payload != nil
 			if f.HttpPath || f.HttpPayload {
 				f.Required = true
 			}
 			d := mem.Traits.Get("smithy.api#default") //for synthesized payload content?!
 			if d != nil {
-				f.Default = d.RawValue()
+				f.Default = d // FIXME d.RawValue()
 			}
 			if mem.Traits.Has("smithy.api#length") {
 				length := mem.Traits.Get("smithy.api#length")
@@ -301,8 +304,14 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 			}
 			if mem.Traits.Has("smithy.api#range") {
 				r := mem.Traits.Get("smithy.api#range")
-				f.MinValue = r.GetDecimal("min", nil)
-				f.MaxValue = r.GetDecimal("max", nil)
+				if r.Has("min") {
+					n := r.Get("min")
+					f.MinValue = model.NewDecimal(n.String())
+				}
+				if r.Has("max") {
+					n := r.Get("max")
+					f.MaxValue = model.NewDecimal(n.String())
+				}
 			}
 			//other traits!!!
 			if mem.Traits.Has("smithy.api#documentation") {
@@ -357,11 +366,11 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 	for _, k := range shape.Members.Keys() {
 		mem := shape.Members.Get(k)
 		header := mem.Traits.GetString("smithy.api#httpHeader")
-		payload := mem.Traits.GetBool("smithy.api#httpPayload")
-		if payload {
+		payload := mem.Traits.Get("smithy.api#httpPayload")
+		if payload != nil {
 			hasPayload = true
 		}
-		if header == "" && !payload {
+		if header == "" && !hasPayload {
 			structField := &model.FieldDef{
 				Comment:  "",
 				Name:     model.Identifier(k),
@@ -375,7 +384,7 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 				Type: toCanonicalTypeName(mem.Target),
 			}
 			f.HttpHeader = header
-			f.HttpPayload = payload
+			f.HttpPayload = hasPayload
 			to.Fields = append(to.Fields, f)
 		}
 	}
@@ -486,7 +495,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 	if examples != nil {
 		uniqueTitles := make(map[string]bool, 0)
 		for _, rex := range examples {
-			ex := AsNodeValue(rex)
+			ex := rex //AsNodeValue(rex)
 			title := ex.GetString("title")
 			if _, ok := uniqueTitles[title]; ok {
 				return fmt.Errorf("Smithy operation example does not have a unique title: %q", title)
@@ -506,7 +515,7 @@ func addOperation(schema *model.Schema, ast *AST, shapeId string, shape *Shape) 
 			}
 			operr := ex.Get("error")
 			if operr != nil {
-				ope := AsNodeValue(operr)
+				ope := operr //AsNodeValue(operr)
 				sid := ope.GetString("shapeId")
 				//to do: ensure namespaced
 				example.Error = &model.OperationErrorExample{
@@ -531,6 +540,8 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 	}
 	number := false
 	switch shape.Type {
+	case "boolean":
+		td.Base = model.BaseType_Bool
 	case "byte":
 		td.Base = model.BaseType_Int8
 		number = true
@@ -623,13 +634,13 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 					}
 					rnge := v.Traits.Get("smithy.api#range")
 					if length != nil {
-						min := rnge.GetDecimal("min", nil)
+						min := rnge.Get("min")
 						if min != nil {
-							fd.MinValue = min
+							fd.MinValue = model.NewDecimal(min.String())
 						}
-						max := rnge.GetDecimal("max", nil)
+						max := rnge.Get("max")
 						if max != nil {
-							fd.MaxValue = max
+							fd.MaxValue = model.NewDecimal(max.String())
 						}
 					}
 				}
@@ -677,8 +688,14 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 	if number {
 		rng := shape.Traits.Get("smithy.api#range")
 		if rng != nil {
-			td.MinValue = rng.Get("min").AsDecimal()
-			td.MaxValue = rng.Get("max").AsDecimal()
+			min := rng.Get("min")
+			if min != nil {
+				td.MinValue = model.NewDecimal(min.String())
+			}
+			max := rng.Get("max")
+			if max != nil {
+				td.MaxValue = model.NewDecimal(max.String())
+			}
 		}
 	}
 	return schema.AddTypeDef(td)

@@ -5,8 +5,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/boynton/api/conf"
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 type AstGenerator struct {
@@ -110,8 +111,8 @@ func (ast *AST) forceNamespaceIfSet(ns string) *AST {
 	return newAst
 }
 
-func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *AstGenerator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func (gen *AstGenerator) Generate(schema *model.Schema, config *data.Object) err
 	if err != nil {
 		return err
 	}
-	ast := gen.ast.forceNamespaceIfSet(config.GetString("namespace"))
+	ast := gen.ast.forceNamespaceIfSet(conf.GetString("namespace"))
 	return gen.Write(model.Pretty(ast), "model.json", "")
 }
 
@@ -141,7 +142,7 @@ func (gen *AstGenerator) GenerateType(td *model.TypeDef) error {
 
 func SmithyAST(schema *model.Schema, sorted bool, ns string) (*AST, error) {
 	gen := &AstGenerator{}
-	gen.Configure(schema, data.NewObject())
+	gen.Init(schema)
 	gen.Sort = sorted
 	ast, err := gen.ToAST()
 	ast = ast.forceNamespaceIfSet(ns)
@@ -156,7 +157,7 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 			Type: "resource",
 		}
 		if rez.Comment != "" {
-			ensureShapeTraits(shape).Put("smithy.api#documentation", rez.Comment)
+			ensureShapeTraits(shape).Put("smithy.api#documentation", data.NewValue(rez.Comment))
 		}
 		resources[string(rez.Id)] = shape
 		if rez.Create != "" {
@@ -234,7 +235,7 @@ func (gen *AstGenerator) EnsureNamespaced(name string) string {
 func (gen *AstGenerator) ToAST() (*AST, error) {
 	ast := &AST{
 		Smithy: "2",
-		//		Metadata: NewNodeValue(),
+		//Metadata: data.NewObject(),
 	}
 	resources, resourceOps, err := gen.GenerateResources()
 	if err != nil {
@@ -258,7 +259,7 @@ func (gen *AstGenerator) ToAST() (*AST, error) {
 			Version: gen.Schema.Version,
 		}
 		if gen.Schema.Comment != "" {
-			ensureShapeTraits(shape).Put("smithy.api#documentation", gen.Schema.Comment)
+			ensureShapeTraits(shape).Put("smithy.api#documentation", data.NewValue(gen.Schema.Comment))
 		}
 		for _, k := range resourceKeys {
 			ref := &ShapeRef{
@@ -326,13 +327,13 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 	}
 	ensureShapeTraits(shape).Put("smithy.api#http", httpTrait(op.HttpMethod, op.HttpUri, status))
 	if op.Comment != "" {
-		ensureShapeTraits(shape).Put("smithy.api#documentation", op.Comment)
+		ensureShapeTraits(shape).PutString("smithy.api#documentation", op.Comment)
 	}
 	switch op.HttpMethod {
 	case "GET":
-		ensureShapeTraits(shape).Put("smithy.api#readonly", NewNodeValue())
+		ensureShapeTraits(shape).Put("smithy.api#readonly", data.NewObject())
 	case "DELETE", "PUT":
-		ensureShapeTraits(shape).Put("smithy.api#idempotent", NewNodeValue())
+		ensureShapeTraits(shape).Put("smithy.api#idempotent", data.NewObject())
 	}
 
 	if op.Input != nil {
@@ -392,7 +393,7 @@ func (gen *AstGenerator) AddShapesFromOperation(ast *AST, op *model.OperationDef
 			examples = append(examples, smex)
 		}
 		if len(examples) > 0 {
-			ensureShapeTraits(shape).Put("smithy.api#examples", examples)
+			ensureShapeTraits(shape).Put("smithy.api#examples", data.NewValue(examples))
 		}
 	}
 	ast.PutShape(string(op.Id), shape)
@@ -440,48 +441,50 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 		}
 		if fd.Required {
 			//note: import form Smithy forces required on any httpPayload field
-			ensureMemberTraits(member).Put("smithy.api#required", NewNodeValue())
+			ensureMemberTraits(member).Put("smithy.api#required", data.NewObject())
 		}
 		if fd.HttpHeader != "" {
-			ensureMemberTraits(member).Put("smithy.api#httpHeader", string(fd.HttpHeader))
+			ensureMemberTraits(member).PutString("smithy.api#httpHeader", string(fd.HttpHeader))
 		} else if fd.HttpQuery != "" {
-			ensureMemberTraits(member).Put("smithy.api#httpQuery", string(fd.HttpQuery))
+			ensureMemberTraits(member).PutString("smithy.api#httpQuery", string(fd.HttpQuery))
 		} else if fd.HttpPath {
-			ensureMemberTraits(member).Put("smithy.api#httpLabel", NewNodeValue())
+			ensureMemberTraits(member).Put("smithy.api#httpLabel", data.NewObject())
 		} else if fd.HttpPayload {
-			ensureMemberTraits(member).Put("smithy.api#httpPayload", NewNodeValue())
+			ensureMemberTraits(member).Put("smithy.api#httpPayload", data.NewObject())
 		}
 		if fd.Default != nil {
-			ensureMemberTraits(member).Put("smithy.api#default", AsNodeValue(fd.Default))
+			ensureMemberTraits(member).Put("smithy.api#default", data.NewValue(fd.Default))
 		}
 		if fd.MinValue != nil || fd.MaxValue != nil {
-			n := NewNodeValue()
+			n := data.NewObject()
 			if fd.MinValue != nil {
-				n.Put("min", fd.MinValue.AsInt64())
+				n.Put("min", data.NewValue(*fd.MinValue))
 			}
 			if fd.MaxValue != nil {
-				n.Put("max", fd.MaxValue.AsInt64())
+				n.Put("max", data.NewValue(*fd.MaxValue))
 			}
 			ensureMemberTraits(member).Put("smithy.api#range", n)
 		}
 		if fd.MinSize != 0 || fd.MaxSize != 0 {
-			n := NewNodeValue()
+			n := data.NewObject()
 			if fd.MinSize != 0 {
-				n.Put("min", fd.MinSize)
+				n.Put("min", data.NewValue(fd.MinSize))
 			}
 			if fd.MaxSize != 0 {
-				n.Put("max", fd.MaxSize)
+				n.Put("max", data.NewValue(fd.MaxSize))
 			}
 			ensureMemberTraits(member).Put("smithy.api#length", n)
 		}
 		if fd.Pattern != "" {
-			ensureMemberTraits(member).Put("smithy.api#pattern", fd.Pattern)
+			ensureMemberTraits(member).PutString("smithy.api#pattern", fd.Pattern)
 		}
 		members.Put(string(fd.Name), member)
 	}
 	shape.Members = members
-	ensureShapeTraits(shape).Put("smithy.api#documentation", input.Comment)
-	ensureShapeTraits(shape).Put("smithy.api#input", NewNodeValue())
+	if input.Comment != "" {
+		ensureShapeTraits(shape).PutString("smithy.api#documentation", input.Comment)
+	}
+	ensureShapeTraits(shape).Put("smithy.api#input", data.NewObject())
 	return shape, nil
 }
 
@@ -505,9 +508,9 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 			Target: ftype,
 		}
 		if fd.HttpHeader != "" {
-			ensureMemberTraits(member).Put("smithy.api#httpHeader", fd.HttpHeader)
+			ensureMemberTraits(member).PutString("smithy.api#httpHeader", fd.HttpHeader)
 		} else if fd.HttpPayload {
-			ensureMemberTraits(member).Put("smithy.api#httpPayload", NewNodeValue())
+			ensureMemberTraits(member).Put("smithy.api#httpPayload", data.NewObject())
 		}
 		shape.Members.Put(string(fd.Name), member)
 	}
@@ -516,12 +519,14 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 		if output.HttpStatus < 500 {
 			fault = "client"
 		}
-		ensureShapeTraits(shape).Put("smithy.api#error", fault)
-		ensureShapeTraits(shape).Put("smithy.api#httpError", output.HttpStatus)
+		ensureShapeTraits(shape).PutString("smithy.api#error", fault)
+		ensureShapeTraits(shape).Put("smithy.api#httpError", data.NewValue(output.HttpStatus))
 	} else {
-		ensureShapeTraits(shape).Put("smithy.api#output", NewNodeValue())
+		ensureShapeTraits(shape).Put("smithy.api#output", data.NewObject())
 	}
-	ensureShapeTraits(shape).Put("smithy.api#documentation", output.Comment)
+	if output.Comment != "" {
+		ensureShapeTraits(shape).PutString("smithy.api#documentation", output.Comment)
+	}
 	return shape, nil
 }
 
@@ -538,7 +543,7 @@ func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error
 		id, shape, err = gen.ShapeFromMap(td)
 	case model.BaseType_String:
 		id, shape, err = gen.ShapeFromString(td)
-	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_Decimal, model.BaseType_Integer:
+	case model.BaseType_Int8, model.BaseType_Int16, model.BaseType_Int32, model.BaseType_Int64, model.BaseType_Float32, model.BaseType_Float64, model.BaseType_Integer, model.BaseType_Decimal:
 		id, shape, err = gen.ShapeFromNumber(td)
 	case model.BaseType_Enum:
 		id, shape, err = gen.ShapeFromEnum(td)
@@ -554,7 +559,7 @@ func (gen *AstGenerator) ShapeFromType(td *model.TypeDef) (string, *Shape, error
 		panic("handle this type:" + model.Pretty(td))
 	}
 	if td.Comment != "" {
-		ensureShapeTraits(shape).Put("smithy.api#documentation", td.Comment)
+		ensureShapeTraits(shape).PutString("smithy.api#documentation", td.Comment)
 	}
 	return id, shape, err
 }
@@ -564,7 +569,7 @@ func (gen *AstGenerator) ShapeFromString(td *model.TypeDef) (string, *Shape, err
 		Type: "string",
 	}
 	if td.Pattern != "" {
-		ensureShapeTraits(shape).Put("smithy.api#pattern", td.Pattern)
+		ensureShapeTraits(shape).PutString("smithy.api#pattern", td.Pattern)
 	}
 	return string(td.Id), shape, nil
 }
@@ -591,10 +596,10 @@ func (gen *AstGenerator) ShapeFromNumber(td *model.TypeDef) (string, *Shape, err
 		shape.Type = "float"
 	case model.BaseType_Float64:
 		shape.Type = "double"
-	case model.BaseType_Decimal:
-		shape.Type = "bigDecimal"
 	case model.BaseType_Integer:
 		shape.Type = "bigInteger"
+	case model.BaseType_Decimal:
+		shape.Type = "bigDecimal"
 	}
 	if td.MinValue != nil || td.MaxValue != nil {
 		ensureShapeTraits(&shape).Put("smithy.api#range", rangeTrait(td.MinValue, td.MaxValue))
@@ -616,40 +621,40 @@ func (gen *AstGenerator) ShapeFromBool(td *model.TypeDef) (string, *Shape, error
 	return string(td.Id), shape, nil
 }
 
-func ensureShapeTraits(shape *Shape) *NodeValue {
+func ensureShapeTraits(shape *Shape) *data.Value {
 	if shape.Traits == nil {
-		shape.Traits = NewNodeValue()
+		shape.Traits = data.NewObject()
 	}
 	return shape.Traits
 }
 
-func ensureMemberTraits(member *Member) *NodeValue {
+func ensureMemberTraits(member *Member) *data.Value {
 	if member.Traits == nil {
-		member.Traits = NewNodeValue()
+		member.Traits = data.NewObject()
 	}
 	return member.Traits
 }
 
-func rangeTrait(min *data.Decimal, max *data.Decimal) *NodeValue {
+func rangeTrait(min *model.Decimal, max *model.Decimal) *data.Value {
 	if min == nil && max == nil {
 		return nil
 	}
-	l := NewNodeValue()
+	l := data.NewObject()
 	if min != nil {
-		l.Put("min", min.AsFloat64())
+		l.Put("min", data.NewValue(data.NewNumber(min.String())))
 	}
 	if max != nil {
-		l.Put("max", max.AsFloat64())
+		l.Put("max", data.NewValue(data.NewNumber(max.String())))
 	}
 	return l
 }
 
-func httpTrait(method, path string, code int) *NodeValue {
-	t := NewNodeValue()
-	t.Put("method", method)
-	t.Put("uri", path)
+func httpTrait(method, path string, code int) *data.Value {
+	t := data.NewObject()
+	t.PutString("method", method)
+	t.PutString("uri", path)
 	if code != 0 {
-		t.Put("code", code)
+		t.PutInt("code", code)
 	}
 	return t
 }
@@ -699,7 +704,7 @@ func (gen *AstGenerator) ShapeFromEnum(td *model.TypeDef) (string, *Shape, error
 			Target: "smithy.api#Unit",
 		}
 		if el.Value != "" {
-			ensureMemberTraits(mem).Put("smithy.api#enumValue", el.Value)
+			ensureMemberTraits(mem).PutString("smithy.api#enumValue", el.Value)
 		}
 		shape.Members.Put(string(el.Symbol), mem)
 	}
@@ -749,10 +754,10 @@ func (gen *AstGenerator) ShapeFromStruct(td *model.TypeDef) (string, *Shape, err
 			Target: ftype,
 		}
 		if fd.Comment != "" {
-			ensureMemberTraits(member).Put("smithy.api#documentation", fd.Comment)
+			ensureMemberTraits(member).PutString("smithy.api#documentation", fd.Comment)
 		}
 		if fd.Required {
-			ensureMemberTraits(member).Put("smithy.api#required", NewNodeValue())
+			ensureMemberTraits(member).Put("smithy.api#required", data.NewObject())
 		}
 		members.Put(string(fd.Name), member)
 	}

@@ -20,8 +20,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
-
-	"github.com/boynton/data"
+	//	"github.com/boynton/api/data"
 )
 
 func Parse(path string) (*Schema, error) {
@@ -1055,23 +1054,46 @@ func (p *Parser) expectEqualsInt64() (int64, error) {
 	return val, nil
 }
 
-func (p *Parser) expectNumber() (*data.Decimal, error) {
+func (p *Parser) expectFloat64() (float64, error) {
+	tok := p.GetToken()
+	if tok == nil {
+		return 0, p.EndOfFileError()
+	}
+	if tok.IsNumeric() {
+		f, err := strconv.ParseFloat(tok.Text, 64)
+		if err != nil {
+			return 0, err
+		}
+		return f, nil
+	}
+	return 0, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
+}
+
+func (p *Parser) expectEqualsFloat64() (float64, error) {
+	err := p.expect(EQUALS)
+	if err != nil {
+		return 0, err
+	}
+	return p.expectFloat64()
+}
+
+func (p *Parser) expectDecimal() (*Decimal, error) {
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
 	if tok.IsNumeric() {
-		return data.DecimalFromString(tok.Text)
+		return NewDecimal(tok.Text), nil
 	}
 	return nil, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
 
-func (p *Parser) expectEqualsNumber() (*data.Decimal, error) {
+func (p *Parser) expectEqualsDecimal() (*Decimal, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
 	}
-	return p.expectNumber()
+	return p.expectDecimal()
 }
 
 func (p *Parser) expect(toktype TokenType) error {
@@ -1120,8 +1142,8 @@ type Options struct {
 	Url       string
 	MinSize   int64
 	MaxSize   int64
-	MinValue  *data.Decimal
-	MaxValue  *data.Decimal
+	MinValue  *Decimal
+	MaxValue  *Decimal
 	Action    string
 	Header    string
 	Name      string
@@ -1135,6 +1157,7 @@ type Options struct {
 func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, error) {
 	options := &Options{}
 	var err error
+	var f *Decimal
 	tok := p.GetToken()
 	if tok == nil {
 		return options, nil
@@ -1155,9 +1178,15 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 				} else if containsOption(acceptable, match) {
 					switch match {
 					case "min":
-						options.MinValue, err = p.expectEqualsNumber()
+						f, err = p.expectEqualsDecimal()
+						if err == nil {
+							options.MinValue = f
+						}
 					case "max":
-						options.MaxValue, err = p.expectEqualsNumber()
+						f, err = p.expectEqualsDecimal()
+						if err == nil {
+							options.MaxValue = f
+						}
 					case "minsize":
 						options.MinSize, err = p.expectEqualsInt64()
 					case "maxsize":
@@ -1314,18 +1343,16 @@ func (p *Parser) parseBytesOptions(typedef *TypeDef) error {
 				if expected == "" {
 					return p.SyntaxError()
 				}
-				val, err := data.DecimalFromString(tok.Text)
-				if err != nil {
-					return err
-				}
+				var err error
 				if expected == "minsize" {
-					i := val.AsInt64()
-					typedef.MinSize = i
+					typedef.MinSize, err = strconv.ParseInt(tok.Text, 10, 64)
 				} else if expected == "maxsize" {
-					i := val.AsInt64()
-					typedef.MinSize = i
+					typedef.MaxSize, err = strconv.ParseInt(tok.Text, 10, 64)
 				} else {
 					return p.Error("bytes option must have numeric value")
+				}
+				if err != nil {
+					return err
 				}
 				expected = ""
 			}
@@ -1498,39 +1525,6 @@ func (p *Parser) parseFields(td *TypeDef, fieldOptions []string) error {
 	return nil
 }
 
-/*
-
-func (p *Parser) parseStructFieldOptions(field *StructFieldDef) error {
-	var acceptable []string
-	switch field.Type {
-	case "String":
-		acceptable = []string{"pattern", "values", "minsize", "maxsize", "reference"}
-	case "UUID":
-		acceptable = []string{"reference"}
-	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
-		acceptable = []string{"min", "max"}
-	case "Bytes", "Array", "Map":
-		acceptable = []string{"minsize", "maxsize"}
-	}
-	acceptable = append(acceptable, "required")
-	acceptable = append(acceptable, "default")
-	options, err := p.ParseOptions(field.Type, acceptable)
-	if err == nil {
-		field.Required = options.Required
-		field.Default = options.Default
-		field.Pattern = options.Pattern
-		field.Values = options.Values
-		field.MinSize = options.MinSize
-		field.MaxSize = options.MaxSize
-		field.Min = options.Min
-		field.Max = options.Max
-		field.Annotations = options.Annotations
-		field.Reference = options.Reference
-	}
-	return err
-}
-*/
-
 func (p *Parser) parseEqualsLiteral() (interface{}, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
@@ -1585,13 +1579,18 @@ func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
-	num, err := data.DecimalFromString(tok.Text)
+func (p *Parser) parseLiteralNumber(tok *Token) (*Decimal, error) {
+	return NewDecimal(tok.Text), nil
+}
+
+/*
+	num, err := strconv.ParseFloat(tok.Text, 64)
 	if err != nil {
-		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
+		return 0, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
 	}
 	return num, nil
-}
+    }
+*/
 
 func (p *Parser) parseLiteralArray() (interface{}, error) {
 	var ary []interface{}
@@ -1714,23 +1713,6 @@ func (p *Parser) mapParams(params []string) (string, string, error) {
 		return "", "", p.SyntaxError()
 	}
 	return keys, items, nil
-}
-
-func (p *Parser) unitValueParams(params []string) (string, string, error) {
-	var value string
-	var unit string
-	var err error
-	switch len(params) {
-	case 0:
-		value = "Decimal"
-		unit = "String"
-	case 2:
-		value = params[0]
-		unit = params[1]
-	default:
-		err = p.SyntaxError()
-	}
-	return value, unit, err
 }
 
 func (p *Parser) EndOfStatement(comment string) (string, error) {

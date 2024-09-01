@@ -3,8 +3,8 @@ package smithy
 import (
 	"fmt"
 
+	"github.com/boynton/api/conf"
 	"github.com/boynton/api/model"
-	"github.com/boynton/data"
 )
 
 type IdlGenerator struct {
@@ -61,18 +61,18 @@ func (gen *IdlGenerator) GenerateException(op *model.OperationOutput) error {
 	return nil
 }
 
-func (gen *IdlGenerator) Generate(schema *model.Schema, config *data.Object) error {
-	err := gen.Configure(schema, config)
+func (gen *IdlGenerator) Generate(schema *model.Schema) error {
+	err := gen.Init(schema)
 	if err != nil {
 		return err
 	}
 
-	ast, err := SmithyAST(schema, gen.Sort, config.GetString("namespace"))
+	ast, err := SmithyAST(schema, gen.Sort, conf.GetString("namespace"))
 	if err != nil {
 		return err
 	}
 
-	//fixme: preserve smithy metadata.
+	//fixme: preserve smithy metadata
 	needsSep := len(ast.Namespaces()) != 1
 	for _, ns := range ast.Namespaces() {
 		fname := gen.FileName(ns, ".smithy")
