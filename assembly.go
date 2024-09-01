@@ -22,10 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
-	//"github.com/boynton/data"
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/openapi"
-	//	"github.com/boynton/api/sadl"
 	"github.com/boynton/api/smithy"
 	"github.com/boynton/api/swagger"
 )
@@ -33,8 +31,6 @@ import (
 var ImportFileExtensions = map[string]string{
 	".api":    "api",
 	".smithy": "smithy",
-	".sadl":   "sadl",
-	".rdl":    "rdl",
 }
 
 func determineFormat(path string) string {
@@ -64,9 +60,6 @@ func determineFormat(path string) string {
 			return "swagger"
 		}
 		return "api"
-	}
-	if ext == ".yaml" {
-		//openapi/swagger in yaml
 	}
 	return ""
 }
@@ -131,15 +124,10 @@ func AssembleModel(paths []string, tags []string, ns string, parseOnly bool, noV
 		schema, err = model.Load(flatPathList, tags)
 	case "smithy":
 		schema, err = smithy.Import(flatPathList, tags, parseOnly)
-	case "sadl":
-		//schema, err = sadl.Import(flatPathList, tags)
-		err = fmt.Errorf("sadl.Import NYI")
 	case "openapi":
 		schema, err = openapi.Import(flatPathList, tags, ns)
 	case "swagger":
 		schema, err = swagger.Import(flatPathList, tags, ns)
-	case "rdl":
-		err = fmt.Errorf("rdl.Import NYI")
 	default:
 		err = fmt.Errorf("unknown format: %q", format)
 	}
