@@ -152,12 +152,29 @@ func SmithyAST(schema *model.Schema, sorted bool, ns string) (*AST, error) {
 func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.AbsoluteIdentifier]bool, error) {
 	resources := make(map[string]*Shape, 0)
 	operations := make(map[model.AbsoluteIdentifier]bool, 0)
+	children := make(map[model.AbsoluteIdentifier][]model.AbsoluteIdentifier, 0)
+	for _, rez := range gen.Schema.Resources {
+		if rez.Parent != "" {
+			lst := children[rez.Parent]
+			children[rez.Parent] = append(lst, rez.Id)
+		}
+	}
 	for _, rez := range gen.Schema.Resources {
 		shape := &Shape{
 			Type: "resource",
 		}
 		if rez.Comment != "" {
 			ensureShapeTraits(shape).Put("smithy.api#documentation", data.NewValue(rez.Comment))
+		}
+		identifiers := data.NewMap[*ShapeRef]()
+		for _, ident := range rez.Identifiers {
+			ref := &ShapeRef{
+				Target: string("smithy.api#String"),
+			}
+			identifiers.Put(string(ident), ref)
+		}
+		if identifiers.Length() > 0 {
+			shape.Identifiers = identifiers
 		}
 		resources[string(rez.Id)] = shape
 		if rez.Create != "" {
@@ -171,20 +188,22 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 			shape.Read = &ShapeRef{
 				Target: string(rez.Read),
 			}
-			od := gen.Schema.GetOperationDef(rez.Read)
-			if od != nil && od.Input != nil {
-				for _, fd := range od.Input.Fields {
-					if fd.HttpPath {
-						if shape.Identifiers == nil {
-							shape.Identifiers = NewMap[*ShapeRef]()
+			/*
+				od := gen.Schema.GetOperationDef(rez.Read)
+				if od != nil && od.Input != nil {
+					for _, fd := range od.Input.Fields {
+						if fd.HttpPath {
+							if shape.Identifiers == nil {
+								shape.Identifiers = NewMap[*ShapeRef]()
+							}
+							fref := &ShapeRef{
+								Target: typeReference(string(fd.Type)),
+							}
+							shape.Identifiers.Put(string(fd.Name), fref)
 						}
-						fref := &ShapeRef{
-							Target: typeReference(string(fd.Type)),
-						}
-						shape.Identifiers.Put(string(fd.Name), fref)
 					}
 				}
-			}
+			*/
 		}
 		if rez.Update != "" {
 			operations[rez.Update] = true
@@ -220,7 +239,15 @@ func (gen *AstGenerator) GenerateResources() (map[string]*Shape, map[model.Absol
 			}
 			shape.CollectionOperations = refs
 		}
-		//to do: child resources
+		if lst, ok := children[rez.Id]; ok {
+			if len(lst) > 0 {
+				var refs []*ShapeRef
+				for _, ref := range lst {
+					refs = append(refs, &ShapeRef{Target: string(ref)})
+				}
+				shape.Resources = refs
+			}
+		}
 	}
 	return resources, operations, nil
 }
@@ -423,7 +450,7 @@ func (gen *AstGenerator) shapeFromOpInput(input *model.OperationInput) (*Shape, 
 	shape := &Shape{
 		Type: "structure",
 	}
-	members := NewMap[*Member]()
+	members := data.NewMap[*Member]()
 	var fields []*model.OperationInputField
 	for _, fd := range input.Fields {
 		fields = append(fields, fd)
@@ -493,7 +520,7 @@ func (gen *AstGenerator) shapeFromOpOutput(output *model.OperationOutput, isExce
 		Type: "structure",
 	}
 	var fields []*model.OperationOutputField
-	shape.Members = NewMap[*Member]()
+	shape.Members = data.NewMap[*Member]()
 	for _, fd := range output.Fields {
 		fields = append(fields, fd)
 	}
@@ -697,7 +724,7 @@ func typeReference(name string) string {
 func (gen *AstGenerator) ShapeFromEnum(td *model.TypeDef) (string, *Shape, error) {
 	shape := &Shape{
 		Type:    "enum",
-		Members: NewMap[*Member](),
+		Members: data.NewMap[*Member](),
 	}
 	for _, el := range td.Elements {
 		mem := &Member{
@@ -737,9 +764,9 @@ func (gen *AstGenerator) ShapeFromStruct(td *model.TypeDef) (string, *Shape, err
 	shape := &Shape{
 		Type: "structure",
 	}
-	members := NewMap[*Member]()
+	members := data.NewMap[*Member]()
 	var fields []*model.FieldDef
-	shape.Members = NewMap[*Member]()
+	shape.Members = data.NewMap[*Member]()
 	for _, fd := range td.Fields {
 		fields = append(fields, fd)
 	}
@@ -769,7 +796,7 @@ func (gen *AstGenerator) ShapeFromUnion(td *model.TypeDef) (string, *Shape, erro
 	shape := &Shape{
 		Type: "union",
 	}
-	members := NewMap[*Member]()
+	members := data.NewMap[*Member]()
 	for _, fd := range td.Fields {
 		ftype := typeReference(string(fd.Type))
 		member := &Member{

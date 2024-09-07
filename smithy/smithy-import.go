@@ -64,6 +64,13 @@ func ImportAST(ast *AST, tags []string) (*model.Schema, error) {
 	err = ast.ForAllShapes(func(shapeId string, shape *Shape) error {
 		return importShape(schema, ast, shapeId, shape)
 	})
+
+	for _, rez := range schema.Resources {
+		for _, childId := range rez.Resources {
+			child := schema.GetResourceDef(childId)
+			child.Parent = rez.Id
+		}
+	}
 	return schema, err
 }
 
@@ -203,8 +210,14 @@ func shapeRefsToIdentifiers(refs []*ShapeRef) []model.AbsoluteIdentifier {
 
 func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) error {
 	id := model.AbsoluteIdentifier(shapeId)
+	var identifiers []model.Identifier
+	for _, ident := range shape.Identifiers.Keys() {
+		//assume the target type is String
+		identifiers = append(identifiers, model.Identifier(ident))
+	}
 	rez := &model.ResourceDef{
 		Id:                   id,
+		Identifiers:          identifiers,
 		Comment:              shape.GetStringTrait("smithy.api#documentation"),
 		Create:               shapeRefToIdentifier(shape.Create),
 		Read:                 shapeRefToIdentifier(shape.Read),
@@ -213,6 +226,7 @@ func addResource(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		List:                 shapeRefToIdentifier(shape.List),
 		Operations:           shapeRefsToIdentifiers(shape.Operations),
 		CollectionOperations: shapeRefsToIdentifiers(shape.CollectionOperations),
+		Resources:            shapeRefsToIdentifiers(shape.Resources),
 	}
 	schema.AddResourceDef(rez)
 	return nil

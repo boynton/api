@@ -395,12 +395,12 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 	return items, nil
 }
 
-func (p *Parser) ExpectIdentifierMapConvertToRefs() (*Map[*ShapeRef], error) {
+func (p *Parser) ExpectIdentifierMapConvertToRefs() (*data.Map[*ShapeRef], error) {
 	tmp, err := p.ExpectIdentifierMap()
 	if err != nil {
 		return nil, err
 	}
-	result := NewMap[*ShapeRef]()
+	result := data.NewMap[*ShapeRef]()
 	for _, k := range tmp.Keys() {
 		id := p.ensureNamespaced(tmp.Get(k))
 		ref := &ShapeRef{
@@ -411,7 +411,7 @@ func (p *Parser) ExpectIdentifierMapConvertToRefs() (*Map[*ShapeRef], error) {
 	return result, nil
 }
 
-func (p *Parser) ExpectIdentifierMap() (*Map[string], error) {
+func (p *Parser) ExpectIdentifierMap() (*data.Map[string], error) {
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
@@ -419,8 +419,7 @@ func (p *Parser) ExpectIdentifierMap() (*Map[string], error) {
 	if tok.Type != OPEN_BRACE {
 		return nil, p.SyntaxError()
 	}
-	//items := make(map[string]string, 0)
-	items := NewMap[string]()
+	items := data.NewMap[string]()
 	for {
 		tok := p.GetToken()
 		var key string
@@ -675,7 +674,7 @@ func (p *Parser) parseSimpleTypeDef(typeName string, traits *data.Value) error {
 			Type:   enumShapeName,
 			Traits: tr,
 		}
-		mems := NewMap[*Member]()
+		mems := data.NewMap[*Member]()
 		for _, e := range enumItems {
 			var mtraits *data.Value
 			d := e
@@ -936,7 +935,7 @@ func (p *Parser) parseStructureBody(name string, traits *data.Value) (*Shape, er
 	if tok.Type != OPEN_BRACE {
 		return nil, p.SyntaxError()
 	}
-	mems := NewMap[*Member]()
+	mems := data.NewMap[*Member]()
 	comment := ""
 	var mtraits *data.Value
 	for {
@@ -1071,7 +1070,7 @@ func (p *Parser) parseUnion(traits *data.Value) error {
 		Type:   "union",
 		Traits: traits,
 	}
-	mems := NewMap[*Member]()
+	mems := data.NewMap[*Member]()
 	var mtraits *data.Value
 	for {
 		comment := ""
@@ -1142,7 +1141,7 @@ func (p *Parser) parseEnum(traits *data.Value, intEnum bool) error {
 		Type:   tname,
 		Traits: traits,
 	}
-	mems := NewMap[*Member]()
+	mems := data.NewMap[*Member]()
 	var mtraits *data.Value
 	comment := ""
 	for {
@@ -1498,14 +1497,12 @@ func (p *Parser) ensureNamespaced(name string) string {
 	return name
 }
 
-func (p *Parser) expectNamedShapeRefs() (*Map[*ShapeRef], error) {
+func (p *Parser) expectNamedShapeRefs() (*data.Map[*ShapeRef], error) {
 	targets, err := p.ExpectIdentifierMap()
 	if err != nil {
 		return nil, err
 	}
-	//refs := make(map[string]*ShapeRef, 0)
-	refs := NewMap[*ShapeRef]()
-	//for k, target := range targets {
+	refs := data.NewMap[*ShapeRef]()
 	for _, k := range targets.Keys() {
 		target := targets.Get(k)
 		ref := &ShapeRef{

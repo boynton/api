@@ -31,9 +31,9 @@ const UnspecifiedNamespace = "example"
 const UnspecifiedVersion = "0.0"
 
 type AST struct {
-	Smithy   string       `json:"smithy"`
-	Metadata *data.Value  `json:"metadata,omitempty"`
-	Shapes   *Map[*Shape] `json:"shapes,omitempty"`
+	Smithy   string            `json:"smithy"`
+	Metadata *data.Value       `json:"metadata,omitempty"`
+	Shapes   *data.Map[*Shape] `json:"shapes,omitempty"`
 }
 
 func jsonEncode(obj interface{}) string {
@@ -78,7 +78,7 @@ func (ast *AST) DeleteShape(id string) {
 
 func (ast *AST) PutShape(id string, shape *Shape) {
 	if ast.Shapes == nil {
-		ast.Shapes = NewMap[*Shape]()
+		ast.Shapes = data.NewMap[*Shape]()
 	}
 	ast.Shapes.Put(id, shape)
 }
@@ -132,7 +132,7 @@ func cloneShape(shape *Shape) *Shape {
 		Traits:               shape.Traits.Copy(),
 	}
 	if shape.Identifiers != nil {
-		m := NewMap[*ShapeRef]()
+		m := data.NewMap[*ShapeRef]()
 		for _, k := range shape.Identifiers.Keys() {
 			sr := shape.Identifiers.Get(k)
 			m.Put(k, cloneShapeRef(sr))
@@ -169,9 +169,9 @@ func cloneMember(member *Member) *Member {
 	return nil
 }
 
-func cloneMembers(members *Map[*Member]) *Map[*Member] {
+func cloneMembers(members *data.Map[*Member]) *data.Map[*Member] {
 	if members != nil {
-		mems := NewMap[*Member]()
+		mems := data.NewMap[*Member]()
 		for _, k := range members.Keys() {
 			m := cloneMember(members.Get(k))
 			mems.Put(k, m)
@@ -195,11 +195,11 @@ type Shape struct {
 	Value *Member `json:"value,omitempty"`
 
 	//Structure and Union
-	Members *Map[*Member] `json:"members,omitempty"` //keys must be case-insensitively unique. For union, len(Members) > 0,
-	Mixins  []*ShapeRef   `json:"mixins,omitempty"`  //mixins for the shape
+	Members *data.Map[*Member] `json:"members,omitempty"` //keys are case-insensitively unique. For union, len(Members) > 0,
+	Mixins  []*ShapeRef        `json:"mixins,omitempty"`  //mixins for the shape
 
 	//Resource
-	Identifiers *Map[*ShapeRef] `json:"identifiers,omitempty"`
+	Identifiers *data.Map[*ShapeRef] `json:"identifiers,omitempty"`
 
 	Create               *ShapeRef   `json:"create,omitempty"`
 	Put                  *ShapeRef   `json:"put,omitempty"`
@@ -335,7 +335,7 @@ func (ast *AST) Namespaces() []string {
 }
 
 func (ast *AST) RequiresDocumentType() bool {
-	included := NewMap[bool]()
+	included := data.NewMap[bool]()
 	for _, k := range ast.Shapes.Keys() {
 		ast.noteDependencies(included, k)
 	}
@@ -345,13 +345,13 @@ func (ast *AST) RequiresDocumentType() bool {
 	return false
 }
 
-func (ast *AST) noteDependenciesFromRef(included *Map[bool], ref *ShapeRef) {
+func (ast *AST) noteDependenciesFromRef(included *data.Map[bool], ref *ShapeRef) {
 	if ref != nil {
 		ast.noteDependencies(included, ref.Target)
 	}
 }
 
-func (ast *AST) noteDependencies(included *Map[bool], name string) {
+func (ast *AST) noteDependencies(included *data.Map[bool], name string) {
 	//note traits
 	if name == "smithy.api#Document" {
 		included.Put(name, true)
@@ -636,7 +636,7 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 				if shape.Type != "structure" {
 					return nil, fmt.Errorf("Target for mixin with members not a Structure: %s", shapeId)
 				}
-				newMembers := NewMap[*Member]()
+				newMembers := data.NewMap[*Member]()
 				for _, memKey := range mixin.Members.Keys() {
 					mem := cloneMember(mixin.Members.Get(memKey))
 					newMembers.Put(memKey, mem)
@@ -676,7 +676,7 @@ func (ast *AST) expandMixins(shapeId string) (*Shape, error) {
 }
 
 func (ast *AST) ExpandMixins() error {
-	newShapes := NewMap[*Shape]()
+	newShapes := data.NewMap[*Shape]()
 	for _, shapeId := range ast.Shapes.Keys() {
 		newShape, err := ast.expandMixins(shapeId)
 		if err != nil {
@@ -691,13 +691,13 @@ func (ast *AST) ExpandMixins() error {
 }
 
 func (ast *AST) FilterDependencies(root []string, exclude []string) {
-	included := NewMap[bool]()
+	included := data.NewMap[bool]()
 	for _, k := range root {
 		if !included.Has(k) {
 			ast.noteDependencies(included, k)
 		}
 	}
-	filtered := NewMap[*Shape]()
+	filtered := data.NewMap[*Shape]()
 	for _, name := range included.Keys() {
 		knn := stripNamespace(name)
 		if !containsString(exclude, name) && !containsString(exclude, knn) && !strings.HasPrefix(name, "smithy.api#") {
