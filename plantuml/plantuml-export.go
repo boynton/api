@@ -21,7 +21,6 @@ import (
 	
 	"github.com/boynton/api/model"
 	"github.com/boynton/api/conf"
-	//	"github.com/boynton/api/data"
 )
 
 const IndentAmount = "    "
@@ -135,10 +134,22 @@ func (gen *Generator) ResourceOperations(rez *model.ResourceDef) []model.Absolut
 }
 
 func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
+	if gen.HasEmitted(rez.Id) {
+		return nil
+	}
+	gen.Emitted(rez.Id)
 	rezId := StripNamespace(rez.Id)
 	connections := make(map[string]string, 0)
 	//gen.Emitf("class %s<Resource> << (R,CadetBlue) >> {\n", rezId)
 	gen.Emitf("class %s << (R,CadetBlue) >> {\n", rezId)
+	if len(rez.Identifiers) > 0 {
+		var lst []string
+		for _, id := range rez.Identifiers {
+			lst = append(lst, string(id))
+		}
+		gen.Emitf("   {field} <b>identifiers</b>: [%s]\n", strings.Join(lst, ", "))
+	}
+	//to do: enumerate the children 
 	if rez.Create != "" {
 		dst := StripNamespace(rez.Create)
 		gen.Emitf("    {field} <b>create</b>: %s\n", rezId)
@@ -176,6 +187,13 @@ func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
 	gen.Emitf("}\n")
 	for dst, src := range connections {
 		gen.Emitf("%s ..> %s\n", src, dst)
+	}
+	for _, childId := range rez.Resources {
+		child := gen.Schema.GetResourceDef(childId)
+		if child != nil { //i.e. not filtered out
+			gen.Emitf("%s ..> %s\n", rezId, StripNamespace(childId))
+			gen.GenerateResource(child)
+		}
 	}
 	/*
 	if gen.Schema.Id == "" {
@@ -313,9 +331,11 @@ func (gen *Generator) GenerateService() {
 	if len(gen.Schema.Resources) > 0 {
 		if len(gen.Schema.Resources) > 0 {
 			for _, rez := range gen.Schema.Resources {
-				dst := StripNamespace(rez.Id)
-				if _, ok := targets[dst]; !ok {
-					targets[dst] = src
+				if rez.Parent == "" {
+					dst := StripNamespace(rez.Id)
+					if _, ok := targets[dst]; !ok {
+						targets[dst] = src
+					}
 				}
 				for _, oid := range gen.ResourceOperations(rez) {
 					opTargets[oid] = StripNamespace(oid)

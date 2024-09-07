@@ -101,6 +101,18 @@ func (gen *Generator) Generate(schema *model.Schema) error {
 	return err
 }
 
+func (gen *Generator) generateResourceIndex(rez *model.ResourceDef, indent string) {
+	s := StripNamespace(rez.Id)
+	gen.Emitf("%s- [%s](#%s)\n", indent, s, strings.ToLower(s))
+	if len(rez.Resources) > 0 {
+		childIndent := indent + "    "
+		for _, childId := range rez.Resources {
+			child := gen.Schema.GetResourceDef(childId)
+			gen.generateResourceIndex(child, childIndent)
+		}
+	}
+}
+
 func (gen *Generator) GenerateSummary() {
 	gen.Emitf("\n# %s\n\n", gen.name)
 	gen.Emit(model.FormatComment("", "", gen.Schema.Comment, 80, true))
@@ -121,8 +133,9 @@ func (gen *Generator) GenerateSummary() {
 	if len(rezs) > 0 {
 		gen.Emitf("\n### Resource Index\n")
 		for _, rez := range rezs {
-			s := StripNamespace(rez.Id)
-			gen.Emitf("- [%s](#%s)\n", s, strings.ToLower(s))
+			if rez.Parent == "" {
+				gen.generateResourceIndex(rez, "")
+			}
 		}
 		gen.Emitf("\n")
 	}

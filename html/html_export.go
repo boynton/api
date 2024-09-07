@@ -134,6 +134,20 @@ func (gen *Generator) GenerateFooter() {
 	gen.Emitf("  </div>\n</body>\n</html>\n")
 }
 
+func (gen *Generator) generateResourceIndex(rez *model.ResourceDef, indent string) {
+	s := StripNamespace(rez.Id)
+	gen.Emitf("  %s<li><a href=\"#%s\"><b>%s</b></a></li>\n", indent, strings.ToLower(s), s)
+	if len(rez.Resources) > 0 {
+		childIndent := indent + "    "
+		gen.Emitf("  %s<ul>\n", indent)
+		for _, childId := range rez.Resources {
+			child := gen.Schema.GetResourceDef(childId)
+			gen.generateResourceIndex(child, childIndent)
+		}
+		gen.Emitf("  %s</ul>\n", indent)
+	}
+}
+
 func (gen *Generator) GenerateSummary() {
 	gen.Emitf("<h1 id=%q>%s</h1>\n", gen.name, model.Capitalize(gen.name))
 	gen.Emitf("<p>%s</p>\n", gen.Schema.Comment) //model.FormatComment("", "", gen.Schema.Comment, 80, true)
@@ -156,8 +170,9 @@ func (gen *Generator) GenerateSummary() {
 		gen.Emitf("<h3 id=\"resources\">Resource Index</h3>\n")
 		gen.Emitf("<ul>\n")
 		for _, rez := range rezs {
-			s := StripNamespace(rez.Id)
-			gen.Emitf("  <li><a href=\"#%s\"><b>%s</b></a></li>\n", strings.ToLower(s), s)
+			if rez.Parent == "" {
+				gen.generateResourceIndex(rez, "")
+			}
 		}
 		gen.Emitf("</ul>\n")
 	}
