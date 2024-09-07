@@ -87,6 +87,8 @@ type AbsoluteIdentifier string
 
 type StringList []string
 
+type IdentifierList []Identifier
+
 type AbsoluteIdentifierList []AbsoluteIdentifier
 
 type FieldDefList []*FieldDef
@@ -145,6 +147,8 @@ type ResourceDef struct {
 	Comment              string                 `json:"comment,omitempty"`
 	Tags                 StringList             `json:"tags,omitempty"`
 	Id                   AbsoluteIdentifier     `json:"id"`
+	Identifiers          IdentifierList         `json:"identifiers,omitempty"`
+	Parent               AbsoluteIdentifier     `json:"parent,omitempty"`
 	Create               AbsoluteIdentifier     `json:"create,omitempty"`
 	Read                 AbsoluteIdentifier     `json:"read,omitempty"`
 	Update               AbsoluteIdentifier     `json:"update,omitempty"`

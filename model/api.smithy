@@ -46,6 +46,10 @@ list StringList {
     member: String
 }
 
+list IdentifierList {
+    member: Identifier
+}
+
 list AbsoluteIdentifierList {
     member: AbsoluteIdentifier
 }
@@ -108,6 +112,10 @@ structure ResourceDef with [GenericTraits] {
     @required
     id: AbsoluteIdentifier
 
+    identifiers: IdentifierList
+
+    parent: AbsoluteIdentifier
+	
     create: AbsoluteIdentifier
 
     read: AbsoluteIdentifier
