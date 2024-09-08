@@ -66,22 +66,22 @@ func (gen *Generator) EmitHttpTrace(op *model.OperationDef, example *model.Opera
 	reqExample := data.NewValue(example.Input) //data.AsObject(example.Input)
 	for _, in := range op.Input.Fields {
 		inName := string(in.Name)
-		ex := reqExample.Get(string(inName))
 		if in.HttpQuery != "" {
-			sex := stringValue(ex)
+			sex := reqExample.GetString(string(inName))
 			if sex != "" {
 				query = query + "&" + inName + "=" + sex
 			}
 		} else if in.HttpPath {
-			sex := stringValue(ex)
+			sex := reqExample.GetString(string(inName))
 			if in.HttpPath {
 				// urlEncode?
 			}
 			path = strings.Replace(path, "{" + inName + "}", sex, -1)
 		} else if in.HttpHeader != "" {
-			sex := stringValue(ex)
+			sex := reqExample.GetString(string(inName))
 			headers = headers + in.HttpHeader + ": " + sex + "\n"
 		} else { //in.HttpPayload
+			ex := reqExample.Get(string(inName))
 			bodyExample = data.Pretty(ex)
 		}
 	}
