@@ -4,6 +4,7 @@ import(
 	"bytes"
     "encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -27,6 +28,10 @@ func JsonEncode(obj any) string {
 		return fmt.Sprint(obj)
 	}
 	return strings.TrimRight(string(buf.String()), " \t\n\v\f\r")
+}
+
+func TypeOf(v interface{}) string {
+    return fmt.Sprint(reflect.TypeOf(v))
 }
 
 func JsonDecode(j string) (*Value, error) {

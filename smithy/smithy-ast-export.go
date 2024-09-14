@@ -662,7 +662,7 @@ func ensureMemberTraits(member *Member) *data.Value {
 	return member.Traits
 }
 
-func rangeTrait(min *model.Decimal, max *model.Decimal) *data.Value {
+func rangeTrait(min *data.Decimal, max *data.Decimal) *data.Value {
 	if min == nil && max == nil {
 		return nil
 	}

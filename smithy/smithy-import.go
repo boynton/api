@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/boynton/api/data"
 	"github.com/boynton/api/model"
 )
 
@@ -320,11 +321,11 @@ func toOpInput(schema *model.Schema, ast *AST, shapeId string) *model.OperationI
 				r := mem.Traits.Get("smithy.api#range")
 				if r.Has("min") {
 					n := r.Get("min")
-					f.MinValue = model.NewDecimal(n.String())
+					f.MinValue = data.NewDecimal(n.String())
 				}
 				if r.Has("max") {
 					n := r.Get("max")
-					f.MaxValue = model.NewDecimal(n.String())
+					f.MaxValue = data.NewDecimal(n.String())
 				}
 			}
 			//other traits!!!
@@ -398,7 +399,7 @@ func toOpOutput(schema *model.Schema, ast *AST, shapeId string) *model.Operation
 				Type: toCanonicalTypeName(mem.Target),
 			}
 			f.HttpHeader = header
-			f.HttpPayload = hasPayload
+			f.HttpPayload = payload != nil
 			to.Fields = append(to.Fields, f)
 		}
 	}
@@ -650,11 +651,11 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 					if length != nil {
 						min := rnge.Get("min")
 						if min != nil {
-							fd.MinValue = model.NewDecimal(min.String())
+							fd.MinValue = data.NewDecimal(min.String())
 						}
 						max := rnge.Get("max")
 						if max != nil {
-							fd.MaxValue = model.NewDecimal(max.String())
+							fd.MaxValue = data.NewDecimal(max.String())
 						}
 					}
 				}
@@ -704,11 +705,11 @@ func importShape(schema *model.Schema, ast *AST, shapeId string, shape *Shape) e
 		if rng != nil {
 			min := rng.Get("min")
 			if min != nil {
-				td.MinValue = model.NewDecimal(min.String())
+				td.MinValue = data.NewDecimal(min.String())
 			}
 			max := rng.Get("max")
 			if max != nil {
-				td.MaxValue = model.NewDecimal(max.String())
+				td.MaxValue = data.NewDecimal(max.String())
 			}
 		}
 	}

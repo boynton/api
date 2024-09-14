@@ -31,9 +31,11 @@ type Generator struct {
 	model.BaseGenerator
 	ns                  model.Namespace
 	pkg                 string
-	inlineSlicesAndMaps bool // more idiomatic, but prevents validating constraints (i.e. list.maxLength)
-	inlinePrimitives    bool // more idomatic, but prevents validating constraints (i.e. string.Pattern)
-	prefixEnums         bool // prefix enum symbols with the typename to avoid collisions
+	inlineSlicesAndMaps bool   // more idiomatic, but prevents validating constraints (i.e. list.maxLength)
+	inlinePrimitives    bool   // more idomatic, but prevents validating constraints (i.e. string.Pattern)
+	prefixEnums         bool   // prefix enum symbols with the typename to avoid collisions
+	decimalPackage      string // optional package to import for the Decimal type
+	decimalImport       string // optional import spec for the Decimal type
 }
 
 func (gen *Generator) GenerateResource(rez *model.ResourceDef) error {
@@ -60,6 +62,11 @@ func (gen *Generator) Generate(schema *model.Schema) error {
 	gen.prefixEnums = !conf.GetBool("golang.noEnumPrefix")
 	gen.inlineSlicesAndMaps = conf.GetBool("golang.inlineSlicesAndMaps")
 	gen.inlinePrimitives = conf.GetBool("golang.inlinePrimitives")
+	gen.decimalImport = conf.GetString("golang.decimalImport")
+	if gen.decimalImport != "" {
+		el := strings.Split(string(gen.decimalImport), "/")
+		gen.decimalPackage = el[len(el)-1]
+	}
 	gen.ns = model.Namespace(conf.GetString("namespace"))
 	if gen.ns == "" {
 		gen.ns = schema.ServiceNamespace()
@@ -143,6 +150,9 @@ func (gen *Generator) golangBaseTypeName(td *model.TypeDef) string {
 	case model.BaseType_Integer:
 		return "" //big.Int?
 	case model.BaseType_Decimal:
+		if gen.decimalPackage != "" {
+			return "*" + gen.decimalPackage + ".Decimal"
+		}
 		return "*Decimal"
 	case model.BaseType_Blob:
 		return "[]byte"
@@ -179,8 +189,14 @@ func (gen *Generator) baseTypeRef(typeRef model.AbsoluteIdentifier) string {
 	case "base#Float64":
 		return "float64"
 	case "base#Integer":
+		if gen.decimalPackage != "" {
+			return "*" + gen.decimalPackage + ".Integer"
+		}
 		return "*Integer"
 	case "base#Decimal":
+		if gen.decimalPackage != "" {
+			return "*" + gen.decimalPackage + ".Decimal"
+		}
 		return "*Decimal"
 	case "base#Timestamp":
 		return "Timestamp"
@@ -219,8 +235,16 @@ func (gen *Generator) golangTypeRef(typeRef model.AbsoluteIdentifier) string {
 		if gen.inlinePrimitives {
 			return "int64"
 		}
-	case model.BaseType_Integer, model.BaseType_Decimal:
-		//always a wrapper
+	case model.BaseType_Integer:
+		if gen.decimalPackage != "" {
+			return "*" + gen.decimalPackage + ".Integer"
+		}
+		indirect = "*"
+	case model.BaseType_Decimal:
+		if gen.decimalPackage != "" {
+			return "*" + gen.decimalPackage + ".Decimal"
+		}
+		indirect = "*"
 	case model.BaseType_String:
 		if gen.inlinePrimitives {
 			return "string"
@@ -273,6 +297,10 @@ func (gen *Generator) golangTypeName(typeRef model.AbsoluteIdentifier) string {
 		return "Number"
 	case "base#Timestamp":
 		return "Timestamp"
+	case "base#Integer":
+		return "Integer"
+	case "base#Decimal":
+		return "Decimal"
 	default:
 		return stripNamespace(typeRef)
 	}
@@ -290,8 +318,12 @@ func (gen *Generator) goImports(forDef bool) map[string]bool {
 				includes["fmt"] = true
 			}
 		case model.BaseType_Decimal, model.BaseType_Integer:
-			includes["math/big"] = true
-			includes["strconv"] = true
+			if gen.decimalImport != "" {
+				includes[gen.decimalImport] = true
+			} else {
+				includes["math/big"] = true
+				includes["strconv"] = true
+			}
 		case model.BaseType_Timestamp:
 			includes["encoding/json"] = true
 			includes["fmt"] = true
@@ -529,6 +561,9 @@ func (gen *Generator) baseConverter(typeref model.AbsoluteIdentifier, def interf
 			r = s + "(" + r + ")"
 		}
 		return r
+		//fixme: decimals/integers as queryParams3
+		//	case "*Decimal" "*data.Decimal":
+		//		return fmt.Sprintf("decimalParam(%s, %q)", body, fmt.Sprint(def))
 	case "*Timestamp":
 		//return fmt.Sprintf("timestampParam(%s, %q)", body, AsString(def))
 		return fmt.Sprintf("timestampParam(%s, %q)", body, fmt.Sprint(def))
@@ -845,6 +880,16 @@ func intParam(val string, def int64) int64 {
         i, err := strconv.ParseInt(val, 10, 64)
         if err == nil {
             return i
+        }
+    }
+    return def
+}
+
+func floatParam(val string, def float64) float64 {
+    if val != "" {
+        f, err := strconv.ParseFloat(val, 64)
+        if err == nil {
+            return f
         }
     }
     return def

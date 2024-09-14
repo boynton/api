@@ -6,7 +6,7 @@ bin/api:: go.mod *.go */*.go
 
 ## bootstrap the model from the smithy definition
 bootstrap::
-	./bin/api -f -g golang -o model/ model/api.smithy
+	./bin/api -f -g golang -a golang.decimalPackage=github.com/boynton/api/data -o model/ model/api.smithy
 
 install:: all
 	rm -f $(HOME)/bin/api

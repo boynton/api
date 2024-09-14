@@ -56,8 +56,8 @@ list AbsoluteIdentifierList {
 
 @mixin
 structure TypeTraits with [GenericTraits] {
-    minValue: Decimal
-    maxValue: Decimal
+    minValue: BigDecimal
+    maxValue: BigDecimal
     minSize: Long
     maxSize: Long
     required: Boolean

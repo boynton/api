@@ -17,10 +17,10 @@ package model
 
 import (
 	"fmt"
+	"github.com/boynton/api/data"
 	"io/ioutil"
 	"strconv"
 	"strings"
-	//	"github.com/boynton/api/data"
 )
 
 func Parse(path string) (*Schema, error) {
@@ -1077,18 +1077,18 @@ func (p *Parser) expectEqualsFloat64() (float64, error) {
 	return p.expectFloat64()
 }
 
-func (p *Parser) expectDecimal() (*Decimal, error) {
+func (p *Parser) expectDecimal() (*data.Decimal, error) {
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
 	if tok.IsNumeric() {
-		return NewDecimal(tok.Text), nil
+		return data.NewDecimal(tok.Text), nil
 	}
 	return nil, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
 
-func (p *Parser) expectEqualsDecimal() (*Decimal, error) {
+func (p *Parser) expectEqualsDecimal() (*data.Decimal, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
@@ -1142,8 +1142,8 @@ type Options struct {
 	Url       string
 	MinSize   int64
 	MaxSize   int64
-	MinValue  *Decimal
-	MaxValue  *Decimal
+	MinValue  *data.Decimal
+	MaxValue  *data.Decimal
 	Action    string
 	Header    string
 	Name      string
@@ -1157,7 +1157,7 @@ type Options struct {
 func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, error) {
 	options := &Options{}
 	var err error
-	var f *Decimal
+	var f *data.Decimal
 	tok := p.GetToken()
 	if tok == nil {
 		return options, nil
@@ -1579,8 +1579,8 @@ func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(tok *Token) (*Decimal, error) {
-	return NewDecimal(tok.Text), nil
+func (p *Parser) parseLiteralNumber(tok *Token) (*data.Decimal, error) {
+	return data.NewDecimal(tok.Text), nil
 }
 
 /*

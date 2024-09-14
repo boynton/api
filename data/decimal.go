@@ -1,6 +1,6 @@
-/* Generated */
+// Just a wrapper for Decimals, doesn't actually tie to an implementation
 
-package model
+package data
 
 import (
 	"math/big"

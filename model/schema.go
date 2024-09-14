@@ -383,6 +383,10 @@ func (schema *Schema) typeReferences(tid AbsoluteIdentifier, referenced map[Abso
 	referenced[tid] = true
 	if !schema.IsBaseType(tid) {
 		td := schema.GetTypeDef(tid)
+		if td == nil {
+			fmt.Println("TypeDef not found:", tid)
+			panic("here")
+		}
 		referenced[td.Id] = true
 		if td.Items != "" {
 			schema.typeReferences(td.Items, referenced)

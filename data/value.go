@@ -214,6 +214,10 @@ func NewValue(raw any) *Value {
 		return &Value{dtype: Type_Number, tval: fmt.Sprintf("%g", v)}
 	case string:
 		return &Value{dtype: Type_String, tval: v}
+	case *Decimal:
+		return &Value{dtype: Type_String, tval: fmt.Sprintf("%v", v)}
+	case Decimal:
+		return &Value{dtype: Type_String, tval: fmt.Sprintf("%v", v)}
 	case []any:
 		return NewArrayFromSlice(v)
 	case map[string]any:
@@ -221,6 +225,7 @@ func NewValue(raw any) *Value {
 	case *Value:
 		return v
 	default:
+		fmt.Println("what is this:", raw, "typeOf() ->", TypeOf(raw))
 		panic("whoops")
 	}
 }
